@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="Drutol@Luminai" APIVersion="9" Name="DKP" Description="">
+    <Script Name="DKP.lua"/>
+    <Script Name="RAID.lua"/>
+    <Script Name="BID.lua"/>
+    <Script Name="EPGP.lua"/>
+    <Script Name="libs/GeminiHook-1.0.lua"/>
+    <Form Name="DKP.xml"/>
+    <Form Name="DKP2.xml"/>
+</Addon>
