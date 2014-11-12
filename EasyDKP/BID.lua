@@ -327,7 +327,8 @@ function DKP:BidStart(strName)
 	if self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxHidden"):IsChecked() == true then self.mode = "hidden" 
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxOpen"):IsChecked() == true  then  self.mode = "open"
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("PureRoll"):IsChecked() == true then self.mode = "pure"
-	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("ModifiedRoll"):IsChecked() == true then self.mode = "modified" end
+	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("ModifiedRoll"):IsChecked() == true then self.mode = "modified"
+	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("BoxOpen"):IsChecked() == true then self.mode = "EPGP" end
 
 	
 	if self.mode ~= nil then
@@ -351,17 +352,17 @@ function DKP:BidStart(strName)
 		
 		
 		if self.mode == "open" then
-			if self.CurrentItemChatStr == nil then	
-				ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in /party channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
-			else
-				ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP]Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in /party channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
-			end
-			if self.bAllowOffspec == true then 
-				ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' in current channel.After you change your mode you cannot change it again") 
-			end
+				if self.CurrentItemChatStr == nil then	
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in /party channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
+				else
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP]Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in /party channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
+				end
+				if self.bAllowOffspec == true then 
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' in current channel.After you change your mode you cannot change it again") 
+				end
 		elseif self.mode == "hidden" then
 				if self.CurrentItemChatStr == nil then	
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in hidden  mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate whisper the amout of dkp to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate whisper the amout of dkp to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
 				else
 					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate whisper the amout of dkp to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
 				end
@@ -380,7 +381,29 @@ function DKP:BidStart(strName)
 				else
 					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your DKP will be added to roll and the whole value will be subtracted from your account.")
 				end
+		elseif self.mode == "EPGP" then
+				if self.CurrentItemChatStr == nil then
+					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] If you want to participate in an auction for item " .. self.CurrentBidSession.strItem .." write !want in /party channel , for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. ".")
+				else
+					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] If you want to participate in an auction for item" .. self.CurrentItemChatStr .." write !want in /party channel.")
+				end
+				if self.bAllowOffspec == true then 
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled ,  for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. ".")
+				end
 		end
+	end
+end
+
+function DKP:BidSetOffspecModifierForEPGP( wndHandler, wndControl, strText )
+	if tonumber(strText) ~= nil then
+		value = tonumber(strText)
+		if value >= 1 and value <=100 then
+			self.tItems["settings"].BidEPGPOffspec = value
+		else
+			wndControl:SetText(self.tItems["settings"].BidEPGPOffspec)
+		end
+	else
+		wndControl:SetText("")
 	end
 end
 
@@ -400,6 +423,16 @@ function DKP:BidMessage(channelCurrent, tMessage)
 		local strResult = self:BidProcessMessageRoll({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
 		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
 	end
+end
+
+function DKP:BidProcessMessageEPGP(tData)
+	local strReturn = ""
+	
+	
+	
+
+
+	return strReturn
 end
 
 function DKP:BidProcessMessageRoll(tData)

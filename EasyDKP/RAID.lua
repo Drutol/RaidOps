@@ -403,7 +403,7 @@ function DKP:RaidUpdateCurrentRaidSession()
 					table.insert(currentPlayers,unit_member.strCharacterName)
 				end
 				local ID = self:GetPlayerByIDByName(unit_member.strCharacterName)
-				if ID ~= -1 then self.tItems[i].Hrs = self.tItems[i].Hrs + (0.00027 * self.tItems["settings"].RaidTimer) end
+				if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + (0.00027 * self.tItems["settings"].RaidTimer) end
 			end
 		end
 		

@@ -39,7 +39,6 @@ function DKP:EPGPInit()
 	self.wndEPGPItems = Apollo.LoadForm(self.xmlDoc2,"CostList",nil,self)
 	self.wndEPGPSettings:Show(false,true)
 	self.wndEPGPItems:Show(false,true)
-	Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 	if self.tItems["EPGP"] == nil then
 		self.tItems["EPGP"] = {}
 		self.tItems["EPGP"].SlotValues = defaultSlotValues
@@ -510,7 +509,7 @@ end
 
 function DKP:EPGPGetItemCostByID(itemID)
 	local item = Item.GetDataFromId(itemID)
-	if item ~= nil and item:IsEquippable() then
+	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then
 		local slot 
 		if item:GetSlotName() ~= "" then
 			slot = item:GetSlotName()
@@ -518,7 +517,7 @@ function DKP:EPGPGetItemCostByID(itemID)
 			slot = item:GetSlot()
 		end
 		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
-		return "                            GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+		return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
 	else return "" end
 end
 
@@ -548,13 +547,13 @@ function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 	if Apollo.GetAddon("ETooltip") == nil then
 		self.tItems["EPGP"].Tooltips = 0
 		Print("Couldn't find EToolTip Addon")
-		wndControl:SetCheck(false)
+		if wndControl ~= nil then wndControl:SetCheck(false) end
 		return
 	end
 	if not Apollo.GetAddon("ETooltip").tSettings["bShowItemID"] then
 		self.tItems["EPGP"].Tooltips = 0
 		Print("Enable option to Show item ID in EToolTip")
-		wndControl:SetCheck(false)
+		if wndControl ~= nil then wndControl:SetCheck(false) end
 		return
 	end
 	self.tItems["EPGP"].Tooltips = 1

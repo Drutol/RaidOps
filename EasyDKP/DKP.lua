@@ -82,6 +82,7 @@ function DKP:OnDocLoaded()
 			return
 		end
 		
+		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
 		self.wndMain:Show(false, true)
 		self.wndDetail:Show(false , true)
@@ -95,7 +96,6 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("dkpbid", "BidOpen", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
-		Apollo.RegisterTimerHandler(1, "TimeAwardTimer", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
 		
 		--Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
@@ -150,9 +150,18 @@ function DKP:OnDocLoaded()
 		self.wndLabelOptions:Show(false,true)
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
-		self.TimeAward = false
-		
+		self:TimeAwardRestore()
+		self:HelloImHome()
 		self:EPGPInit()
+		
+		self:CloseBigPOPUP()
+		Print(self.tItems["settings"].guildname)
+		if self.tItems["settings"].NewStartup == nil then
+			self.wndMain:FindChild("BIGPOPUP"):Show(true,false)
+			self.tItems["settings"].NewStartup = "DONE"
+		end
+
+
 		
 		
 		
@@ -179,7 +188,9 @@ function DKP:OnDocLoaded()
 	end
 end
 
-
+function DKP:CloseBigPOPUP()
+	self.wndMain:FindChild("BIGPOPUP"):Show(false,true)
+end
 
 function DKP:OnUnitCreated(unit,isStr)
 		local strName
@@ -536,8 +547,11 @@ function DKP:OnListItemSelected(wndHandler, wndControl)
 end
 
 function DKP:OnSave(eLevel)
-	   local tSave = {}
-       if purge_database == 0 then
+	   	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
+
+
+		local tSave = {}
+		if purge_database == 0 then
 			
 			--Raid Settings
 			if self.wndRaidOptions:FindChild("Button"):IsChecked() == true then
@@ -564,6 +578,12 @@ function DKP:OnSave(eLevel)
 			else
 				self.tItems["settings"].BidSpendOneMore = 0
 			end
+			
+			-- Time award awards
+			
+			self.tItems["AwardTimer"].EP = self.wndTimeAward:FindChild("Settings"):FindChild("EP"):IsChecked()
+			self.tItems["AwardTimer"].GP = self.wndTimeAward:FindChild("Settings"):FindChild("GP"):IsChecked()
+			self.tItems["AwardTimer"].DKP = self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):IsChecked()
 			
 			
 			for k=1,table.maxn(self.tItems) do
@@ -612,13 +632,15 @@ function DKP:OnSave(eLevel)
 			end
 			tSave["EPGP"] = self.tItems["EPGP"]
 			tSave["Standby"] = self.tItems["Standby"]
+			tSave["AwardTimer"] = self.tItems["AwardTimer"]
 		else
 			tSave["purged"] = "purged"
 		end
 	return tSave
 end
 
-function DKP:OnRestore(eLevel, tData)
+function DKP:OnRestore(eLevel, tData)	
+		if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 		self.tItems = tData
 		if self.tItems["EPGP"] ~= nil then
 			self.ItemDatabase = self.tItems["EPGP"].Loot
@@ -1022,6 +1044,40 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					end
 				end
 			elseif strMessage == "!top5" then
+				if self.tItems["EPGP"].Enable == 1 then 
+					local sortedIDs = {}
+					for i=1,table.maxn(self.tItems) do
+						if self.tItems[i] ~= nil then
+							if self.tItems[i].GP ~= 0 then
+								table.insert(sortedIDs,{ID = i,value = (self.tItems[i].EP/self.tItems[i].GP)})
+							else
+								table.insert(sortedIDs,{ID = i,value = 0})
+							end
+						end
+					end
+					table.sort(sortedIDs,compare_easyDKP)
+					for k , entry in ipairs(sortedIDs) do
+						if k > 5 then break end
+						if self.tItems[entry.ID].GP ~= 0 then
+							ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:   " .. string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[entry.ID].EP / self.tItems[entry.ID].GP))
+						else
+							ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:    0" )
+						end
+					end
+				else
+					local sortedIDs = {}
+					for i=1,table.maxn(self.tItems) do
+						if self.tItems[i] ~= nil then
+								table.insert(sortedIDs,{ID = i,value = self.tItems[i].net})
+						end
+					end
+					table.sort(sortedIDs,compare_easyDKP)
+					for k , entry in ipairs(sortedIDs) do
+						if k > 5 then break end
+						ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:   " .. string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[entry.ID].EP / self.tItems[entry.ID].GP))
+						
+					end
+				end
 				
 			
 			end
@@ -1204,6 +1260,8 @@ function DKP:ControlsUpdateQuickAddButtons()
 end
 
 
+
+
 ---------------------------------------------------------------------------------------------------
 -- Time Award
 ---------------------------------------------------------------------------------------------------
@@ -1218,56 +1276,131 @@ function DKP:TimedAwardClose( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:TimeAwardStop( wndHandler, wndControl, eMouseButton )
+	if self.tItems["AwardTimer"].running == 1 then
+		if self.tItems["AwardTimer"].amount ~= nil and self.tItems["AwardTimer"].period ~= nil then
+			self.AwardTimer:Stop()
+			Apollo.RemoveEventHandler("TimeAwardTimer", self)
+			self.NextAward = nil
+			self.tItems["AwardTimer"].running = 0
+		end
+	end
+	self:TimeAwardRefresh()
 end
 
 function DKP:TimeAwardStart( wndHandler, wndControl, eMouseButton )
 	if self.tItems["AwardTimer"].running == 0 then
 		if self.tItems["AwardTimer"].amount ~= nil and self.tItems["AwardTimer"].period ~= nil then
-			self.AwardTimer = ApolloTimer.Create(10, true, "TimeAwardTimer", self)
+			Apollo.RegisterTimerHandler(1, "TimeAwardTimer", self)
+			self.AwardTimer = ApolloTimer.Create(1, true, "TimeAwardTimer", self)
 			self.NextAward = self.tItems["AwardTimer"].period
 			self.tItems["AwardTimer"].running = 1
 		end
 	end
-	
+	self:TimeAwardRefresh()
 end
 
 function DKP:TimeAwardRefresh()
-	if self.TimeAward == true then
+	if self.tItems["AwardTimer"].running == 1 then
 		self.wndTimeAward:FindChild("StateFrame"):FindChild("State"):SetSprite("achievements:sprAchievements_Icon_Complete")
-		self.wndTimeAward:FindChild("CountDown"):SetText("")
+		local diff =  os.date("*t",self.NextAward)
+		if diff ~= nil then
+			self.wndTimeAward:FindChild("CountDown"):SetText((diff.hour-1 <=9 and "0" or "" ) .. diff.hour-1 .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
+		else
+			self.wndTimeAward:FindChild("CountDown"):SetText("--:--:--")
+		end
+		self.wndMain:FindChild("TimeAwardIndicator"):Show(true,false)
 	else
 		self.wndTimeAward:FindChild("StateFrame"):FindChild("State"):SetSprite("ClientSprites:LootCloseBox_Holo")
 		self.wndTimeAward:FindChild("CountDown"):SetText("Disabled")
+		self.wndMain:FindChild("TimeAwardIndicator"):Show(false,false)
 	end
 end
 
 function DKP:TimeAwardRestore()
+	if self.tItems["AwardTimer"] == nil then self.tItems["AwardTimer"] = {} end
+
 	if self.tItems["AwardTimer"].running == 1 then
+		self.NextAward = self.tItems["settings"].period
+		self.tItems["AwardTimer"].running = 0
 		self:TimeAwardStart()
-		self:TimeAwardRefresh()
 	end
 	if self.tItems["AwardTimer"].running == nil then 
 		self.tItems["AwardTimer"].running = 0
 	end
-
+	
+	if self.tItems["AwardTimer"].EP == true then
+		self.wndTimeAward:FindChild("Settings"):FindChild("EP"):SetCheck(true)
+	end
+	
+	if self.tItems["AwardTimer"].GP == true then
+		self.wndTimeAward:FindChild("Settings"):FindChild("GP"):SetCheck(true)
+	end
+	
+	if self.tItems["AwardTimer"].DKP == true then
+		self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):SetCheck(true)
+	end
+	
+	if self.tItems["AwardTimer"].Hrs == 1 then
+		self.wndTimeAward:FindChild("Options"):FindChild("HRS"):SetCheck(true)
+	end
+	
+	if self.tItems["AwardTimer"].Notify == 1 then
+		self.wndTimeAward:FindChild("Options"):FindChild("Notify"):SetCheck(true)
+	end
+	
+	if self.tItems["AwardTimer"].amount ~= nil then self.wndTimeAward:FindChild("Settings"):FindChild("HowMuch"):SetText(self.tItems["AwardTimer"].amount) end
+	if self.tItems["AwardTimer"].period ~= nil then self.wndTimeAward:FindChild("Settings"):FindChild("Period"):SetText(self.tItems["AwardTimer"].period) end
+	self:TimeAwardRefresh()
 end
 
 function DKP:TimeAwardTimer()
+	self:TimeAwardRefresh()
 	if self.NextAward <= 0 then
 		self:TimeAwardAward()
 		self.NextAward = self.tItems["AwardTimer"].period
+		if self.tItems["AwardTimer"].Notify == 1 then
+			self:TimeAwardPostNotification()
+		end
 	else
-		self.NextAward = self.NextAward - 10
+		self.NextAward = self.NextAward - 1
+	end
+	if self.tItems["AwardTimer"].Hrs == 1 then
+		for i=1,GroupLib.GetMemberCount() do
+			local member = GroupLib.GetGroupMember(i)
+			if self.tItems["AwardTimer"].Hrs == 1 then
+				local ID = self:GetPlayerByIDByName(member.strCharacterName)
+				if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + 0.00027 end
+			end
+		end
 	end
 end
 
 function DKP:TimeAwardAward()
-	local children = self.wndItemList:GetChildren()
-	local prevSelection = self.wndSelectedListItem
-	for k,child in ipairs(children) do
-		
+	local raidMembers =  {}
+	for i=1,GroupLib.GetMemberCount() do
+	local unit_member = GroupLib.GetGroupMember(i)
+		table.insert(raidMembers,unit_member.strCharacterName)
 	end
 
+	for k, member in ipairs(raidMembers) do
+		local ID = self:GetPlayerByIDByName(member)
+		if ID ~= -1 then
+			if self.wndTimeAward:FindChild("Settings"):FindChild("EP"):IsChecked() then
+				self.tItems[ID].EP = self.tItems[ID].EP + self.tItems["AwardTimer"].amount
+			end
+			
+			if self.wndTimeAward:FindChild("Settings"):FindChild("GP"):IsChecked() then
+				self.tItems[ID].GP = self.tItems[ID].GP + self.tItems["AwardTimer"].amount
+			end
+			
+			if self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):IsChecked() then
+				self.tItems[ID].net = self.tItems[ID].net + self.tItems["AwardTimer"].amount
+				self.tItems[ID].tot = self.tItems[ID].tot + self.tItems["AwardTimer"].amount
+			end
+		end
+	end
+	
+	self:ShowAll()
 end
 
 function DKP:TimeAwardSetAmount( wndHandler, wndControl, strText )
@@ -1282,12 +1415,35 @@ end
 function DKP:TimeAwardPeriodChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
 		self.tItems["AwardTimer"].period = tonumber(strText)
+		if self.NextAward ~= nil and self.NextAward > self.tItems["AwardTimer"].period then
+			self.NextAward = self.tItems["AwardTimer"].period
+			self:TimeAwardRefresh()
+		end
 	else
 		wndControl:SetText("")
 		self.tItems["AwardTimer"].period = nil
 	end
 end
 
+function DKP:TimeAwardEnableHRS( wndHandler, wndControl, eMouseButton )
+	self.tItems["AwardTimer"].Hrs = 1
+end
+
+function DKP:TimeAwardDisableHRS( wndHandler, wndControl, eMouseButton )
+	self.tItems["AwardTimer"].Hrs = 0
+end
+
+function DKP:TimeAwardEnableNotification( wndHandler, wndControl, eMouseButton )
+	self.tItems["AwardTimer"].Notify = 1
+end
+
+function DKP:TimeAwardDisableNotification( wndHandler, wndControl, eMouseButton )
+	self.tItems["AwardTimer"].Notify = 0
+end
+
+function DKP:TimeAwardPostNotification()
+	ChatSystemLib.Command("/party [EasyDKP] Timed awards have been granted")
+end
 ---------------------------------------------------------------------------------------------------
 -- Mass Edit
 ---------------------------------------------------------------------------------------------------
@@ -2159,6 +2315,16 @@ end
 
 function DKP:SettingsWhisperDisable( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].whisp = 0
+end
+
+function DKP:HelloImHome()
+	-- self.SpyChannel = ICCommLib.JoinChannel( "EasyDKPShareChannel","OnNothing",self)
+	-- self.SpyChannel:SendMessage({name = GameLib.GetPlayerUnit():GetName() or "unknown"})
+	-- self.SyncChannel = nil 
+end
+
+function DKP:OnNothing(channel, tMsg, strSender)
+	--Print(tMsg.name)
 end
 
 function DKP:SettingsSetQuickDKP( wndHandler, wndControl, eMouseButton )
