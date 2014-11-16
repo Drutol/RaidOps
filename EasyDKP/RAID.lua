@@ -153,6 +153,14 @@ function DKP:RaidPopulateLists(which) -- , Raids
 				wnd:FindChild("RaidName"):SetText(self.tItems["Raids"][tableIDsOrder[i]].name) 
 				wnd:FindChild("RaidDate"):SetText(self.tItems["Raids"][tableIDsOrder[i]].date.strDate)
 				wnd:FindChild("CurrentRaid"):Show(false,false)
+				if self.tItems["Raids"][tableIDsOrder[i]].Raid == "Datascape" then
+					wnd:FindChild("GA"):Show(false,true)
+					wnd:FindChild("DS"):Show(false,true)
+				else	
+					wnd:FindChild("GA"):Show(true,true)
+					wnd:FindChild("DS"):Show(false,true)
+				end
+				wnd:FindChild("Progress"):SetText(#self.tItems["Raids"][tableIDsOrder[i]].tMisc.tBossKills.names)
 				if self.bIsRaidSession == true and currentRaidID == tableIDsOrder[i] then 
 					wnd:FindChild("Button"):Enable(false)
 					wnd:FindChild("CurrentRaid"):Show(true,false)
@@ -169,11 +177,12 @@ function DKP:RaidRemoveEntry(wndHandler,wndControl,eMouseButton)
 	local name = wndControl:GetParent():FindChild("RaidName"):GetText()
 	local ID
 	for i=1,table.maxn(self.tItems["Raids"]) do
+		if currentRaidID == i then self.wndRaidSummary:Show(false,false) end
 		if self.tItems["Raids"][i] ~= nil and self.tItems["Raids"][i].name == name then
 			self.tItems["Raids"][i] = nil
 			break
 		end
-		if currentRaidID == i then self.wndRaidSummary:Show(false,false) end
+		
 	end
 	self:RaidPopulateLists("Raids")
 end
@@ -221,9 +230,9 @@ function DKP:RaidSubmitSession()
 end
 
 function DKP:RaidProcessLeftTimers()
-	for i=1,self.tItems[currentRaidID].tPlayers do
-		if self.tItems[currentRaidID].tPlayers[i].bLeft ~= "!Left" and self.tItems[currentRaidID].tPlayers[i].bLeft ~= "Left" then
-			self.tItems[currentRaidID].tPlayers[i].bLeft = "!Left"
+	for i=1,#self.tItems["Raids"][currentRaidID].tPlayers do
+		if self.tItems["Raids"][currentRaidID].tPlayers[i].bLeft ~= "!Left" and self.tItems["Raids"][currentRaidID].tPlayers[i].bLeft ~= "Left" then
+			self.tItems["Raids"][currentRaidID].tPlayers[i].bLeft = "!Left"
 		end
 	end
 end
@@ -236,6 +245,8 @@ function DKP:RaidResumeSession()
 	self.tItems["Raids"][currentRaidID].tPlayers = self.tItems["Raids"]["Save"].tPlayers
 	self.tItems["Raids"][currentRaidID].tMisc = self.tItems["Raids"][currentRaidID].tMisc
 	self.tItems["Raids"][currentRaidID].date = self.tItems["Raids"]["Save"].date
+	self.tItems["Raids"][currentRaidID].Raid = self.tItems["Raids"]["Save"].Raid
+	self.tItems["Raids"][currentRaidID].RaidSure = self.tItems["Raids"]["Save"].RaidSure
 	local diff = os.difftime(os.time()-self.tItems["Raids"][currentRaidID].date.resDate)
 
 	self.tItems["Raids"][currentRaidID].name = self.tItems["Raids"]["Save"].name
@@ -247,16 +258,18 @@ function DKP:RaidResumeSession()
 	self.tItems["Raids"][currentRaidID].misc = 1
 	self.wndRaidTools:FindChild("ButtonMassAdd"):Enable(true)
 	self.wndRaidTools:FindChild("ButtonShowSummary"):Enable(true)
-	self.ItemDatabase = self.tItems["Raids"]["Save"].Drops
 	if diff >= self.tItems["settings"].RaidOfflineTimer then
-		Print("You have been offline for more than an hour.Raid Session will be now submitted")
+		Print("You have been offline for more than specified time.Raid Session will be now submitted")
 		self.wndRaidSummary:Show(false,true)
 		self:RaidSubmitSession()
 		return
 	end
 	self.RaidTimer = ApolloTimer.Create(self.tItems["settings"].RaidTimer,true,"RaidUpdateCurrentRaidSession",self)
 	--Date check
-	
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ExportCSV"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonPlayers"):SetCheck(true)
+	self:RaidUpdateSummaryPlayerDetails()
 
 	
 	--Date Check
@@ -272,7 +285,8 @@ function DKP:RaidBackupSession()
 	self.tItems["Raids"]["Save"].date.resDate = os.time()
 	self.tItems["Raids"]["Save"].tMisc = self.tItems["Raids"][currentRaidID].tMisc
 	self.tItems["Raids"]["Save"].ID = currentRaidID
-	self.tItems["Raids"]["Save"].Drops = self.ItemDatabase
+	self.tItems["Raids"]["Save"].Raid = self.tItems["Raids"][currentRaidID].Raid
+	self.tItems["Raids"]["Save"].RaidSure = self.tItems["Raids"][currentRaidID].RaidSure
 end
 
 local tBossItems = {}
@@ -287,6 +301,8 @@ function DKP:RaidOpenSummary(RaidName)
 			tData.date.osDate = os.time()
 			tData.tPlayers = {}
 			tData.tMisc = {}
+			tData.Raid = self:RaidAssumeRaid()
+			tData.RaidSure = false
 			tData.tMisc.tBossKills = {}
 			tData.tMisc.tBossKills.count = 0
 			tData.tMisc.tBossKills.names = {}
@@ -295,6 +311,7 @@ function DKP:RaidOpenSummary(RaidName)
 			tData.tMisc.tBossKills.prototype3 = 0
 			tData.tMisc.tBossKills.prototype4 = 0
 			tData.tMisc.tBossKills.converCount = 0
+			tData.tMisc.tBossKills.elementals = 0
 			tData.misc = 0
 			tData.FirstIteration = true
 			table.insert(self.tItems["Raids"],tData)
@@ -340,7 +357,10 @@ function DKP:RaidOpenSummary(RaidName)
 				end
 				self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("KilledBossesList"):ArrangeChildrenVert()
 			end
-		end	
+		end
+		self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ExportCSV"):Show(false,true)
+		self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(false,true)
+		
 	end
 end
 
@@ -353,6 +373,20 @@ function DKP:RaidRegisterDkpManipulation(strName,modifier)
 			tAllRaidMembersInSession[i].dkpMod = tAllRaidMembersInSession[i].dkpMod + modifier
 		end
 	end
+end
+
+function DKP:RaidRegisterEPManipulation(strName,modifier)
+
+	if self.tItems["settings"].lowercase == 1 then
+		strName = string.lower(strName)
+	end
+	for i=1,table.getn(tAllRaidMembersInSession) do
+		if string.lower(tAllRaidMembersInSession[i].name) == string.lower(strName) then
+			Print(strName)
+			tAllRaidMembersInSession[i].dkpMod = tAllRaidMembersInSession[i].dkpMod + modifier
+		end
+	end
+
 end
 
 
@@ -369,10 +403,13 @@ function DKP:RaidRunMiscSummaries(RaidID)
 				self.tItems["Raids"][RaidID].tMisc.lootcount = self.tItems["Raids"][RaidID].tMisc.lootcount + table.getn(self.tItems["Raids"][RaidID].tPlayers[i].tClaimedLoot)
 			end
 		end
+		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscRaid"):SetText(self.tItems["Raids"][currentRaidID].Raid)
+		
 		self.tItems["Raids"][RaidID].tMisc.allPlayersCount = table.getn(tAllRaidMembersInSession)
 		self:RaidPurgeItemTable(tBossItems)
 		if self.tItems["Raids"][RaidID].tMisc.tBossKills.count ~= nil and #self.tItems["Raids"][RaidID].tMisc.tBossKills.names  then
 			for i=1,#self.tItems["Raids"][RaidID].tMisc.tBossKills.names do
+				if self.tItems["Raids"][currentRaidID].Raid == "Datascape" then wnd:SetSprite("CRB_Tooltips:sprTooltip_Header_Orange") end
 				local wnd = Apollo.LoadForm(self.xmlDoc,"BossItem",self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("KilledBossesList"),self)
 				wnd:FindChild("BossName"):SetText(self.tItems["Raids"][RaidID].tMisc.tBossKills.names[i])
 				table.insert(tBossItems,wnd)
@@ -391,26 +428,28 @@ function DKP:RaidUpdateCurrentRaidSession()
 	end
 	
 	
-	if currentRaidID ~= nil then
+		if currentRaidID ~= nil then
+			self:RaidBackupSession()
+			local currentPlayers = {}
+			for k=1,GroupLib.GetMemberCount(),1 do -- Getting Players List
+				local unit_member = GroupLib.GetGroupMember(k)
+				if unit_member ~= nil then
+					if self.tItems["settings"].lowercase == 1 then 
+						table.insert(currentPlayers,string.lower(unit_member.strCharacterName))
+					else
+						table.insert(currentPlayers,unit_member.strCharacterName)
+					end
+					local ID = self:GetPlayerByIDByName(unit_member.strCharacterName)
+					if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + (0.00027 * self.tItems["settings"].RaidTimer) end
+				end
+			end
+		
+		--[[if currentRaidID ~= nil then
 		self:RaidBackupSession()
 		local currentPlayers = {}
-		for k=1,GroupLib.GetMemberCount(),1 do -- Getting Players List
-			local unit_member = GroupLib.GetGroupMember(k)
-			if unit_member ~= nil then
-				if self.tItems["settings"].lowercase == 1 then 
-					table.insert(currentPlayers,string.lower(unit_member.strCharacterName))
-				else
-					table.insert(currentPlayers,unit_member.strCharacterName)
-				end
-				local ID = self:GetPlayerByIDByName(unit_member.strCharacterName)
-				if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + (0.00027 * self.tItems["settings"].RaidTimer) end
-			end
-		end
-		
-		--local currentPlayers = {}
-		--for k=1,math.random(15, 20) do
-		--	table.insert(currentPlayers,"Player"..tostring(k))
-		--end
+		for k=1,math.random(15, 20) do
+			table.insert(currentPlayers,"Player"..tostring(k))
+		end]]
 		
 		
 		
@@ -469,6 +508,7 @@ function DKP:RaidUpdateCurrentRaidSession()
 					Player.dkpMod = 0
 					Player.bLeft = "!Left"
 					Player.tClaimedLoot = {}
+					Player.Deaths = 0
 					table.insert(self.tItems["Raids"][currentRaidID].tPlayers,Player)
 					table.insert(tAllRaidMembersInSession,Player)
 				end
@@ -519,6 +559,7 @@ function DKP:RaidUpdateCurrentRaidSession()
 					Player.dkpMod = 0
 					Player.bLeft = "!Left"
 					Player.tClaimedLoot = {}
+					Player.Deaths = 0
 					table.insert(tAllRaidMembersInSession,Player)
 				else -- Reset Left Timer
 					tAllRaidMembersInSession[ID].bLeft = "!Left" 
@@ -536,7 +577,9 @@ function DKP:RaidUpdateCurrentRaidSession()
 		end
 		
 		self:RaidRunMiscSummaries(currentRaidID)
-		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscLen"):SetText(self.tItems["Raids"][currentRaidID].tMisc.length.."(s)")
+		local diff = os.date("*t",self.tItems["Raids"][currentRaidID].tMisc.length)
+		
+		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscLen"):SetText((diff.hour-1 <=9 and "0" or "" ) .. diff.hour-1 .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
 		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscLoot"):SetText(self.tItems["Raids"][currentRaidID].tMisc.lootcount)
 		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscPlayers"):SetText(self.tItems["Raids"][currentRaidID].tMisc.allPlayersCount)
 		
@@ -585,9 +628,7 @@ function DKP:RaidProccesNewPieceOfLoot(strItem,strLooter)
 			local LootItem = {}
 			LootItem.name = strItem
 			LootItem.dkp = 0
-			if self.ItemDatabase ~= nil and self.ItemDatabase[strItem] ~= nil and self.ItemDatabase[strItem].ID ~= nil then
-				LootItem.ID = self.ItemDatabase[strItem].ID
-			end
+			LootItem.ID = self.ItemDatabase[string.sub(strItem,2)].ID
 			table.insert(tAllRaidMembersInSession[i].tClaimedLoot,LootItem) 
 			self.tItems["Raids"][currentRaidID].tMisc.lootcount = self.tItems["Raids"][currentRaidID].tMisc.lootcount + 1
 			break
@@ -628,10 +669,11 @@ function DKP:RaidUpdateSummary(tData)
 	self.wndRaidSummary:FindChild("StatEditDate"):SetText(tData.date.strDate)
 
 	if tData.misc == 1 then
-		local formattedDate = os.date("*t",tData.len)
-		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscLen"):SetText(formattedDate.hour-1 .. ":" .. formattedDate.min .. ":" .. formattedDate.sec)
+		local diff = os.date("*t",tData.len)
+		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscLen"):SetText((diff.hour-1 <=9 and "0" or "" ) .. diff.hour-1 .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
 		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscLoot"):SetText(tData.loot)
 		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscPlayers"):SetText(tData.players)
+		self.wndRaidSummary:FindChild("StatsContainer"):FindChild("MiscContainer"):FindChild("MiscRaid"):SetText(self.tItems["Raids"][currentRaidID].Raid)
 	end
 
 end
@@ -639,6 +681,12 @@ end
 
 
 function DKP:RaidUpdateSummaryPlayerDetails()
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ExportCSV"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("PlayerLabels"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("LootLabels"):Show(false,true)
+	
+	
 	if self.bIsRaidSession == false then tAllRaidMembersInSession = self.tItems["Raids"][currentRaidID].tPlayers end
 	for i=1,table.getn(self.tPlayersRaidItems) do
 		self.tPlayersRaidItems[i]:Destroy()
@@ -653,15 +701,21 @@ function DKP:RaidUpdateSummaryPlayerDetails()
 		if tAllRaidMembersInSession[i].bLeft ~= "Left" and tAllRaidMembersInSession[i].bLeft ~= "!Left" then
 			wnd:FindChild("Left"):SetText(tostring("Time to come back (s) :" .. tAllRaidMembersInSession[i].bLeft))
 		end
-		if tAllRaidMembersInSession[i].bLeft == "Left" or tAllRaidMembersInSession[i].bLeft == "!Left" then
-			wnd:FindChild("Left"):SetText(tostring(tAllRaidMembersInSession[i].bLeft))
+		if tAllRaidMembersInSession[i].bLeft == "Left" then
+			wnd:FindChild("Left"):Show(true,false)
+		elseif tonumber(tAllRaidMembersInSession[i].bLeft) ~= nil then
+			wnd:FindChild("Left"):SetText(tAllRaidMembersInSession[i].bLeft .. "(s)")
+		else
+			wnd:FindChild("Left"):Show(false,true)
 		end
+		wnd:FindChild("Deaths"):SetText(tAllRaidMembersInSession[i].Deaths)
 		local strTooltip = "Loot:\n"
 		if tAllRaidMembersInSession[i].tClaimedLoot ~= nil then
 			for j=1,table.getn(tAllRaidMembersInSession[i].tClaimedLoot) do
-				strTooltip = strTooltip .. tAllRaidMembersInSession[i].tClaimedLoot[j].name .. " - " ..  tostring(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp) .. "\n"
+				strTooltip = strTooltip .. tAllRaidMembersInSession[i].tClaimedLoot[j].name .. " - " .. (self.tItems["EPGP"].Enable == 1 and string.sub(self:EPGPGetItemCostByID(tAllRaidMembersInSession[i].tClaimedLoot[j].ID),32) .. " GP" or tostring(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)) .. "\n"
 			end
 		end
+		if self.tItems["EPGP"].Enable == 1 then wnd:FindChild("Mod"):SetTooltip("Earned EP") end
 		if strTooltip == "Loot:\n" then wnd:FindChild("Loot"):Show(false) end
 		wnd:FindChild("Loot"):SetTooltip(strTooltip)
 		table.insert(self.tPlayersRaidItems,wnd)
@@ -671,6 +725,12 @@ function DKP:RaidUpdateSummaryPlayerDetails()
 end
 
 function DKP:RaidUpdateSummaryLootDetails()
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ExportCSV"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("PlayerLabels"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("LootLabels"):Show(true,true)
+	
+	
 	if self.bIsRaidSession == false then tAllRaidMembersInSession = self.tItems["Raids"][currentRaidID].tPlayers end
 	for i=1,table.getn(self.tPlayersRaidItems) do
 		self.tPlayersRaidItems[i]:Destroy()
@@ -685,8 +745,21 @@ function DKP:RaidUpdateSummaryLootDetails()
 				local wnd = Apollo.LoadForm(self.xmlDoc, "RaidLootItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
 				wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].name)
 				wnd:FindChild("Looter"):SetText(tAllRaidMembersInSession[i].name)
-				wnd:FindChild("Cost"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)
-				table.insert(self.tLootItems,wnd)
+				local itemID = tAllRaidMembersInSession[i].tClaimedLoot[j].ID
+				
+				if self.tItems["EPGP"].Enable == 1 and Item.GetDataFromId(itemID):IsEquippable()  then 
+					wnd:FindChild("Cost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
+				else
+					wnd:FindChild("Cost"):SetText("--")
+				end
+				wnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(itemID):GetItemQuality()))
+				wnd:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(itemID):GetIcon())
+				Tooltip.GetItemTooltipForm(self, wnd:FindChild("ItemIcon") , Item.GetDataFromId(itemID), {bPrimary = true, bSelling = false})
+				
+				if self.tItems["EPGP"].Enable == 0 then
+						wnd:FindChild("Cost"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)
+				end
+					table.insert(self.tLootItems,wnd)
 			end
 		end
 	end
@@ -707,48 +780,127 @@ function DKP:RaidStartNewSession( wndHandler, wndControl, eMouseButton )
 	self:RaidOpenSummary("New")
 end
 
+function DKP:RaidAssumeRaid()
+	if GroupLib.GetMemberCount() > 20 then return "Datascape" 
+	else return "Genetic Archives" end
+end
+
 function DKP:RaidOnUnitDestroyed(tArgs)
 	
 	if  tArgs.bTargetKilled== false then return end
-	local name = tArgs.unitTarget:GetName()
-	if name == "Phagetech Commander" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype1 = 1 end
-	if name == "Phagetech Augmentor" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype2 = 1 end
-	if name == "Phagetech Protector" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype3 = 1 end
-	if name == "Phagetech Fabricator" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype4 = 1 end
 	
-	if self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype1 == 1 and self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype2 == 1 and self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype3 == 1 and self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype4 == 1 then
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,"Phagetech Prototypes")
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype1 = 0
-	end
-	
-	if name == "Ersoth Curseform" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1  end
-	if name == "Fleshmonger Vratorg" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-	if name == "Terax Blightweaver" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-	if name == "Goldox Lifecrusher" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-	if name == "Noxmind the Insidious" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-	
-	if  self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount >= 4 then
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,"Phageborn Convergence")
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = 0
+	if tArgs.unitTarget:IsACharacter() then
+		local ID 
+		for k,player in ipairs(tAllRaidMembersInSession) do
+			if player.name == tArgs.unitTarget:GetName() then
+				ID = k
+				break
+			end
+		end
+		if ID ~= nil then
+			tAllRaidMembersInSession[ID].Deaths = tAllRaidMembersInSession[ID].Deaths + 1
+		end
+		return
 	end
 	
 	
+	if self.tItems["Raids"][currentRaidID].RaidSure == false or self.tItems["Raids"][currentRaidID].RaidSure == true and self.tItems["Raids"][currentRaidID].Raid == "Genetic Archives"  then
 	
-	if name == "Experiment X-89" then
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-	elseif name == "Kuralak the Defiler" then
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-	elseif name == "Phage Maw" then
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-	elseif name == "Phageborn Convergence" then
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-	elseif name == "Dreadphage Ohmna" then
-		self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-		table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+		-- GA
+		local name = tArgs.unitTarget:GetName()
+		if name == "Phagetech Commander" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype1 = 1 end
+		if name == "Phagetech Augmentor" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype2 = 1 end
+		if name == "Phagetech Protector" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype3 = 1 end
+		if name == "Phagetech Fabricator" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype4 = 1 end
+		
+		if self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype1 == 1 and self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype2 == 1 and self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype3 == 1 and self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype4 == 1 then
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,"Phagetech Prototypes")
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.prototype1 = 0
+		end
+		
+		if name == "Ersoth Curseform" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1  end
+		if name == "Fleshmonger Vratorg" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
+		if name == "Terax Blightweaver" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
+		if name == "Goldox Lifecrusher" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
+		if name == "Noxmind the Insidious" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
+		
+		if  self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount >= 4 then
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,"Phageborn Convergence")
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = 0
+		end
+		
+	
+		
+		if name == "Experiment X-89" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Kuralak the Defiler" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Phage Maw" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Phageborn Convergence" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Dreadphage Ohmna" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		end
+	end
+		-- DS
+	if self.tItems["Raids"][currentRaidID].RaidSure == false or self.tItems["Raids"][currentRaidID].RaidSure == true and self.tItems["Raids"][currentRaidID].Raid == "Datascape"  then
+		
+		if name == "Megalith" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
+		elseif name == "Hydroflux" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
+		elseif name == "Visceralus" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
+		elseif name == "Aileron" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
+		elseif name == "Pyrobane" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
+		elseif name == "Mnemesis" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
+		end
+		
+		
+		
+		
+		
+		
+		if name == "System Daemons" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Gloomclaw" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Maelstrom Authority" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		elseif name == "Avatus" then
+			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
+			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
+			self.tItems["Raids"][currentRaidID].RaidSure = true
+		end
 	end
 end
 
@@ -815,10 +967,19 @@ function DKP:RaidSetRaidDate( wndHandler, wndControl, strText )
 end
 
 function DKP:RaidSummaryListShowPlayers( wndHandler, wndControl, eMouseButton )
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ExportCSV"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("PlayerLabels"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("LootLabels"):Show(false,true)
+	
 	self:RaidUpdateSummaryPlayerDetails()
 end
 
 function DKP:RaidSummaryListShowLoot( wndHandler, wndControl, eMouseButton )
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ExportCSV"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("PlayerLabels"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("LootLabels"):Show(true,true)
 	self:RaidUpdateSummaryLootDetails()
 end
 
@@ -837,12 +998,17 @@ function DKP:RaidExportTable( wndHandler, wndControl, eMouseButton )
 		for i=1,table.getn(self.tItems["Raids"][currentRaidID].tPlayers) do -- Formatting table
 			
 			players[self.tItems["Raids"][currentRaidID].tPlayers[i].name] = {}
-			players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Gained_DKP = self.tItems["Raids"][currentRaidID].tPlayers[i].dkpMod
+			if self.tItems["EPGP"].Enable == 0 then
+				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Gained_DKP = self.tItems["Raids"][currentRaidID].tPlayers[i].dkpMod
+			else
+				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Gained_EP = self.tItems["Raids"][currentRaidID].tPlayers[i].dkpMod
+			end
 			if self.tItems["Raids"][currentRaidID].tPlayers[i].bLeft == "Left" then
 				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Has_Player_Left = "Yes"
 			else
 				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Has_Player_Left = "No"
 			end
+			players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Deaths = self.tItems["Raids"][currentRaidID].tPlayers[i].Deaths
 
 				if table.getn(self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot) == 0 then players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Claimed_Loot = "Player has not claimed any loot"
 				else
@@ -851,7 +1017,11 @@ function DKP:RaidExportTable( wndHandler, wndControl, eMouseButton )
 					for j=1,table.getn(self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot) do
 						local LootItem = {}
 						LootItem.Name = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].name
-						LootItem.Cost = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].dkp
+						if self.tItems["EPGP"].Enable == 0 then
+							LootItem.Cost = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].dkp
+						else
+							LootItem.Cost = string.sub(self:EPGPGetItemCostByID(self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID),32)
+						end
 						if self.tItems["settings"].forceCheck == 1 then
 							if self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID ~= nil then
 								LootItem.ID = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID
@@ -892,13 +1062,18 @@ function DKP:RaidExportTable( wndHandler, wndControl, eMouseButton )
 			local players = {}
 			for i=1,table.getn(self.tItems["Raids"][currentRaidID].tPlayers) do -- Formatting table
 				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name] = {}
+				if self.tItems["EPGP"].Enable == 0 then
 				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Gained_DKP = self.tItems["Raids"][currentRaidID].tPlayers[i].dkpMod
+			else
+				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Gained_EP = self.tItems["Raids"][currentRaidID].tPlayers[i].dkpMod
+			end
 
 				if self.tItems["Raids"][currentRaidID].tPlayers[i].bLeft == "Left" then
 					players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Has_Player_Left = "Yes"
 				else
 					players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Has_Player_Left = "No"
 				end
+				players[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Deaths = self.tItems["Raids"][currentRaidID].tPlayers[i].Deaths
 			end
 			exportStr = exportStr .. tohtml(players)
 		
@@ -907,13 +1082,14 @@ function DKP:RaidExportTable( wndHandler, wndControl, eMouseButton )
 				local loot = {}
 				for i=1,table.getn(self.tItems["Raids"][currentRaidID].tPlayers) do
 					for j=1,table.getn(self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot) do
+	
 						loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name] = {}
 						loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Item_Name = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].name
 						
 						if self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID ~= nil and self.tItems["settings"].forceCheck == 1 then
 							loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].ID = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID
 						elseif self.tItems["settings"].forceCheck == 1 then
-							lloot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].ID = "--"
+							loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].ID = "--"
 						end
 					
 					
@@ -921,6 +1097,9 @@ function DKP:RaidExportTable( wndHandler, wndControl, eMouseButton )
 							loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Cost = "Cost unknown"
 						else
 							loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Cost = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].dkp
+						end
+						if self.tItems["EPGP"].Enable == 1  then
+							loot[self.tItems["Raids"][currentRaidID].tPlayers[i].name].Cost = string.sub(self:EPGPGetItemCostByID(self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID),32)
 						end
 					end	
 				end
@@ -934,21 +1113,17 @@ function DKP:RaidExportTable( wndHandler, wndControl, eMouseButton )
 						lootPiece.looter = self.tItems["Raids"][currentRaidID].tPlayers[i].name
 						lootPiece.strItem = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].name
 						lootPiece.dkp = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].dkp
-						if self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID ~= nil and self.tItems["settings"].forceCheck == 1 then
-							lootPiece.ID = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID
-						elseif self.tItems["settings"].forceCheck == 1 then
-							lootPiece.ID = "--"
-						end
+						lootPiece.ID = self.tItems["Raids"][currentRaidID].tPlayers[i].tClaimedLoot[j].ID
 						table.insert(loot,lootPiece)
 					end
 				end
 				if self.tItems["settings"].forceCheck == 1 then
 					for i=1,table.getn(loot) do
-						lootExportStr = lootExportStr .. loot[i].looter .. ";" ..  loot[i].strItem .. ";" ..  tostring(loot[i].dkp) .. " ; " .. loot[i].ID .. "\n"
+						lootExportStr = lootExportStr .. loot[i].looter .. ";" ..  loot[i].strItem .. ";" ..  (self.tItems["EPGP"].Enable == 0 and tostring(loot[i].dkp) or string.sub(self:EPGPGetItemCostByID(loot[i].ID),32)) .. " ; " .. loot[i].ID .. "\n"
 					end
 				else
 					for i=1,table.getn(loot) do
-						lootExportStr = lootExportStr .. loot[i].looter .. ";" ..  loot[i].strItem .. ";" ..  tostring(loot[i].dkp) .. "\n"
+						lootExportStr = lootExportStr .. loot[i].looter .. ";" ..  loot[i].strItem .. ";" ..  (self.tItems["EPGP"].Enable == 0 and tostring(loot[i].dkp) or string.sub(self:EPGPGetItemCostByID(loot[i].ID),32)) .. "\n"
 					end
 				end
 				exportStr = lootExportStr

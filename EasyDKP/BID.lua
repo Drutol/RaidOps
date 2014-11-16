@@ -165,7 +165,6 @@ function DKP:BidUpdateItemDatabase()
 			else
 				self.ItemDatabase[curItemList[i]:GetName()].slot = curItemList[i]:GetSlot()
 			end
-			if curItemList[i]:GetSlotName() == nil then self.ItemDatabase[curItemList[i]:GetName()] = nil end
 		end
 	end
 	
@@ -290,7 +289,7 @@ end
 
 function DKP:BidLinkItem()
 	if self.CurrentItemChatStr ~= nil then
-		ChatSystemLib.Command("/party " .. self.CurrentItemChatStr)
+		ChatSystemLib.Command(self.ChannelPrefix .. self.CurrentItemChatStr)
 	end
 end
 
@@ -313,7 +312,7 @@ function DKP:BitSetCountdown( wndHandler, wndControl, eMouseButton )
 		local value = math.abs(tonumber(self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):GetText()))
 		if value >= 1 and value <= 6 then
 			self.tItems["settings"].BidCount = value
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText(self.tItems["settings"].BidMin)
+			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText(self.tItems["settings"].BidCount)
 		else
 			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText("Final Countdown")
 			self.tItems["settings"].BidCount = nil
@@ -324,14 +323,15 @@ end
 
 function DKP:BidStart(strName)
 	self.mode = nil
-	if self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxHidden"):IsChecked() == true then self.mode = "hidden" 
+	if self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard1"):FindChild("BoxHidden"):IsChecked() == true then self.mode = "hidden" 
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxOpen"):IsChecked() == true  then  self.mode = "open"
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("PureRoll"):IsChecked() == true then self.mode = "pure"
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("ModifiedRoll"):IsChecked() == true then self.mode = "modified"
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("BoxOpen"):IsChecked() == true then self.mode = "EPGP" end
 
-	
+	Print(self.mode)
 	if self.mode ~= nil then
+		Print("LOL")
 		if self.CurrentBidSession == nil then
 			self.CurrentBidSession = {} 
 			self.CurrentBidSession.HighestBidEver = {}

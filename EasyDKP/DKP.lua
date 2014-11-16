@@ -247,7 +247,7 @@ function DKP:OnUnitCreated(unit,isStr)
 					self:AddItem(i,existingID)
 					self.tItems[existingID].listed = 1
 				end
-		elseif isNew == true and self.tItems["settings"].CheckAffiliation == 0 or isNew == true and self.tItems["settings"].CheckAffiliation == 1 and isStr == nil then
+		elseif isNew == true and self.tItems["settings"].CheckAffiliation == 0 or isNew == true and self.tItems["settings"].CheckAffiliation == 1 and isStr == nil or isNew == true and isStr and self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):GetText() ~= "Input New Entry Name" then
 			if counter == 0 then counter = 1 end
 			self.tItems[counter] = {}
 			self.tItems[counter].strName = strName
@@ -288,7 +288,7 @@ function DKP:OnTimer()
 		if self.tItems["settings"].CheckAffiliation == 1 then
 			local member = GroupLib.GetUnitForGroupMember(k)
 				if member ~= nil and member:GetGuildName() ~= nil  then
-					if self:GetPlayerByIDByName(member:GetName()) == -1 and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname) then
+					if self:GetPlayerByIDByName(member:GetName()) == -1 and member:GetGuildName() ~= nil  and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname) then
 						self:OnUnitCreated(member)
 					end
 				end
@@ -882,7 +882,6 @@ function DKP:Add100DKP()
 	end
 end
 function DKP:OnChatMessage(channelCurrent, tMessage)
-	if GroupLib.InRaid() == true then
 		if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
 			local itemStr = ""
 			local strName = ""
@@ -910,7 +909,6 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),itemStr) end
 				if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then self:RaidProccesNewPieceOfLoot(itemStr,strName:sub(1,#strName-1)) end
 			end
-		end
 	end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
 		if self.tItems["settings"].TradeEnable == 1 then 
@@ -2740,30 +2738,37 @@ end
 local CurrentPopUpID = nil
 local PopUpItemQueue = {} 
 function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
-	if self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "X" then return end
+	if self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "X" or self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "" then return end
 	local newDKP
 	local modifier
 	if self.tItems["EPGP"].Enable == 0 then
 		modifier = tonumber(self.tItems[CurrentPopUpID].net)
 		newDKP = tostring(tonumber(self.tItems[CurrentPopUpID].net)-math.abs(tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())))
-		if self.tItems[CurrentPopUpID].listed == 1 then
-			self.tItems[CurrentPopUpID].wnd:FindChild("Net"):SetText(newDKP)
+		if self.tItems[CurrentPopUpID].listed == 1 and self:LabelGetColumnNumberForValue("Net") ~= -1 then
+			self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(newDKP)
 		end
 		modifier = tostring(tonumber(newDKP) - modifier)
 		self.tItems[CurrentPopUpID].net = newDKP
 		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),modifier,CurrentPopUpID)
 	else
-		self:EPGPSubtract(self.tItems[CurrentPopUpID].strName,nil,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()))
+		self:EPGPAdd(self.tItems[CurrentPopUpID].strName,nil,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()))
 		if self:LabelGetColumnNumberForValue("GP") ~= -1 and self.tItems[CurrentPopUpID].wnd ~= nil then
 			self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[CurrentPopUpID].GP)
 		end
-		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())*-1,CurrentPopUpID)
+		if self:LabelGetColumnNumberForValue("PR") ~= -1 then
+			if self.tItems[CurrentPopUpID].GP ~= 0 then 
+				self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText(string.format("%."..tostring(self.tItems["settings"].Precision).."f",self.tItems[CurrentPopUpID].EP/self.tItems[CurrentPopUpID].GP))
+			else
+				self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText("0")
+			end
+		end	
+		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText() .. "{GP}",tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()),CurrentPopUpID)
 	end
-	if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then
+	if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false and self.tItems["EPGP"].Enable == 0 then
 		self:RaidAddCostInfo(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())*-1)
 	elseif self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == true then 
 		self:RaidProccesNewPieceOfLoot(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName)
-		self:RaidAddCostInfo(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())*-1)
+		if self.tItems["EPGP"].Enable == 0 then self:RaidAddCostInfo(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())*-1) end
 	end
 	self:PopUpWindowClose()
 	self:PopUpUpdateQueueLength()
@@ -2787,17 +2792,18 @@ function DKP:PopUpWindowClose( wndHandler, wndControl )
 		self.wndPopUp:FindChild("EditBoxDKP"):SetText("X")
 		self.wndPopUp:FindChild("LabelName"):SetText(PopUpItemQueue[1].strName)
 		self.wndPopUp:FindChild("LabelItem"):SetText(PopUpItemQueue[1].strItem)
+		self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
+		self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
+		Tooltip.GetItemTooltipForm(self, self.wndPopUp:FindChild("ItemIcon") , Item.GetDataFromId(PopUpItemQueue[1].itemID), {bPrimary = true, bSelling = false})
 		if self.tItems["EPGP"].Enable == 1 then
-			self.wndPopUp:FindChild("Currency"):SetText("GP")
-			if self.ItemDatabase[PopUpItemQueue[i].strItem] ~= nil then
-				self.wndPopUp:FindChild("EditBoxDKP"):SetText(EPGPGetItemCostByName(PopUpItemQueue[1].strItem))
-			end
+			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
+			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
 		else
-			self.wndPopUp:FindChild("Currency"):SetText("DKP")
+			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
 		end
 		CurrentPopUpID = PopUpItemQueue[1].ID
-		if self.RegistredBidWinners[PopUpItemQueue[1].strItem].cost ~= nil then
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[PopUpItemQueue[1].strItem].cost)
+		if self.RegistredBidWinners[string.sub(PopUpItemQueue[1].strItem,2)] ~= nil then
+			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[string.sub(PopUpItemQueue[1].strItem,2)].cost)
 		end
 		table.remove(PopUpItemQueue,1)
 	end
@@ -2821,14 +2827,24 @@ function DKP:PopUpWindowOpen(strName,strItem)
 		item.strName = strName
 		item.strItem = strItem
 		item.ID = ID_popup
+		item.itemID = self.ItemDatabase[string.sub(strItem,2)].ID
 		table.insert(PopUpItemQueue,1,item)
 		if CurrentPopUpID == nil then --First Iteration
 			self.wndPopUp:FindChild("LabelName"):SetText(strName)
 			self.wndPopUp:FindChild("LabelItem"):SetText(strItem)
+			self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
+			self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
+			Tooltip.GetItemTooltipForm(self, self.wndPopUp:FindChild("ItemIcon") , Item.GetDataFromId(PopUpItemQueue[1].itemID), {bPrimary = true, bSelling = false})
+			if self.tItems["EPGP"].Enable == 1 then
+				self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
+				self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
+			else
+				self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
+			end
 			CurrentPopUpID = ID_popup
 		end
-		if self.RegistredBidWinners[PopUpItemQueue[1].strItem].cost ~= nil  then
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[PopUpItemQueue[1].strItem].cost)
+		if self.RegistredBidWinners[string.sub(strItem,2)] ~= nil and self.tItems["EPGP"].Enable == 0 then
+			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[strItem].cost)
 		end
 		self.wndPopUp:Show(true,false)
 		if #PopUpItemQueue > 1 then self.wndPopUp:FindChild("ButtonSkip"):Enable(true) else self.wndPopUp:FindChild("ButtonSkip"):Enable(false) end
@@ -2849,6 +2865,15 @@ function DKP:PopUpSkip( wndHandler, wndControl, eMouseButton )
 		ID_popup = PopUpItemQueue[1].ID
 		self.wndPopUp:FindChild("LabelName"):SetText(PopUpItemQueue[1].strName)
 		self.wndPopUp:FindChild("LabelItem"):SetText(PopUpItemQueue[1].strItem)
+		if self.tItems["EPGP"].Enable == 1 then
+			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
+			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
+		else
+			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
+		end
+		self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
+		self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
+		Tooltip.GetItemTooltipForm(self, self.wndPopUp:FindChild("ItemIcon") , Item.GetDataFromId(PopUpItemQueue[1].itemID), {bPrimary = true, bSelling = false})
 		CurrentPopUpID = PopUpItemQueue[1].ID
 		table.remove(PopUpItemQueue,1)
 		if #PopUpItemQueue <= 1  then wndControl:Enable(false) end

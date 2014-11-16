@@ -59,7 +59,7 @@ end
 
 function DKP:OnLootedItem(item)
 			self.ItemDatabase[item:GetName()] = {}
-			self.ItemDatabase[item:GetName()].ID= item:GetItemId()
+			self.ItemDatabase[item:GetName()].ID = item:GetItemId()
 			self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()
 			self.ItemDatabase[item:GetName()].strChat = item:GetChatLinkString()
 			self.ItemDatabase[item:GetName()].sprite = item:GetIcon()
@@ -70,7 +70,8 @@ function DKP:OnLootedItem(item)
 			else
 				self.ItemDatabase[item:GetName()].slot = item:GetSlot()
 			end
-			if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
+			--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
+			Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Player"..tostring(math.random(2,14))))
 end
 
 function DKP:EPGPRestore()
@@ -124,6 +125,16 @@ function DKP:EPGPGetSlotStringByID(ID)
 	elseif ID == "Legs" then return "Legs"
 	elseif ID == "Shields" then return "Shield"
 	elseif ID == 8  then return "Support"
+	end
+end
+
+function DKP:EPGPGetSlotSpriteByQuality(ID)
+	if ID == 5 then return "CRB_Tooltips:sprTooltip_SquareFrame_Purple"
+	elseif ID == 6 then return "CRB_Tooltips:sprTooltip_SquareFrame_Orange"
+	elseif ID == 4 then return "CRB_Tooltips:sprTooltip_SquareFrame_Blue"
+	elseif ID == 3 then return "CRB_Tooltips:sprTooltip_SquareFrame_Green"
+	elseif ID == 2 then return "CRB_Tooltips:sprTooltip_SquareFrame_White"
+	else return "CRB_Tooltips:sprTooltip_SquareFrame_DarkModded"
 	end
 end
 
@@ -222,6 +233,7 @@ function DKP:EPGPAdd(strName,EP,GP)
 	if ID ~= -1 then
 		if EP ~= nil then
 			self.tItems[ID].EP = self.tItems[ID].EP + EP
+			self:RaidRegisterEPManipulation(strName,EP)
 		end
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP + GP
@@ -238,6 +250,7 @@ function DKP:EPGPSubtract(strName,EP,GP)
 			if self.tItems[ID].EP < self.tItems["EPGP"].MinEP then
 				self.tItems[ID].EP = self.tItems["EPGP"].MinEP
 			end
+			self:RaidRegisterEPManipulation(strName,EP)
 		end
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP - GP
@@ -246,7 +259,6 @@ function DKP:EPGPSubtract(strName,EP,GP)
 			end
 		end
 	end
-
 
 end
 
