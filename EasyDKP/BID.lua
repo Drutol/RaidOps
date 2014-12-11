@@ -138,9 +138,9 @@ function DKP:BidCompleteInit()
 	lol1:FindChild("ItemName"):SetText("Galactium Chunk")
 	Hook.wndLooter_ItemList:ArrangeChildrenVert()
 	Hook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKP)
-	Hook.wndMasterLoot_ItemList:ArrangeChildrenVert()
-	self:InsertLootChildren()
-	self:InsertLooterChildren()]]
+	Hook.wndMasterLoot_ItemList:ArrangeChildrenVert()]]
+	--self:InsertLootChildren()
+	--self:InsertLooterChildren()
 	-- Resume
 	
 	if self.tItems["BidRes"] ~= nil then self:BidResumeSession() end
@@ -191,8 +191,6 @@ function DKP:BidCheckConditions()
 		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStop"):Enable(true)
 		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStart"):Enable(false)
 	end
-	
-	
 end
 
 function DKP:BidSetSortAsc()
@@ -289,11 +287,13 @@ function DKP:BidMLSearch(wndHandler,wndControl)
 end
 
 function DKP:BidMLSortPlayers()
-	if self.tItems["settings"].BidMLSorting == 1 then
-		if self.tItems["settings"].BidSortAsc == 1 then
-			Hook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPasc)
+	local MLHook = Apollo.GetAddon("MasterLoot") -- mitigating an issue where the caller is differnt then DKP
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	if DKPInstance.tItems["settings"].BidMLSorting == 1 then
+		if DKPInstance.tItems["settings"].BidSortAsc == 1 then
+			MLHook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPasc)
 		else
-			Hook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPdesc)
+			MLHook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPdesc)
 		end
 	end
 end

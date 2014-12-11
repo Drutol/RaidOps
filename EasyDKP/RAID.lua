@@ -365,6 +365,13 @@ function DKP:RaidOpenSummary(RaidName)
 	end
 end
 
+function DKP:RaidGoHub()
+	self.wndRaidSummary:Show(false,false)
+	self.wndRaidGlobalStats:Show(false,false)
+	self.wndRaidSelection:Show(false,false)
+	self.wndHub:Show(true,false)
+end
+
 function DKP:RaidRegisterDkpManipulation(strName,modifier)
 	if self.tItems["settings"].lowercase == 1 then
 		strName = string.lower(strName)
@@ -450,12 +457,8 @@ function DKP:RaidUpdateCurrentRaidSession()
 		local currentPlayers = {}
 		for k=1,math.random(15, 20) do
 			table.insert(currentPlayers,"Player"..tostring(k))
-		end
-		
-		for k=1,GroupLib.GetMemberCount(),1 do -- Getting Players List
-				self:ExportShowPreloadedText(tohtml(GroupLib.GetGroupMember(k)))
 		end]]
-		
+
 		--Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), "SUMWEAPON", "Player"..tostring(math.random(2,14))))
 		
 		local LeftNames = {}
@@ -630,8 +633,9 @@ function DKP:RaidProccesNewPieceOfLoot(strItem,strLooter)
 		if string.lower(tAllRaidMembersInSession[i].name) == string.lower(strLooter) then 
 			local LootItem = {}
 			LootItem.name = strItem
-			LootItem.dkp = 0
+			LootItem.dkp = self.tItems["EPGP"].Enable == 1 and tonumber(string.sub(self:EPGPGetItemCostByID(self.ItemDatabase[string.sub(strItem,2)].ID),36)) or 0
 			LootItem.ID = self.ItemDatabase[string.sub(strItem,2)].ID
+			LootItem.currency = self.tItems["EPGP"].Enable == 1 and "GP" or "DKP"
 			table.insert(tAllRaidMembersInSession[i].tClaimedLoot,LootItem) 
 			self.tItems["Raids"][currentRaidID].tMisc.lootcount = self.tItems["Raids"][currentRaidID].tMisc.lootcount + 1
 			break

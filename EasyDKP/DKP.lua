@@ -113,6 +113,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("dkp", "OnDKPOn", self)
 		Apollo.RegisterSlashCommand("sum", "RaidShowMainWindow", self)
 		Apollo.RegisterSlashCommand("dkpbid", "BidOpen", self)
+		Apollo.RegisterSlashCommand("rops", "HubShow", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
@@ -300,6 +301,7 @@ end
 
 
 function DKP:OnTimer()
+	if self.tItems["settings"].HubAutoSession and GroupLib.InRaid() and not self.bIsRaidSession then self:RaidOpenSummary("New") end
 	if self.tItems["settings"].collect_new == 1 then
 		for k=1,GroupLib.GetMemberCount(),1 do
 		local unit_member = GroupLib.GetGroupMember(k)

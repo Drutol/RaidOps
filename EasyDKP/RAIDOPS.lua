@@ -36,16 +36,19 @@ local wndListedNews = {}
 function DKP:RaidOpsInit()
 	self:AttendanceInit()
 	self:HubInit()
+	self:LootListInit()
+	self:HubSettingsInit()
 end
 
 function DKP:HubInit()
 	if self.tItems["Hub"] == nil then self.tItems["Hub"] = {} end
 	self.wndHub = Apollo.LoadForm(self.xmlDoc2,"RaidOpsHub",nil,self)
 	self.wndNews = self.wndHub:FindChild("News")
-	self:HubPopulateInfo()
+	self.wndHub:Show(false,true)
 	
-
 end
+
+
 
 function DKP:HubPopulateInfo()
 	-- TopDKP
@@ -130,7 +133,7 @@ function DKP:HubPopulateNews()
 	local newsItemCount = 5
 	self.wndNews:DestroyChildren()
 	self.wndListedNews = {}
-	
+	local counter = 0
 	if self.tItems["Hub"]["News"] == nil then self.tItems["Hub"]["News"] = {} end
 	for k,news in ipairs(self.tItems["Hub"]["News"]) do
 		local wnd = Apollo.LoadForm(self.xmlDoc2,"NewsItem",self.wndNews,self)
@@ -139,10 +142,23 @@ function DKP:HubPopulateNews()
 		wnd:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 		wnd:FindChild("ItemIcon"):SetSprite(item:GetIcon())
 		wnd:FindChild("Recipent"):SetText(news.looter)
-		
 		table.insert(self.wndListedNews,wnd)
+		counter = counter + 1
+		if counter >= self.tItems["settings"].HubNewsCount then break end
 	end
 	self.wndNews:ArrangeChildrenVert(0)
+end
+
+function DKP:HubShow()
+	self.wndRaidSummary:Show(false,false)
+	self.wndRaidSelection:Show(false,false)
+	self.wndMain:Show(false,false)
+	self.wndHub:Show(true,false)
+	self:HubPopulateInfo()
+end
+
+function DKP:HubClose()
+	self.wndHub:Show(false,false)
 end
 
 function DKP:HubRefresh()
@@ -159,44 +175,83 @@ function DKP:HubRegisterLoot(strName,strItem)
 	end
 end
 
+function DKP:HubDispatch(wndHandler,wndControl)
+	self.wndHub:Show(false,false)
+	if wndControl:GetName() == "DKP" then
+		self.wndMain:Show(true,false)
+	elseif wndControl:GetName() == "Raid" then
+		self:RaidShowMainWindow()
+	elseif wndControl:GetName() == "Att" then
+		self.wndAttendance:Show(true,false)
+		self:AttendancePopulate()
+	elseif wndControl:GetName() == "LootList" then
+		self:LootListShow()
+	end
+end
+
+function DKP:HubOpenOptions()
+	
+end
+
+-- Attendance
+
 function DKP:AttendanceInit()
 	self.wndAttendance = Apollo.LoadForm(self.xmlDoc2,"AttendanceGrid",nil,self)
-	self:AttendancePopulate()
+	self.wndAttendance:Show(false,true)
 end
 
 function DKP:AttendanceShow()
-
+	self.wndAttendance:Show(true,false)
 end
 
+function DKP:AttendanceGoHub()
+	self.wndAttendance:Show(false,false)
+	self.wndHub:Show(true,false)
+end
+
+function DKP:AttendanceClose()
+	self.wndAttendance:Show(false,false)
+end
 function DKP:AttendancePopulate()
 	local grid = self.wndAttendance:FindChild("Grid")
 	grid:DeleteAll()
-	for i=0,table.maxn(self.tItems) do -- Adding rows
-		if self.tItems[i] ~= nil then
+	local addedPlayers= {}
+	--[[for i=0,table.maxn(self.tItems) do -- Adding rows
+		if self.tItems[i] ~= nil and self:string_starts(self.tItems[i].strName, self.wndAttendance:FindChild("Search"):GetText() ~= "Search" and self.wndAttendance:FindChild("Search"):GetText() or self.tItems[i].strName) then
 			grid:AddRow(self.tItems[i].strName)
 		end
-	end
+	end]]
 	local skippedIDs = 0
+	local rowCount = 1
 	for k=0,table.maxn(self.tItems["Raids"]) do -- adding cell data
 		if self.tItems["Raids"][k] ~= nil then
-			grid:SetColumnText(k+1," "..self.tItems["Raids"][k].date.strDate)
-			for i=0,table.maxn(self.tItems) do 
-				if self.tItems[i] ~= nil then
-					for j=1,#self.tItems["Raids"][k].tPlayers do
-						if string.lower(self.tItems[i].strName) == string.lower(self.tItems["Raids"][k].tPlayers[j].name) then
-							if self.tItems["Raids"][k].tPlayers[j].bLeft == "Left" then
-								grid:SetCellData(i+1-skippedIDs, k+1,"","ClientSprites:LootCloseBox_Holo","f")
-							else
-								grid:SetCellData(i+1-skippedIDs, k+1,"","achievements:sprAchievements_Icon_Complete","t")
+			if self.AttendanceExpectedRaid == nil or self.AttendanceExpectedRaid == self.tItems["Raids"][k].Raid then
+				if self.tItems["settings"].HubCallRaidBy == "Date" then grid:SetColumnText(k+1," "..self.tItems["Raids"][k].date.strDate) else grid:SetColumnText(k+1," "..self.tItems["Raids"][k].name) end
+				for i=0,table.maxn(self.tItems) do 
+					if self.tItems[i] ~= nil then
+						if addedPlayers[self.tItems[i].strName] == nil then
+							if self:string_starts(self.tItems[i].strName, self.wndAttendance:FindChild("Search"):GetText() ~= "Search" and self.wndAttendance:FindChild("Search"):GetText() or self.tItems[i].strName) then
+								grid:AddRow(self.tItems[i].strName)
+								addedPlayers[self.tItems[i].strName] = rowCount
+								rowCount = rowCount + 1
 							end
-							break
-						elseif j == #self.tItems["Raids"][k].tPlayers then 
-							grid:SetCellData(i+1-skippedIDs, k+1,"","ClientSprites:LootCloseBox_Holo","f")
-							grid:SetCellImageColor(i+1-skippedIDs, k+1,"xkcdApple") 
 						end
+						for j=1,#self.tItems["Raids"][k].tPlayers do
+							if addedPlayers[self.tItems[i].strName] ~= nil and string.lower(self.tItems[i].strName) == string.lower(self.tItems["Raids"][k].tPlayers[j].name) and self:string_starts(self.tItems[i].strName, self.wndAttendance:FindChild("Search"):GetText() ~= "Search" and self.wndAttendance:FindChild("Search"):GetText() or self.tItems[i].strName) then
+								if self.tItems["Raids"][k].tPlayers[j].bLeft == "Left" then
+									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo","f")
+								else
+									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","achievements:sprAchievements_Icon_Complete","t")
+								end
+								break
+							elseif j == #self.tItems["Raids"][k].tPlayers and addedPlayers[self.tItems[i].strName] ~= nil then 
+								grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo","f")
+								grid:SetCellImageColor(addedPlayers[self.tItems[i].strName], k+1,"xkcdApple") 
+							end
+						end
+					else
+						skippedIDs = skippedIDs + 1
 					end
-				else
-					skippedIDs = skippedIDs + 1
 				end
 			end
 			skippedIDs = 0
@@ -206,21 +261,207 @@ function DKP:AttendancePopulate()
 end
 
 function DKP:AttendanceSearch(wndHandler, wndControl, strText)
-	local grid = self.wndAttendance:FindChild("Grid")
-	if strText ~= "Search" and strText ~= "" then
-		self:AttendancePopulate()
-		local remRows = {}
-		for k=1,grid:GetRowCount() do
-			if not self:string_starts(grid:GetCellText(k,1),strText)  then
-				Print(grid:GetCellText(k,1) .. " " .. strText)
-				table.insert(remRows,k)
+	self:AttendancePopulate()
+end
+
+function DKP:AttendanceTypeFilterChanged(wndHandler,wndControl)
+	if wndControl:GetName() == "GA" then
+		self.AttendanceExpectedRaid = "Genetic Archives"
+	else
+		self.AttendanceExpectedRaid = "Datascape"
+	end
+	self:AttendancePopulate()
+end
+
+function DKP:AttendanceFilterDisabled()
+	self.AttendanceExpectedRaid = nil
+end
+
+----------------- LootList
+
+function DKP:LootListInit()
+	self.wndLootList = Apollo.LoadForm(self.xmlDoc2,"ItemList",nil,self)
+	self.wndLootList:Show(false,true)
+	self.wndIconList = Apollo.LoadForm(self.xmlDoc2,"TabIconView",self.wndLootList,self)
+	self.wndListList = self.wndLootList:FindChild("TabWindow")
+	self.wndLootList:FindChild("TabWindow"):AttachTab(self.wndIconList,true)
+	self.wndIconList:Lock(true)
+	self.wndListList:Lock(true)
+	self:LootListIconWindowPopulate()
+	self:LootListListWindowPopulate()
+end
+
+function DKP:LootListShow()
+	self.wndLootList:Show(true,false)
+	self:LootListIconWindowPopulate()
+	self:LootListListWindowPopulate()
+end
+
+function DKP:LootListIconWindowPopulate()
+	local icons = self.wndIconList:FindChild("IconWindow")
+	icons:DestroyChildren()
+	local counter = 0
+	for k=table.maxn(self.tItems["Raids"]),1,-1 do
+		if self.tItems["Raids"][k] ~= nil then							
+			for i=1,#self.tItems["Raids"][k].tPlayers do
+				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
+					local wnd = Apollo.LoadForm(self.xmlDoc2,"ItemIcon",icons,self)
+					local item = Item.GetDataFromId(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].ID)
+					wnd:FindChild("Icon"):SetSprite(item:GetIcon())
+					wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+					wnd:FindChild("Recipent"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
+					wnd:SetData({itemData = item , raidData = k , cost = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp, currency = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency})
+					Tooltip.GetItemTooltipForm(self, wnd:FindChild("Icon") , item , {bPrimary = true, bSelling = false})
+					counter = counter + 1
+					if counter >= self.tItems["settings"].HubItemCount then
+						icons:ArrangeChildrenTiles(0)
+						return
+					end
+				end
 			end
 		end
-		for l,row in ipairs(remRows) do
-			grid:DeleteRow(row)
+	end
+	icons:ArrangeChildrenTiles(0)
+end
+
+function DKP:LootListShowIconInfo(wndHandler,wndControl)
+	local details = self.wndIconList:FindChild("Details")
+	local wndData = wndControl:GetData()
+	self.wndIconList:FindChild("ItemInfo"):FindChild("Icon"):SetSprite(wndData.itemData:GetIcon())
+	Tooltip.GetItemTooltipForm(self,self.wndIconList:FindChild("ItemInfo"):FindChild("Icon"), wndData.itemData,self)
+	self.wndIconList:FindChild("ItemInfo"):FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(wndData.itemData:GetItemQuality()))
+	self.wndIconList:FindChild("ItemInfo"):FindChild("Item"):SetText(wndData.itemData:GetName())
+	self.wndIconList:FindChild("ItemInfo"):FindChild("Drops"):FindChild("Count"):SetText(self:LootListGetCountForItem(wndData.itemData:GetName()))
+	details:FindChild("Looter"):SetText(wndControl:FindChild("Recipent"):GetText())
+	details:FindChild("Date"):SetText(self.tItems["Raids"][wndData.raidData].date.strDate)
+	details:FindChild("Cost"):SetText(wndData.cost .. " " .. wndData.currency)
+end
+
+function DKP:LootListGetCountForItem(strItem)
+	local counter = 0
+	for k=table.maxn(self.tItems["Raids"]),1,-1 do
+		if self.tItems["Raids"][k] ~= nil then							
+			for i=1,#self.tItems["Raids"][k].tPlayers do
+				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
+					if string.lower(string.sub(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].name,2)) == string.lower(strItem) then counter = counter + 1 end
+				end
+			end
+		end
+	end
+	return counter
+end
+
+function DKP:LootListListWindowPopulate()
+	local list = self.wndListList:FindChild("List")
+	list:DestroyChildren()
+	local counter = 0
+	for k=table.maxn(self.tItems["Raids"]),1,-1 do
+		if self.tItems["Raids"][k] ~= nil then							
+			for i=1,#self.tItems["Raids"][k].tPlayers do
+				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
+					local wnd = Apollo.LoadForm(self.xmlDoc2,"ListItem",list,self)
+					local item = Item.GetDataFromId(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].ID)
+					wnd:FindChild("Icon"):SetSprite(item:GetIcon())
+					wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+					wnd:FindChild("Looter"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
+					wnd:FindChild("Date"):SetText(self.tItems["Raids"][k].date.strDate)
+					wnd:FindChild("Cost"):SetText(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp .. " " .. self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp)
+					Tooltip.GetItemTooltipForm(self,wnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
+					counter = counter + 1
+					if counter >= self.tItems["settings"].HubItemCount then
+						icons:ArrangeChildrenTiles(0)
+						return
+					end
+				end
+			end
+		end
+	end
+	list:ArrangeChildrenVert(0)
+end
+
+function DKP:ItemListClose()
+	self.wndLootList:Show(false,false)
+end
+
+function DKP:LootListBackToHub()
+	self.wndLootList:Show(false,false)
+	self.wndHub:Show(true,false)
+end
+--- Settings
+function DKP:HubSettingsInit()
+	self.wndHubSettings = Apollo.LoadForm(self.xmlDoc2,"HubSettings",nil,self)
+	self.wndHubSettings:Show(false,true)
+	self:HubSettingsRestore()
+end
+
+function DKP:HubSettingsRestore()
+	if self.tItems["settings"].HubAutoSession == nil then self.tItems["settings"].HubAutoSession = 0 end
+	if self.tItems["settings"].HubAutoSession == 1 then 
+		self.wndHubSettings:FindChild("OptionAutoSession"):FindChild("Value"):SetCheck(true)
+		Apollo.RegisterEventHandler("Group_Join","HubCheckForAutoSession",self)
+	end
+	if self.tItems["settings"].HubNewsCount == nil then self.tItems["settings"].HubNewsCount = 5 end
+	self.wndHubSettings:FindChild("OptionItemNewsCount"):FindChild("Value"):SetText(self.tItems["settings"].HubNewsCount)
+	if self.tItems["settings"].HubItemCount == nil then self.tItems["settings"].HubItemCount = 20 end
+	self.wndHubSettings:FindChild("OptionLootItemCount"):FindChild("Value"):SetText(self.tItems["settings"].HubItemCount)
+	if self.tItems["settings"].HubCallRaidBy == nil then self.tItems["settings"].HubCallRaidBy = "Date" end
+	if self.tItems["settings"].HubCallRaidBy == "Date" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Date"):SetCheck(true) end
+	if self.tItems["settings"].HubCallRaidBy == "Name" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Name"):SetCheck(true) end
+end
+
+function DKP:HubSettingsClose()
+	self.wndHubSettings:Show(false,false)
+end
+
+function DKP:HubSettingsShow()
+	self.wndHubSettings:Show(true,false)
+	self.wndHubSettings:ToFront()
+end
+
+function DKP:HubSettingsRaidNamingChanged(wndHandler,wndControl)
+	self.tItems["settings"].HubCallRaidBy = wndControl:GetName()
+end
+function DKP:HubSettingsAutoSessionEnable()
+	Apollo.RegisterEventHandler("Group_Join","HubCheckForAutoSession",self)
+	self.tItems["settings"].HubAutoSession = 1
+	if GroupLib.InRaid() and not self.bIsRaidSession then self:RaidOpenSummary("New") end
+end
+
+function DKP:HubSettingsAutoSessionDisable()
+	Apollo.RemoveEventHandler("Group_Join", self)
+	self.tItems["settings"].HubAutoSession = 0
+end
+
+function DKP:HubCheckForAutoSession()
+	if GroupLib.InRaid() and not self.bIsRaidSession then self:RaidOpenSummary("New") end
+end
+
+function DKP:HubSettingsSetNewsCount(wndHandler,wndControl,strText)
+	if tonumber(strText) then
+		local value = tonumber(strText)
+		if value > 0 and value <= 50 then
+			self.tItems["settings"].HubNewsCount = value
+		else
+			wndControl:SetText("5")
+			self.tItems["settings"].HubNewsCount = 5
 		end
 	else
-		self:AttendancePopulate()
+		wndControl:SetText("5")
+		self.tItems["settings"].HubNewsCount = 5
 	end
+end
 
+function DKP:HubSettingsSetLootCount(wndHandler,wndControl,strText)
+	if tonumber(strText) then
+		local value = tonumber(strText)
+		if value > 0 and value <= 50 then
+			self.tItems["settings"].HubNewsCount = value
+		else
+			wndControl:SetText("20")
+			self.tItems["settings"].HubNewsCount = 20
+		end
+	else
+		wndControl:SetText("20")
+		self.tItems["settings"].HubNewsCount = 20
+	end
 end
