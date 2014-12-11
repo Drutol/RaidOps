@@ -312,8 +312,8 @@ function DKP:BidLooterItemSelected(wndHandler,wndControl)
 	
 end
 
-function DKP:BidMasterItemSelected(wndHandler,wndControl)
-	self.SelectedMasterItem = wndControl:FindChild("ItemName"):GetText()
+function DKP:BidMasterItemSelected()
+	self.SelectedMasterItem = Hook.tMasterLootSelectedItem.itemDrop:GetName()
 	self.wndInsertedMasterButton:Enable(true)
 	self:BidMatchIndicatorsByItem(self.SelectedMasterItem)
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
@@ -1533,14 +1533,13 @@ function DKP:TradeRemove( wndHandler, wndControl, eMouseButton )
 	end
 end
 
--------------- Hook to Carbine's player disp method
+-------------- Hook to Carbine's ML addon
 
 function DKP:HookToMasterLootDisp()
 	if not self:IsHooked(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList") then
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
-		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck")
-		Print("Succes")
+		self:PostHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck","BidMasterItemSelected")
 	end
 end
 function sortMasterLootEasyDKPasc(a,b)
@@ -1648,14 +1647,3 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 end
 
-function DKP:OnItemCheck(luaCaller,wndHandler, wndControl, eMouseButton)
-	if eMouseButton ~= GameLib.CodeEnumInputMouse.Right then
-		local tItemInfo = wndHandler:GetData()
-		if tItemInfo and tItemInfo.bIsMaster then
-			luaCaller.tMasterLootSelectedItem = tItemInfo
-			luaCaller.tMasterLootSelectedLooter = nil
-			luaCaller:OnMasterLootUpdate(true)
-			self:BidMasterItemSelected(wndHandler,wndControl)
-		end
-	end
-end

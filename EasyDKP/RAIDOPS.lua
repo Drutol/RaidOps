@@ -170,8 +170,7 @@ end
 
 function DKP:AttendancePopulate()
 	local grid = self.wndAttendance:FindChild("Grid")
-	grid:SetColumnText(7,"LOL")
-	
+	grid:DeleteAll()
 	for i=0,table.maxn(self.tItems) do -- Adding rows
 		if self.tItems[i] ~= nil then
 			grid:AddRow(self.tItems[i].strName)
@@ -180,7 +179,7 @@ function DKP:AttendancePopulate()
 	local skippedIDs = 0
 	for k=0,table.maxn(self.tItems["Raids"]) do -- adding cell data
 		if self.tItems["Raids"][k] ~= nil then
-			grid:SetColumnText(k+1,self.tItems["Raids"][k].date.strDate)
+			grid:SetColumnText(k+1," "..self.tItems["Raids"][k].date.strDate)
 			for i=0,table.maxn(self.tItems) do 
 				if self.tItems[i] ~= nil then
 					for j=1,#self.tItems["Raids"][k].tPlayers do
@@ -202,6 +201,26 @@ function DKP:AttendancePopulate()
 			end
 			skippedIDs = 0
 		end
+	end
+
+end
+
+function DKP:AttendanceSearch(wndHandler, wndControl, strText)
+	local grid = self.wndAttendance:FindChild("Grid")
+	if strText ~= "Search" and strText ~= "" then
+		self:AttendancePopulate()
+		local remRows = {}
+		for k=1,grid:GetRowCount() do
+			if not self:string_starts(grid:GetCellText(k,1),strText)  then
+				Print(grid:GetCellText(k,1) .. " " .. strText)
+				table.insert(remRows,k)
+			end
+		end
+		for l,row in ipairs(remRows) do
+			grid:DeleteRow(row)
+		end
+	else
+		self:AttendancePopulate()
 	end
 
 end

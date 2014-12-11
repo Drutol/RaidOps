@@ -172,7 +172,7 @@ function DKP:OnDocLoaded()
 		self:TimeAwardRestore()
 		self:HelloImHome()
 		self:EPGPInit()
-		--self:RaidOpsInit()
+		self:RaidOpsInit()
 		
 		self:CloseBigPOPUP()
 		--if self.tItems["settings"].NewStartup1 == nil then
