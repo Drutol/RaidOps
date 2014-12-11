@@ -15,6 +15,25 @@ local DKP = {}
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloNormal")
  
+ local ktClassToIcon =
+{
+	[GameLib.CodeEnumClass.Medic]       	= "Icon_Windows_UI_CRB_Medic",
+	[GameLib.CodeEnumClass.Esper]       	= "Icon_Windows_UI_CRB_Esper",
+	[GameLib.CodeEnumClass.Warrior]     	= "Icon_Windows_UI_CRB_Warrior",
+	[GameLib.CodeEnumClass.Stalker]     	= "Icon_Windows_UI_CRB_Stalker",
+	[GameLib.CodeEnumClass.Engineer]    	= "Icon_Windows_UI_CRB_Engineer",
+	[GameLib.CodeEnumClass.Spellslinger]  	= "Icon_Windows_UI_CRB_Spellslinger",
+}
+
+local ktClassToString =
+{
+	[GameLib.CodeEnumClass.Medic]       	= "Medic",
+	[GameLib.CodeEnumClass.Esper]       	= "Esper",
+	[GameLib.CodeEnumClass.Warrior]     	= "Warrior",
+	[GameLib.CodeEnumClass.Stalker]     	= "Stalker",
+	[GameLib.CodeEnumClass.Engineer]    	= "Engineer",
+	[GameLib.CodeEnumClass.Spellslinger]  	= "Spellslinger",
+}
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -153,14 +172,14 @@ function DKP:OnDocLoaded()
 		self:TimeAwardRestore()
 		self:HelloImHome()
 		self:EPGPInit()
+		--self:RaidOpsInit()
 		
 		self:CloseBigPOPUP()
-		Print(self.tItems["settings"].guildname)
-		if self.tItems["settings"].NewStartup == nil then
-			self.wndMain:FindChild("BIGPOPUP"):Show(true,false)
-			self.tItems["settings"].NewStartup = "DONE"
-		end
-
+		--if self.tItems["settings"].NewStartup1 == nil then
+		--	self.wndMain:FindChild("BIGPOPUP"):Show(true,false)
+		--	self.tItems["settings"].NewStartup1 = "DONE"
+		--end
+		--self.tItems["settings"].NewStartup = nil
 
 		
 		
@@ -232,6 +251,8 @@ function DKP:OnUnitCreated(unit,isStr)
 				end
 			end
 		end
+		
+		
 		if isNew == false then
 				local i = {}
 				i = self.tItems[existingID]
@@ -284,16 +305,28 @@ function DKP:OnTimer()
 		local unit_member = GroupLib.GetGroupMember(k)
 			if unit_member ~= nil then
 					self:OnUnitCreated(unit_member.strCharacterName,true)
+					self:RegisterPlayerClass(self:GetPlayerByIDByName(unit_member.strCharacterName),unit_member.strClassName)
 			end
 		if self.tItems["settings"].CheckAffiliation == 1 then
 			local member = GroupLib.GetUnitForGroupMember(k)
 				if member ~= nil and member:GetGuildName() ~= nil  then
-					if self:GetPlayerByIDByName(member:GetName()) == -1 and member:GetGuildName() ~= nil  and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname) then
+					if self:GetPlayerByIDByName(member:GetName()) == -1 and member:GetGuildName() ~= nil and self.tItems["settings"].guildname ~= nil   and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname)  then
 						self:OnUnitCreated(member)
+						self:RegisterPlayerClass(self:GetPlayerByIDByName(member:GetName()),member:GetClassId())
 					end
+					
 				end
 			
 			end
+		end
+	end
+end
+
+function DKP:RegisterPlayerClass(ID,strClass)
+	if ID ~= -1 then
+		if self.tItems[ID].class == nil then
+			if type(strClass) ~= "string" then strClass = ktClassToString[strClass] end
+			self.tItems[ID].class = strClass
 		end
 	end
 end
@@ -549,7 +582,7 @@ end
 function DKP:OnSave(eLevel)
 	   	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 
-
+		if newImportedDatabaseGlobal ~= nil then self.tItems = newImportedDatabaseGlobal end
 		local tSave = {}
 		if purge_database == 0 then
 			
@@ -636,6 +669,7 @@ function DKP:OnSave(eLevel)
 		else
 			tSave["purged"] = "purged"
 		end
+
 	return tSave
 end
 
@@ -1944,7 +1978,7 @@ end
 
 function DKP:DecayHide( wndHandler, wndControl, eMouseButton )
 	self.wndMain:FindChild("Decay"):Show(false,false)
-	if self.wndMain:FindChild("DecayExt"):IsShown() == true then
+	if self.wndMain:FindChild("Decay"):FindChild("DecExt"):IsChecked()  then
 		self.wndMain:FindChild("DecayExt"):Show(false,false)
 		self.wndMain:FindChild("Decay"):FindChild("DecExt"):SetCheck(false)
 		local l,t,r,b = self.wndMain:GetAnchorOffsets()
@@ -2440,63 +2474,41 @@ function DKP:SettingsDisableSync( wndHandler, wndControl, eMouseButton )
 end
 function DKP:OnChannelNameFetchResponse(channel, tMsg, strSender)
 	if tMsg.type == "FetchName" then
-		Print("RecvN")
-		if tMsg.fetchedName == GameLib.GetPlayerUnit():GetName() then
+		if tMsg.fetchedName == string.lower(GameLib.GetPlayerUnit():GetName()) then
 			local MSG = {}
 			MSG.type = "FetchNameResponse"
-			MSG.val = true
-			self.PrivateSyncChannel = ICCommLib.JoinChannel( "EasyDKPSync","OnChannelReadyToExchange",self)
+			self.PrivateSyncChannel = ICCommLib.JoinChannel( "EasyDKPSync","OnChannelReadyToExchange"..string.lower(GameLib.GetPlayerUnit():GetName()),self)
 			self.SyncChannel:SendMessage(MSG)
 			server = true
 			client = false
 		end
 	end
 	if tMsg.type == "FetchNameResponse" then
-		Print("RecvR")
-		if tMsg.val == true then
-			self.PrivateSyncChannel = ICCommLib.JoinChannel( "EasyDKPSync","OnChannelReadyToExchange",self)
+			self.PrivateSyncChannel = ICCommLib.JoinChannel( "EasyDKPSync","OnChannelReadyToExchange"..string.lower(self.wndSettings:FindChild("EditBoxFetchedName"):GetText()),self)
 			local MSG = {}
 			MSG.type = "ReadyToSync"
-			MSG.val = true
 			self.PrivateSyncChannel:SendMessage(MSG)
 			client = true
 			server = false
-		end
 	end
 end
 
 function DKP:OnChannelReadyToExchange(channel, tMsg, strSender)
 	if client == true then
-		Print("data received")
-		if tMsg.type == "SyncedData" then
-			local prev_settings = self.tItems["settings"]
-			for i=1,table.maxn(self.tItems) do
-				self.tItems[i].wnd:Destroy()
-				self.tItems[i].wnd = nil
-			end
-			self.tItems = tMsg
-			self.tItems["settings"] = prev_settings
-			self.tItems.type = nil
+		if tMsg.type == "ReqData" then
+			newImportedDatabaseGlobal = serpent.load(Base64.Decode(tMsg.exportString))
 			self.PrivateSyncChannel = nil
-			self:ForceRefresh()
-			self:ShowAll()
-			counter = table.getn(self.tItems)+1
+			if type(newImportedDatabaseGlobal) ~= "table" or newImportedDatabaseGlobal["settings"] == nil then newImportedDatabaseGlobal = nil
+			else ChatSystemLib.Command("/reloadui") end
 		end
 	end
 	if server == true then
-		Print("sending data")
 		if tMsg.type == "ReadyToSync" then
-			if tMsg.val == true then
-				self.tItems.type = "SyncedData"
-				local MSG = self.tItems
-				for i=1,table.maxn(self.tItems) do 
-					MSG[i].wnd = nil
-					MSG[i].listed = 0
-				end
-				MSG["settings"] = nil
-				self.PrivateSyncChannel:SendMessage(MSG)
-				self.PrivateSyncChannel = nil
-			end
+			local MSG = {}
+			MSG.type = "ReqData"
+			MSG.exportString = Base64.Encode(serpent.dump(self.tItems))
+			self.PrivateSyncChannel:SendMessage(MSG)
+			self.PrivateSyncChannel = nil
 		end
 	end
 end
@@ -2504,15 +2516,8 @@ function DKP:SettingsFetchData( wndHandler, wndControl, eMouseButton )
 	local fetchedNameStr = self.wndSettings:FindChild("EditBoxFetchedName"):GetText()
 	local MSG = {}
 	MSG.type = "FetchName"
-	MSG.fetchedName = fetchedNameStr
-	local succes = self.SyncChannel:SendMessage(MSG)
-	if succes == true then 
-		Print("succes")
-	end
-	if succes == false then
-		Print("failure")
-	end
-	Print("If "..fetchedNameStr.." is found the data will be Synced")
+	MSG.fetchedName = string.lower(fetchedNameStr)
+	self.SyncChannel:SendMessage(MSG)
 end
 
 function DKP:SettingsCheckFetchedNameSpelling( wndHandler, wndControl, strText )
@@ -2608,6 +2613,14 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLDKP())
 		end
 	end
+	
+	if self.wndExport:FindChild("ButtonExportSerialize"):IsChecked() then
+		self.wndExport:FindChild("ExportBox"):SetText(Base64.Encode(serpent.dump(self.tItems)))
+	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
+		newImportedDatabaseGlobal = serpent.load(Base64.Decode(self.wndExport:FindChild("ExportBox"):GetText()))
+		if type(newImportedDatabaseGlobal) ~= "table" or newImportedDatabaseGlobal["settings"] == nil then newImportedDatabaseGlobal = nil
+		else ChatSystemLib.Command("/reloadui") end
+	end
 end
 
 function DKP:ExportCloseWindow( wndHandler, wndControl, eMouseButton )
@@ -2692,7 +2705,7 @@ function DKP:ExportAsFormattedHTMLEPGP()
 					end
 				end
 			end
-			if #formatedTable[self.tItems[i].strName]["Logs"] < 1 then formatedTable[self.tItems[i].strName]["Logs"] = nil end
+			if formatedTable[self.tItems[i].strName]["Logs"] ~= nil and #formatedTable[self.tItems[i].strName]["Logs"] < 1 then formatedTable[self.tItems[i].strName]["Logs"] = nil end
 		end
 	end
 
@@ -2713,8 +2726,9 @@ function DKP:ExportAsFormattedHTMLDKP()
 						table.insert(formatedTable[self.tItems[i].strName]["Logs"],logs)
 					end
 				end
+				if #formatedTable[self.tItems[i].strName]["Logs"] < 1 then formatedTable[self.tItems[i].strName]["Logs"] = nil end
 			end
-			if #formatedTable[self.tItems[i].strName]["Logs"] < 1 then formatedTable[self.tItems[i].strName]["Logs"] = nil end
+			
 		end
 	end
 
@@ -2948,7 +2962,6 @@ function DKP:StandbyListItemDeselected( wndHandler, wndControl, eMouseButton )
 		end
 	end
 end
-
 
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

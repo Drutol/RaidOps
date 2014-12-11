@@ -434,10 +434,10 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and self.tItems["Standby"][string.lower(self.tItems[i].strName)] == nil then
 			if self.wndEPGPSettings:FindChild("DecayEP"):IsChecked() == true then
-				self.tItems[i].EP = self.tItems[i].EP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100)
+				self.tItems[i].EP = math.floor(self.tItems[i].EP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100))
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
-				self.tItems[i].GP = self.tItems[i].GP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100)
+				self.tItems[i].GP = math.floor(self.tItems[i].GP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100))
 			end
 		end
 	end
@@ -549,6 +549,16 @@ function DKP:EPGPCostListCheckChannel( wndHandler, wndControl, eMouseButton )
 	end
 end
 
+function DKP:EPGPGetPRByName(strName)
+	local ID = self:GetPlayerByIDByName(strName)
+	if ID ~= -1 then
+		if self.tItems[ID].GP ~= 0 then
+			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/self.tItems[ID].GP)
+		else
+			return "0"
+		end
+	else return "0" end
+end
 
 
 

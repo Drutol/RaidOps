@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Addon Author="Drutol@Jabbit" APIVersion="9" Name="EasyDKP" Description="">
+    <Script Name="libs/GeminiHook-1.0.lua"/>
+    <Script Name="libs/Base64.lua"/>
+    <Script Name="libs/Serpent.lua"/>
     <Script Name="DKP.lua"/>
     <Script Name="RAID.lua"/>
     <Script Name="BID.lua"/>
     <Script Name="EPGP.lua"/>
-    <Script Name="libs/GeminiHook-1.0.lua"/>
+    <Script Name="RAIDOPS.lua"/>
     <Form Name="DKP.xml"/>
     <Form Name="DKP2.xml"/>
 </Addon>

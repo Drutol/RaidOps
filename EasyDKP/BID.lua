@@ -9,8 +9,20 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
+local ktClassToIcon =
+{
+	[GameLib.CodeEnumClass.Medic]       	= "Icon_Windows_UI_CRB_Medic",
+	[GameLib.CodeEnumClass.Esper]       	= "Icon_Windows_UI_CRB_Esper",
+	[GameLib.CodeEnumClass.Warrior]     	= "Icon_Windows_UI_CRB_Warrior",
+	[GameLib.CodeEnumClass.Stalker]     	= "Icon_Windows_UI_CRB_Stalker",
+	[GameLib.CodeEnumClass.Engineer]    	= "Icon_Windows_UI_CRB_Engineer",
+	[GameLib.CodeEnumClass.Spellslinger]  	= "Icon_Windows_UI_CRB_Spellslinger",
+}
+
 local bInitialized = false
 function DKP:BidBeginInit()
+	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList","InsertLootChildren")
+	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList","InsertLooterChildren")
 	Apollo.RegisterTimerHandler(1, "OnWait", self)
 	self.wait_timer = ApolloTimer.Create(1, true, "OnWait", self)
 end
@@ -28,12 +40,12 @@ function DKP:OnWait()
 end
 
 function DKP:BidCompleteInit()
-	wait_counter = 0
-	self.wait_timer:Stop()
 	bInitialized = true
+	self.wait_timer:Stop()
 	
 	--Hook.wndLooter:Show(true,false)
 	--Hook.wndMasterLoot:Show(true,false)
+	
 	Apollo.RegisterEventHandler("MasterLootUpdate","BidUpdateItemDatabase", self)
 	if self.ItemDatabase == nil then
 		self.ItemDatabase = {}
@@ -49,6 +61,26 @@ function DKP:BidCompleteInit()
 	self.wndInsertedLooterButton:Enable(false)
 	self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertMasterBid",Hook.wndMasterLoot,self)
 	self.wndInsertedMasterButton:Enable(false)
+	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-200,63)
+	--Asc/Desc
+	if self.tItems["settings"].BidSortAsc == nil then self.tItems["settings"].BidSortAsc = 1 end
+	if self.tItems["settings"].BidMLSorting == nil then self.tItems["settings"].BidMLSorting = 1 end
+	
+	
+	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc2,"InsertMLControls",Hook.wndMasterLoot,self)
+	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
+	if self.tItems["settings"].BidSortAsc == 1 then self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):SetCheck(true) 
+	else self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):SetCheck(true) end
+	
+	if self.tItems["settings"].BidMLSorting == 0 then
+		self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):Enable(false)
+		self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):Enable(false)
+	else
+		self.wndInsertedControls:FindChild("Window"):FindChild("Sort"):SetCheck(true)
+	end
+	self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
+	Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(5,84,-131,128)
+	self:HookToMasterLootDisp()
 	
 	self.PrevSelectedLooterItem = nil
 	self.CurrentItemChatStr = nil
@@ -77,11 +109,13 @@ function DKP:BidCompleteInit()
 	if self.tItems["settings"].BidMin ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):SetText(self.tItems["settings"].BidMin) end
 	if self.tItems["settings"].BidCount ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText(self.tItems["settings"].BidCount) end
 	if self.tItems["settings"].BidOver ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumOverBid"):FindChild("Field"):SetText(self.tItems["settings"].BidOver) end
-	if self.tItems["settings"].BidAllowOffspec ~= nil and self.tItems["settings"].BidAllowOffspec == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("AllowOffspec"):SetCheck(true) end
+	if self.tItems["settings"].BidAllowOffspec == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("AllowOffspec"):SetCheck(true) end
 	if self.tItems["settings"].BidSpendOneMore == nil then self.tItems["settings"].BidSpendOneMore = 0 end
 	if self.tItems["settings"].BidSpendOneMore == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("GlobalOptions"):FindChild("OneMore"):SetCheck(true) end
 	if self.tItems["settings"].BidRollModifier == nil then self.tItems["settings"].BidRollModifier = 5 end
+	if self.tItems["settings"].BidEPGPOffspec == nil then self.tItems["settings"].BidEPGPOffspec = 5 end
 	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("EditBox"):SetText(self.tItems["settings"].BidRollModifier)
+	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("EditBox"):SetText(self.tItems["settings"].BidEPGPOffspec)
 	
 	self.ChannelPrefix = "/party "
 	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("GlobalOptions"):FindChild("PartyMode"):SetCheck(true)
@@ -98,19 +132,22 @@ function DKP:BidCompleteInit()
 	lol3:FindChild("ItemName"):SetText("BiggerWeapun")
 	local lol = Apollo.LoadForm(Hook.xmlDoc,"CharacterButton",Hook.wndMasterLoot_LooterList,self)
 	lol:FindChild("CharacterName"):SetText("Drutol Windchaser")
-	Apollo.LoadForm(Hook.xmlDoc,"CharacterButton",Hook.wndMasterLoot_LooterList,self)
+	local lol5 = Apollo.LoadForm(Hook.xmlDoc,"CharacterButton",Hook.wndMasterLoot_LooterList,self)
+	lol5:FindChild("CharacterName"):SetText("Player1")
+
 	
 	local lol1 = Apollo.LoadForm(Hook.xmlDoc,"ItemButton",Hook.wndMasterLoot_ItemList,self)
 	lol1:FindChild("ItemName"):SetText("Galactium Chunk")
 	Hook.wndLooter_ItemList:ArrangeChildrenVert()
-	Hook.wndMasterLoot_LooterList:ArrangeChildrenVert()
-	Hook.wndMasterLoot_ItemList:ArrangeChildrenVert()]]
-	
+	Hook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKP)
+	Hook.wndMasterLoot_ItemList:ArrangeChildrenVert()
+	self:InsertLootChildren()
+	self:InsertLooterChildren()]]
 	-- Resume
 	
 	if self.tItems["BidRes"] ~= nil then self:BidResumeSession() end
 	
-	self:BidInsertChildren()
+	--self:BidInsertChildren()
 end
 
 function DKP:BidResumeSession()
@@ -118,10 +155,8 @@ function DKP:BidResumeSession()
 end
 
 function DKP:BidSelectedChannelChanged( wndHandler, wndControl, eMouseButton )
-	Print(wndControl:GetText())
 	if wndControl:GetText() == "   Party" then self.ChannelPrefix = "/party " end
 	if wndControl:GetText() == "   Guild" then self.ChannelPrefix = "/guild " end
-	Print(self.ChannelPrefix)
 end
 
 --[[function DKP:BidSelectedChannelCheck( wndHandler, wndControl, eMouseButton )
@@ -130,6 +165,19 @@ end
 		self.ChannelPrefix = "/party "
 	end
 end]]
+
+function DKP:BidMLSortEnable()
+	self.tItems["settings"].BidMLSorting = 1
+	self.wndInsertedControls:FindChild("Asc"):Enable(true)
+	self.wndInsertedControls:FindChild("Desc"):Enable(true)
+
+end
+
+function DKP:BidMLSortDisable()
+	self.tItems["settings"].BidMLSorting = 0
+	self.wndInsertedControls:FindChild("Asc"):Enable(false)
+	self.wndInsertedControls:FindChild("Desc"):Enable(false)
+end
 
 
 function DKP:BidCheckConditions()
@@ -149,21 +197,42 @@ function DKP:BidCheckConditions()
 	
 end
 
+function DKP:BidSetSortAsc()
+	self.tItems["settings"].BidSortAsc = 1
+	self:BidMLSortPlayers()
+end
+
+function DKP:BidSetSortDesc()
+	self.tItems["settings"].BidSortAsc = 0
+	self:BidMLSortPlayers()
+end
+
+function DKP:BidRandomLooter()
+	local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
+	local luckyChild = children[math.random(#children)]
+	for k,child in pairs(children) do
+		child:SetCheck(false)
+	end
+	Hook.tMasterLootSelectedLooter = luckyChild:GetData()
+	Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
+	luckyChild:SetCheck(true)
+end
+
 function DKP:BidUpdateItemDatabase()
 	local curItemList = GameLib.GetMasterLoot()
 	if curItemList ~= nil then
-		for i=1,table.getn(curItemList) do
-			self.ItemDatabase[curItemList[i]:GetName()] = {}
-			self.ItemDatabase[curItemList[i]:GetName()].ID= curItemList[i]:GetItemId()
-			self.ItemDatabase[curItemList[i]:GetName()].quality = curItemList[i]:GetItemQuality()
-			self.ItemDatabase[curItemList[i]:GetName()].strChat = curItemList[i]:GetChatLinkString()
-			self.ItemDatabase[curItemList[i]:GetName()].sprite = curItemList[i]:GetIcon()
-			self.ItemDatabase[curItemList[i]:GetName()].strItem = curItemList[i]:GetName()
-			self.ItemDatabase[curItemList[i]:GetName()].Power = curItemList[i]:GetItemPower()
-			if curItemList[i]:GetSlotName() ~= "" then
-				self.ItemDatabase[curItemList[i]:GetName()].slot = curItemList[i]:GetSlotName()
+		for idxNewItem, tCurNewItem in pairs(curItemList) do
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()] = {}
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()].ID= tCurNewItem.itemDrop:GetItemId()
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()].quality = tCurNewItem.itemDrop:GetItemQuality()
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()].strChat = tCurNewItem.itemDrop:GetChatLinkString()
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()].sprite = tCurNewItem.itemDrop:GetIcon()
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()].strItem = tCurNewItem.itemDrop:GetName()
+			self.ItemDatabase[tCurNewItem.itemDrop:GetName()].Power = tCurNewItem.itemDrop:GetItemPower()
+			if tCurNewItem.itemDrop:GetSlotName() ~= "" then
+				self.ItemDatabase[tCurNewItem.itemDrop:GetName()].slot = tCurNewItem.itemDrop:GetSlotName()
 			else
-				self.ItemDatabase[curItemList[i]:GetName()].slot = curItemList[i]:GetSlot()
+				self.ItemDatabase[tCurNewItem.itemDrop:GetName()].slot = tCurNewItem.itemDrop:GetSlot()
 			end
 		end
 	end
@@ -171,36 +240,24 @@ function DKP:BidUpdateItemDatabase()
 	self.wait_timer = ApolloTimer.Create(1, true, "OnWait", self)
 end
 
-function DKP:BidInsertChildren()
-	self.wait_timer:Stop()
-	wait_counter = 0 
-	if #self.InsertedCountersList ~= #Hook.wndMasterLoot_LooterList:GetChildren() then 
-		self.InsertedCountersList = {} 
-		self.InsertedIndicators ={}
-		self.ActiveIndicators = {}
-	end
-	
+--[[function DKP:BidInsertChildren()
 	local looterChildren = Hook.wndLooter_ItemList:GetChildren()
 	for i=1,#looterChildren do
 			looterChildren[i]:AddEventHandler("MouseButtonUp", "BidLooterItemSelected", self)
 	end
-	
+end
+function DKP:InsertLooterChildren()
+		self.InsertedCountersList = {} 
 	local masterChildren = Hook.wndMasterLoot_LooterList:GetChildren()
 	for i=1,#masterChildren do
-		local strName = masterChildren[i]:FindChild("CharacterName"):GetText()
-		local ID = self:GetPlayerByIDByName(strName)
-		if ID ~= -1 then
-			local wndCounter = Apollo.LoadForm(self.xmlDoc,"InsertDKPIndicator",masterChildren[i],self)
-			masterChildren[i]:AddEventHandler("ButtonCheck", "BidMasterPlayerSelected", self)
-			masterChildren[i]:AddEventHandler("ButtonUncheck", "BidMasterPlayerUnSelected", self)
-			wndCounter:SetText("DKP : ".. self.tItems[ID].net)
-			wndCounter:FindChild("Indicator"):Show(false,true)
-			self.InsertedCountersList[strName] = wndCounter
-		end
+
 	end
-	
+	self:BidMLSearch()
+end
+function DKP:InsertLootChildren()	
 	local masterLootChildren = Hook.wndMasterLoot_ItemList:GetChildren()
-	
+	self.InsertedIndicators ={}
+	self.ActiveIndicators = {}
 	for i=1,#masterLootChildren do
 		masterLootChildren[i]:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
 		masterLootChildren[i]:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
@@ -208,10 +265,7 @@ function DKP:BidInsertChildren()
 		indi:Show(false,true)
 		self.InsertedIndicators[masterLootChildren[i]:FindChild("ItemName"):GetText()] = indi
 	end
-	
-	self.wndInsertedLooterButton:Enable(false)
-	self.SelectedLooterItem = nil
-end
+end]]
 
 function DKP:BidMasterPlayerSelected(wndHandler,wndControl)
 	self:BidMatchIndicatorsByPlayer(wndControl:FindChild("CharacterName"):GetText())
@@ -221,6 +275,32 @@ function DKP:BidMasterPlayerUnSelected(wndHandler,wndControl)
 	self:BidResetIndicators()
 end
 
+function DKP:BidMLSearch(wndHandler,wndControl)
+	if self.wndInsertedSearch:GetText() ~= "Search" then
+		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
+		
+		for k,child in ipairs(children) do
+			child:Show(true,true)
+		end
+		
+		for k,child in ipairs(children) do
+			if not self:string_starts(child:FindChild("CharacterName"):GetText(),self.wndInsertedSearch:GetText()) then child:Show(false,true) end
+		end
+		
+		if wndControl ~= nil and wndControl:GetText() == "" then wndControl:SetText("Search") end
+	end
+	self:BidMLSortPlayers()
+end
+
+function DKP:BidMLSortPlayers()
+	if self.tItems["settings"].BidMLSorting == 1 then
+		if self.tItems["settings"].BidSortAsc == 1 then
+			Hook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPasc)
+		else
+			Hook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPdesc)
+		end
+	end
+end
 
 function DKP:BidLooterItemSelected(wndHandler,wndControl)
 	self.SelectedLooterItem = wndControl:FindChild("ItemName"):GetText()
@@ -240,11 +320,13 @@ function DKP:BidMasterItemSelected(wndHandler,wndControl)
 	self.SelectedMasterItem = wndControl:FindChild("ItemName"):GetText()
 	self.wndInsertedMasterButton:Enable(true)
 	self:BidMatchIndicatorsByItem(self.SelectedMasterItem)
+	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
 end
 
 function DKP:BidMasterItemUnSelected(wndHandler,wndControl)
 	self.SelectedMasterItem = nil
 	self.wndInsertedMasterButton:Enable(false)
+	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
 	self:BidResetIndicators()
 end
 
@@ -293,6 +375,14 @@ function DKP:BidLinkItem()
 	end
 end
 
+function DKP:BidEnableOffspec()
+	self.tItems["settings"].BidAllowOffspec = 1
+end
+
+function DKP:BidDisableOffspec()
+	self.tItems["settings"].BidAllowOffspec = 0
+end
+
 
 function DKP:BidSetMin( wndHandler, wndControl, eMouseButton )
 	if tonumber(self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):GetText()) == nil then
@@ -329,9 +419,7 @@ function DKP:BidStart(strName)
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("ModifiedRoll"):IsChecked() == true then self.mode = "modified"
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("BoxOpen"):IsChecked() == true then self.mode = "EPGP" end
 
-	Print(self.mode)
 	if self.mode ~= nil then
-		Print("LOL")
 		if self.CurrentBidSession == nil then
 			self.CurrentBidSession = {} 
 			self.CurrentBidSession.HighestBidEver = {}
@@ -418,9 +506,15 @@ function DKP:BidMessage(channelCurrent, tMessage)
 		ChatSystemLib.Command("/w " .. tMessage.strSender .. " " .. strResult)
 	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.mode == "pure" then
 		local strResult = self:BidProcessMessageRoll({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
+		if strResult == -1 then return end
 		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
 	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.mode == "modified" then
 		local strResult = self:BidProcessMessageRoll({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
+		if strResult == -1 then return end
+		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
+	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper and self.mode == "EPGP" and self.ChannelPrefix == "/party " or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.mode == "EPGP" and self.ChannelPrefix == "/guild " then
+		local strResult = self:BidProcessMessageEPGP({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
+		if strResult == -1 then return end
 		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
 	end
 end
@@ -428,7 +522,40 @@ end
 function DKP:BidProcessMessageEPGP(tData)
 	local strReturn = ""
 	
-	
+	if tData.strMsg == "!off" and self.tItems["settings"].BidAllowOffspec == 1 or tData.strMsg == "!bid" then
+		local ID = self:GetPlayerByIDByName(tData.strSender)
+		if ID ~= -1 then
+			local bAlreadyBid = false
+			local bidID
+			for i=1,#self.CurrentBidSession.Bidders do
+				if tData.strSender == self.CurrentBidSession.Bidders[i].strName then
+					bAlreadyBid = true
+					bidID = i
+					break
+				end
+			end
+			
+			if not bAlreadyBid then
+				local newBidder = {}
+				newBidder.HighestBid = (tData.strMsg == "!off" and tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100) or tonumber(self:EPGPGetPRByName(tData.strSender)))
+				newBidder.strName = tData.strSender
+				newBidder.offspec = (tData.strMsg == "!off" and true or false)
+				table.insert(self.CurrentBidSession.Bidders,newBidder)
+				strReturn = "Accepted"
+			elseif self.CurrentBidSession.Bidders[bidID].offspec == false and tData.strMsg == "!off" then
+				self.CurrentBidSession.Bidders[bidID].offspec = true
+				self.CurrentBidSession.Bidders[bidID].HighestBid = tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100)
+				strReturn = "Accepted"
+			else
+				strReturn = "Already bid"
+			end
+			self:BidUpdateBiddersList()
+		else
+			strReturn = "No such player in Database"
+		end
+	else
+		strReturn = -1
+	end
 	
 
 
@@ -1408,4 +1535,118 @@ function DKP:TradeRemove( wndHandler, wndControl, eMouseButton )
 		self.tItems["trades"][tradeID] = nil
 		self:TradePopulateTrades()
 	end
+end
+
+-------------- Hook to Carbine's player disp method
+
+function DKP:HookToMasterLootDisp()
+	if not self:IsHooked(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList") then
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
+		Print("Succes")
+	end
+end
+function sortMasterLootEasyDKPasc(a,b)
+	if DKP.tItems["EPGP"].Enable == 1 then
+		return DKP:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) > DKP:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
+	else
+		local IDa = DKP:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
+		local IDb = DKP:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
+		if IDa ~= -1 and IDb ~= -1 then
+			return DKP.tItems[IDa].net > DKP.tItems[IDb].net
+		else
+			return a:FindChild("CharacterName"):GetText() < b:FindChild("CharacterName"):GetText() 
+		end
+	end
+end
+function sortMasterLootEasyDKPdesc(a,b)
+	if DKP.tItems["EPGP"].Enable == 1 then
+		return DKP:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) < DKP:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
+	else
+		local IDa = DKP:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
+		local IDb = DKP:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
+		if IDa ~= -1 and IDb ~= -1 then
+			return DKP.tItems[IDa].net < DKP.tItems[IDb].net
+		else
+			return a:FindChild("CharacterName"):GetText() < b:FindChild("CharacterName"):GetText() 
+		end
+	end
+end
+function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
+
+	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
+
+	if luaCaller.tMasterLootSelectedItem ~= nil then
+		for idx, tItem in pairs (tMasterLootItemList) do
+			if tItem.nLootId == luaCaller.tMasterLootSelectedItem.nLootId then
+				local bStillHaveLooter = false
+				for idx, unitLooter in pairs(tItem.tLooters) do
+					local wndCurrentLooter = Apollo.LoadForm(luaCaller.xmlDoc, "CharacterButton", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())
+					wndCurrentLooter:FindChild("CharacterLevel"):SetText(unitLooter:GetBasicStats().nLevel)
+					wndCurrentLooter:FindChild("ClassIcon"):SetSprite(ktClassToIcon[unitLooter:GetClassId()])
+					wndCurrentLooter:SetData(unitLooter)
+					local strName = unitLooter:GetName()
+					local ID = self:GetPlayerByIDByName(strName)
+					if ID ~= -1 then
+						local wndCounter = Apollo.LoadForm(self.xmlDoc,"InsertDKPIndicator",wndCurrentLooter,self)
+						wndCurrentLooter:AddEventHandler("ButtonCheck", "BidMasterPlayerSelected", self)
+						wndCurrentLooter:AddEventHandler("ButtonUncheck", "BidMasterPlayerUnSelected", self)
+						if self.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. self.tItems[ID].net)
+						else wndCounter:SetText("PR : ".. self:EPGPGetPRByName(self.tItems[ID].strName)) end
+						wndCounter:FindChild("Indicator"):Show(false,true)
+						self.InsertedCountersList[strName] = wndCounter
+					end
+					if luaCaller.tMasterLootSelectedLooter == unitLooter then
+						wndCurrentLooter:SetCheck(true)
+						bStillHaveLooter = true
+					end
+				end
+
+				if not bStillHaveLooter then
+					luaCaller.tMasterLootSelectedLooter = nil
+				end
+
+				-- get out of range people
+				-- tLootersOutOfRange
+				if tItem.tLootersOutOfRange and next(tItem.tLootersOutOfRange) then
+					for idx, strLooterOOR in pairs(tItem.tLootersOutOfRange) do
+						local wndCurrentLooter = Apollo.LoadForm(luaCaller.xmlDoc, "CharacterButton", luaCaller.wndMasterLoot_LooterList, luaCaller)
+						wndCurrentLooter:FindChild("CharacterName"):SetText(String_GetWeaselString(Apollo.GetString("Group_OutOfRange"), strLooterOOR))
+						wndCurrentLooter:FindChild("ClassIcon"):SetSprite("CRB_GroupFrame:sprGroup_Disconnected")
+						wndCurrentLooter:Enable(false)
+					end
+				end
+				self:BidMLSortPlayers()
+			end
+		end
+	end
+end
+
+function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
+
+	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
+	
+	self.InsertedIndicators ={}
+	self.ActiveIndicators = {}
+	
+	for idx, tItem in ipairs (tMasterLootItemList) do
+		local wndCurrentItem = Apollo.LoadForm(luaCaller.xmlDoc, "ItemButton", luaCaller.wndMasterLoot_ItemList, luaCaller)
+		wndCurrentItem:FindChild("ItemIcon"):SetSprite(tItem.itemDrop:GetIcon())
+		wndCurrentItem:FindChild("ItemName"):SetText(tItem.itemDrop:GetName())
+		wndCurrentItem:SetData(tItem)
+		wndCurrentItem:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
+		wndCurrentItem:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
+		local indi = Apollo.LoadForm(self.xmlDoc,"InsertItemIndicator",wndCurrentItem,self)
+		indi:Show(false,true)
+		self.InsertedIndicators[wndCurrentItem:FindChild("ItemName"):GetText()] = indi
+		if luaCaller.tMasterLootSelectedItem ~= nil and (luaCaller.tMasterLootSelectedItem.nLootId == tItem.nLootId) then
+			wndCurrentItem:SetCheck(true)
+			luaCaller:RefreshMasterLootLooterList(tMasterLootItemList)
+		end
+		Tooltip.GetItemTooltipForm(luaCaller, wndCurrentItem , tItem.itemDrop, {bPrimary = true, bSelling = false, itemCompare = tItem.itemDrop:GetEquippedItemForItemType()})
+	end
+	
+	luaCaller.wndMasterLoot_ItemList:ArrangeChildrenVert(0)
+
 end

@@ -1,0 +1,44 @@
+<table border='3' bgcolor='#339900' cellpadding='10' cellspacing='0'><tr><td> : false</td></tr>
+<tr><td>eRaceId : 3</td></tr>
+<tr><td>nMana : 0</td></tr>
+<tr><td>nManaMax : 0</td></tr>
+<tr><td>nShieldMax : 7980</td></tr>
+<tr><td>bCanInvite : false</td></tr>
+<tr><td>bPending : false</td></tr>
+<tr><td>strClassName : Engineer</td></tr>
+<tr><td>ePathType : 3</td></tr>
+<tr><td>nHealth : 19283</td></tr>
+<tr><td>bIsOnline : true</td></tr>
+<tr><td>strRaceName : Granok{p:Granok}</td></tr>
+<tr><td>bCanMark : false</td></tr>
+<tr><td>bIsLeader : false</td></tr>
+<tr><td>nLevel : 50</td></tr>
+<tr><td>nShield : 7980</td></tr>
+<tr><td>bIsMentored : false</td></tr>
+<tr><td>nEffectiveLevel : 0</td></tr>
+<tr><td>nAbsorptionMax : 0</td></tr>
+<tr><td>bCanKick : false</td></tr>
+<tr><td>nOrder : 2</td></tr>
+<tr><td>nMenteeIdx : 0</td></tr>
+<tr><td>bRaidAssistant : false</td></tr>
+<tr><td>nInterruptArmorMax : 0</td></tr>
+<tr><td>bHasSetReady : false</td></tr>
+<tr><td>nMemberIdx : 10</td></tr>
+<tr><td>bRoleLocked : false</td></tr>
+<tr><td>bReady : false</td></tr>
+<tr><td>bMainAssist : false</td></tr>
+<tr><td>bMainTank : false</td></tr>
+<tr><td>bDPS : false</td></tr>
+<tr><td>nHealthMax : 25356</td></tr>
+<tr><td>bTank : false</td></tr>
+<tr><td>nInterruptArmor : 0</td></tr>
+<tr><td>bDisconnected : false</td></tr>
+<tr><td>nAbsorption : 0</td></tr>
+<tr><td><b>tMentoredBy</b><table border='1' bgcolor='#FFFFCC' cellpadding='5' cellspacing='0'><tr></tr></table>
+</td></tr>
+<tr><td>strCharacterName : Chimaso Tendrinks</td></tr>
+<tr><td>bIsMentoring : false</td></tr>
+<tr><td>eClassId : 2</td></tr>
+<tr><td>nMarkerId : 0</td></tr>
+<tr><td>bHealer : false</td></tr>
+</table>

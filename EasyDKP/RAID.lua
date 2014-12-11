@@ -312,6 +312,7 @@ function DKP:RaidOpenSummary(RaidName)
 			tData.tMisc.tBossKills.prototype4 = 0
 			tData.tMisc.tBossKills.converCount = 0
 			tData.tMisc.tBossKills.elementals = 0
+			tData.tMisc.tBossKills.pairs = {}
 			tData.misc = 0
 			tData.FirstIteration = true
 			table.insert(self.tItems["Raids"],tData)
@@ -422,7 +423,7 @@ end
 
 function DKP:RaidUpdateCurrentRaidSession() 
 
-	if GroupLib.InRaid() == false then
+	--[[if GroupLib.InRaid() == false then
 		Print("You are not in raid , close session")
 		return
 	end
@@ -442,16 +443,18 @@ function DKP:RaidUpdateCurrentRaidSession()
 					local ID = self:GetPlayerByIDByName(unit_member.strCharacterName)
 					if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + (0.00027 * self.tItems["settings"].RaidTimer) end
 				end
-			end
+			end]]
 		
-		--[[if currentRaidID ~= nil then
+		if currentRaidID ~= nil then
 		self:RaidBackupSession()
 		local currentPlayers = {}
 		for k=1,math.random(15, 20) do
 			table.insert(currentPlayers,"Player"..tostring(k))
-		end]]
+		end
 		
-		
+		for k=1,GroupLib.GetMemberCount(),1 do -- Getting Players List
+				self:ExportShowPreloadedText(tohtml(GroupLib.GetGroupMember(k)))
+		end
 		
 		--Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), "SUMWEAPON", "Player"..tostring(math.random(2,14))))
 		
@@ -685,6 +688,7 @@ function DKP:RaidUpdateSummaryPlayerDetails()
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(false,true)
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("PlayerLabels"):Show(true,true)
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("LootLabels"):Show(false,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("OrderContainer"):Show(true,true)
 	
 	
 	if self.bIsRaidSession == false then tAllRaidMembersInSession = self.tItems["Raids"][currentRaidID].tPlayers end
@@ -694,31 +698,74 @@ function DKP:RaidUpdateSummaryPlayerDetails()
 	for i=1,table.getn(self.tLootItems) do
 		self.tLootItems[i]:Destroy()
 	end
-	for i=1,table.getn(tAllRaidMembersInSession) do
-		local wnd = Apollo.LoadForm(self.xmlDoc , "RaidPlayerItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
-		wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[i].name)
-		wnd:FindChild("Mod"):SetText(tostring(tAllRaidMembersInSession[i].dkpMod))
-		if tAllRaidMembersInSession[i].bLeft ~= "Left" and tAllRaidMembersInSession[i].bLeft ~= "!Left" then
-			wnd:FindChild("Left"):SetText(tostring("Time to come back (s) :" .. tAllRaidMembersInSession[i].bLeft))
-		end
-		if tAllRaidMembersInSession[i].bLeft == "Left" then
-			wnd:FindChild("Left"):Show(true,false)
-		elseif tonumber(tAllRaidMembersInSession[i].bLeft) ~= nil then
-			wnd:FindChild("Left"):SetText(tAllRaidMembersInSession[i].bLeft .. "(s)")
-		else
-			wnd:FindChild("Left"):Show(false,true)
-		end
-		wnd:FindChild("Deaths"):SetText(tAllRaidMembersInSession[i].Deaths)
-		local strTooltip = "Loot:\n"
-		if tAllRaidMembersInSession[i].tClaimedLoot ~= nil then
-			for j=1,table.getn(tAllRaidMembersInSession[i].tClaimedLoot) do
-				strTooltip = strTooltip .. tAllRaidMembersInSession[i].tClaimedLoot[j].name .. " - " .. (self.tItems["EPGP"].Enable == 1 and string.sub(self:EPGPGetItemCostByID(tAllRaidMembersInSession[i].tClaimedLoot[j].ID),32) .. " GP" or tostring(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)) .. "\n"
+	
+	
+	if self.wndRaidSummary:FindChild("SortDeaths"):IsChecked() or self.wndRaidSummary:FindChild("SortEarned"):IsChecked() then
+		local IDsOrder = {}
+		if self.wndRaidSummary:FindChild("SortDeaths"):IsChecked() then
+			
+			for k,player in ipairs(tAllRaidMembersInSession) do
+				table.insert(IDsOrder,{ID = k,value = player.Deaths})
 			end
+			table.sort(IDsOrder,compare_easyDKP)
+			
+			
+		
+		else
+			for k,player in ipairs(tAllRaidMembersInSession) do
+				table.insert(IDsOrder,{ID = k,value = player.dkpMod})
+			end
+			table.sort(IDsOrder,compare_easyDKP)
+		
 		end
-		if self.tItems["EPGP"].Enable == 1 then wnd:FindChild("Mod"):SetTooltip("Earned EP") end
-		if strTooltip == "Loot:\n" then wnd:FindChild("Loot"):Show(false) end
-		wnd:FindChild("Loot"):SetTooltip(strTooltip)
-		table.insert(self.tPlayersRaidItems,wnd)
+		
+		for i=1,table.getn(IDsOrder) do
+			local wnd = Apollo.LoadForm(self.xmlDoc , "RaidPlayerItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
+			wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[IDsOrder[i].ID].name)
+			wnd:FindChild("Mod"):SetText(tostring(tAllRaidMembersInSession[IDsOrder[i].ID].dkpMod))
+			if tAllRaidMembersInSession[IDsOrder[i].ID].bLeft == "Left" then
+				wnd:FindChild("Left"):Show(true,false)
+			elseif tonumber(tAllRaidMembersInSession[IDsOrder[i].ID].bLeft) ~= nil then
+				wnd:FindChild("Left"):SetText(tAllRaidMembersInSession[IDsOrder[i].ID].bLeft .. "(s)")
+			else
+				wnd:FindChild("Left"):Show(false,true)
+			end
+			wnd:FindChild("Deaths"):SetText(tAllRaidMembersInSession[IDsOrder[i].ID].Deaths)
+			local strTooltip = "Loot:\n"
+			if tAllRaidMembersInSession[IDsOrder[i].ID].tClaimedLoot ~= nil then
+				for j=1,table.getn(tAllRaidMembersInSession[IDsOrder[i].ID].tClaimedLoot) do
+					strTooltip = strTooltip .. tAllRaidMembersInSession[IDsOrder[i].ID].tClaimedLoot[j].name .. " - " .. (self.tItems["EPGP"].Enable == 1 and string.sub(self:EPGPGetItemCostByID(tAllRaidMembersInSession[IDsOrder[i].ID].tClaimedLoot[j].ID),32) .. " GP" or tostring(tAllRaidMembersInSession[IDsOrder[i].ID].tClaimedLoot[j].dkp)) .. "\n"
+				end
+			end
+			if self.tItems["EPGP"].Enable == 1 then wnd:FindChild("Mod"):SetTooltip("Earned EP") end
+			if strTooltip == "Loot:\n" then wnd:FindChild("Loot"):Show(false) end
+			wnd:FindChild("Loot"):SetTooltip(strTooltip)
+			table.insert(self.tPlayersRaidItems,wnd)
+		end
+	else
+		for i=1,table.getn(tAllRaidMembersInSession) do
+			local wnd = Apollo.LoadForm(self.xmlDoc , "RaidPlayerItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
+			wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[i].name)
+			wnd:FindChild("Mod"):SetText(tostring(tAllRaidMembersInSession[i].dkpMod))
+			if tAllRaidMembersInSession[i].bLeft == "Left" then
+				wnd:FindChild("Left"):Show(true,false)
+			elseif tonumber(tAllRaidMembersInSession[i].bLeft) ~= nil then
+				wnd:FindChild("Left"):SetText(tAllRaidMembersInSession[i].bLeft .. "(s)")
+			else
+				wnd:FindChild("Left"):Show(false,true)
+			end
+			wnd:FindChild("Deaths"):SetText(tAllRaidMembersInSession[i].Deaths)
+			local strTooltip = "Loot:\n"
+			if tAllRaidMembersInSession[i].tClaimedLoot ~= nil then
+				for j=1,table.getn(tAllRaidMembersInSession[i].tClaimedLoot) do
+					strTooltip = strTooltip .. tAllRaidMembersInSession[i].tClaimedLoot[j].name .. " - " .. (self.tItems["EPGP"].Enable == 1 and string.sub(self:EPGPGetItemCostByID(tAllRaidMembersInSession[i].tClaimedLoot[j].ID),32) .. " GP" or tostring(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)) .. "\n"
+				end
+			end
+			if self.tItems["EPGP"].Enable == 1 then wnd:FindChild("Mod"):SetTooltip("Earned EP") end
+			if strTooltip == "Loot:\n" then wnd:FindChild("Loot"):Show(false) end
+			wnd:FindChild("Loot"):SetTooltip(strTooltip)
+			table.insert(self.tPlayersRaidItems,wnd)
+		end
 	end
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems"):ArrangeChildrenVert()
 	if self.bIsRaidSession == false then tAllRaidMembersInSession = {} end
@@ -729,6 +776,7 @@ function DKP:RaidUpdateSummaryLootDetails()
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("Window1"):Show(true,true)
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("PlayerLabels"):Show(false,true)
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("LootLabels"):Show(true,true)
+	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("OrderContainer"):Show(false,true)
 	
 	
 	if self.bIsRaidSession == false then tAllRaidMembersInSession = self.tItems["Raids"][currentRaidID].tPlayers end
@@ -768,14 +816,14 @@ function DKP:RaidUpdateSummaryLootDetails()
 end
 
 function DKP:RaidStartNewSession( wndHandler, wndControl, eMouseButton )
-	if GroupLib.InRaid() == false then
+	--[[if GroupLib.InRaid() == false then
 		Print("You cannot begin new session while not in raid")
 		return
 	end
 	if self.bIsRaidSession == true then
 		Print("Close previous session first") 
 		return
-	end
+	end]]
 	self.wndRaidSelection:Show(false,false)
 	self:RaidOpenSummary("New")
 end
@@ -860,6 +908,11 @@ function DKP:RaidOnUnitDestroyed(tArgs)
 	end
 		-- DS
 	if self.tItems["Raids"][currentRaidID].RaidSure == false or self.tItems["Raids"][currentRaidID].RaidSure == true and self.tItems["Raids"][currentRaidID].Raid == "Datascape"  then
+		
+		if name == "Megalith" or name == "Hydroflux" or name == "Visceralus" or name == "Aileron" or name == "Pyrobane" or name == "Mnemesis" then
+			if self.tItems["Raids"][currentRaidID].tMisc.tBossKills.pairs == nil then  self.tItems["Raids"][currentRaidID].tMisc.tBossKills.pairs = {} end
+			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.pairs,name)
+		end
 		
 		if name == "Megalith" then
 			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
@@ -1377,26 +1430,86 @@ function DKP:RaidGlobalStatsRunUpdate( wndHandler, wndControl, eMouseButton )
 		bosses["Proto"] = 0
 		bosses["Con"] = 0
 		bosses["Ohmna"] = 0
+		--DS
+		bosses["Daemons"] = 0
+		bosses["Gloomclaw"] = 0
+		bosses["Maelstrom"] = 0
+		bosses["Avatus"] = 0
+		bosses["Megalith"] = 0
+		bosses["Visceralus"] = 0
+		bosses["Aileron"] = 0
+		bosses["Pyrobane"] = 0
+		bosses["Mnemesis"] = 0
+		bosses["Hydroflux"] = 0
+		local bossesDS = 0
+		local bossesGA = 0
+		
 		for i=1,table.getn(raidIDs) do
 			for j=1,table.getn(self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.names) do
 				local name = self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.names[j]
+				
 				if name == "Experiment X-89" then
 					bosses["Exp"] = bosses["Exp"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Kuralak the Defiler" then
 					bosses["Kur"] = bosses["Kur"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Phage Maw" then
 					bosses["Maw"] = bosses["Maw"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Phagetech Prototypes" then
 					bosses["Proto"] = bosses["Proto"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Phageborn Convergence" then
 					bosses["Con"] = bosses["Con"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Dreadphage Ohmna" then
 					bosses["Ohmna"] = bosses["Ohmna"] + 1
+					bossesGA = bossesGA + 1
+				-- DS
+				elseif name == "Avatus" then
+					bosses["Avatus"] = bosses["Avatus"] + 1
+					bossesDS = bossesDS + 1				
+				elseif name == "System Daemons" then
+					bosses["Daemons"] = bosses["Daemons"] + 1
+					bossesDS = bossesDS + 1					
+				elseif name == "Gloomclaw" then
+					bosses["Gloomclaw"] = bosses["Gloomclaw"] + 1
+					bossesDS = bossesDS + 1
+				elseif name == "Maelstrom Authority" then
+					bosses["Maelstrom"] = bosses["Maelstrom"] + 1	
+					bossesDS = bossesDS + 1					
 				end
-		
+				
 			end	
+			for j=1,table.getn(self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.pairs) do
+				local name = self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.pairs[j]
+					if name == "Megalith" then
+						bosses["Megalith"] = bosses["Megalith"] + 1
+						bossesDS = bossesDS + 1						
+					elseif name == "Pyrobane" then
+						bosses["Pyrobane"] = bosses["Pyrobane"] + 1
+						bossesDS = bossesDS + 1
+					elseif name == "Aileron" then
+						bosses["Aileron"] = bosses["Aileron"] + 1	
+						bossesDS = bossesDS + 1
+					elseif name == "Mnemesis" then
+						bosses["Mnemesis"] = bosses["Mnemesis"] + 1	
+						bossesDS = bossesDS + 1
+					elseif name == "Visceralus" then
+						bosses["Visceralus"] = bosses["Visceralus"] + 1	
+						bossesDS = bossesDS + 1
+					elseif name == "Hydroflux" then
+						bosses["Hydroflux"] = bosses["Hydroflux"] + 1
+						bossesDS = bossesDS + 1
+					end
+			end
+
+		
 		end
 		stats.KilledBossesByName = bosses
+		stats.KilledBossesByNameGA = bossesGA
+		stats.KilledBossesByNameDS = bossesDS
 		
 	-- dropped loot
 		local lootCount = 0 
@@ -1529,26 +1642,87 @@ function DKP:RaidGlobalStatsRunUpdate( wndHandler, wndControl, eMouseButton )
 		stats.KilledBossesCount = bossCounter
 	-- killed bosses by name
 		local bosses = self.tItems["Raids"]["GlobalStats"].KilledBossesByName
+		if bosses["Daemons"] == nil then
+			bosses["Daemons"] = 0
+			bosses["Gloomclaw"] = 0
+			bosses["Maelstrom"] = 0
+			bosses["Avatus"] = 0
+			bosses["Megalith"] = 0
+			bosses["Visceralus"] = 0
+			bosses["Aileron"] = 0
+			bosses["Pyrobane"] = 0
+			bosses["Mnemesis"] = 0
+			bosses["Hydroflux"] = 0
+		end
+		local bossesGA = self.tItems["Raids"]["GlobalStats"].KilledBossesByNameGA or 0
+		local bossesDS = self.tItems["Raids"]["GlobalStats"].KilledBossesByNameDS or 0
 		for i=1,table.getn(raidIDs) do
 			for j=1,table.getn(self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.names) do
 				local name = self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.names[j]
+				
 				if name == "Experiment X-89" then
 					bosses["Exp"] = bosses["Exp"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Kuralak the Defiler" then
 					bosses["Kur"] = bosses["Kur"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Phage Maw" then
 					bosses["Maw"] = bosses["Maw"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Phagetech Prototypes" then
 					bosses["Proto"] = bosses["Proto"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Phageborn Convergence" then
 					bosses["Con"] = bosses["Con"] + 1
+					bossesGA = bossesGA + 1
 				elseif name == "Dreadphage Ohmna" then
 					bosses["Ohmna"] = bosses["Ohmna"] + 1
+					bossesGA = bossesGA + 1
+				-- DS
+				elseif name == "Avatus" then
+					bosses["Avatus"] = bosses["Avatus"] + 1
+					bossesDS = bossesDS + 1				
+				elseif name == "System Daemons" then
+					bosses["Daemons"] = bosses["Daemons"] + 1
+					bossesDS = bossesDS + 1					
+				elseif name == "Gloomclaw" then
+					bosses["Gloomclaw"] = bosses["Gloomclaw"] + 1
+					bossesDS = bossesDS + 1
+				elseif name == "Maelstrom Authority" then
+					bosses["Maelstrom"] = bosses["Maelstrom"] + 1	
+					bossesDS = bossesDS + 1					
 				end
-		
+				
 			end	
+			for j=1,table.getn(self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.pairs) do
+				local name = self.tItems["Raids"][raidIDs[i]].tMisc.tBossKills.pairs[j]
+					if name == "Megalith" then
+						bosses["Megalith"] = bosses["Megalith"] + 1
+						bossesDS = bossesDS + 1						
+					elseif name == "Pyrobane" then
+						bosses["Pyrobane"] = bosses["Pyrobane"] + 1
+						bossesDS = bossesDS + 1
+					elseif name == "Aileron" then
+						bosses["Aileron"] = bosses["Aileron"] + 1	
+						bossesDS = bossesDS + 1
+					elseif name == "Mnemesis" then
+						bosses["Mnemesis"] = bosses["Mnemesis"] + 1	
+						bossesDS = bossesDS + 1
+					elseif name == "Visceralus" then
+						bosses["Visceralus"] = bosses["Visceralus"] + 1	
+						bossesDS = bossesDS + 1
+					elseif name == "Hydroflux" then
+						bosses["Hydroflux"] = bosses["Hydroflux"] + 1
+						bossesDS = bossesDS + 1
+					end
+			end
+
+		
 		end
 		stats.KilledBossesByName = bosses
+		stats.KilledBossesByNameGA = bossesGA
+		stats.KilledBossesByNameDS = bossesDS
+		
 		
 	-- dropped loot
 		local lootCount = self.tItems["Raids"]["GlobalStats"].DistributedLoot
@@ -1623,12 +1797,26 @@ function DKP:RaidGlobalStatsPushData()
 	
 	---------------->>>>>Boss Stats<<<<<---------------------
 	BossStats:FindChild("ContainerBossKillsTotal"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesCount)
+	BossStats:FindChild("ContainerBossKillsTotalGA"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByNameGA)
+	BossStats:FindChild("ContainerBossKillsTotalDS"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByNameDS)
+	--GA
 	BossStats:FindChild("ContainerBossKillsList"):FindChild("Experiment"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Exp"])
 	BossStats:FindChild("ContainerBossKillsList"):FindChild("Kuralak"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Kur"])
 	BossStats:FindChild("ContainerBossKillsList"):FindChild("Phage"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Maw"])
 	BossStats:FindChild("ContainerBossKillsList"):FindChild("Phagetech"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Proto"])
 	BossStats:FindChild("ContainerBossKillsList"):FindChild("Phageborn"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Con"])
 	BossStats:FindChild("ContainerBossKillsList"):FindChild("Ohmna"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Ohmna"])
+	--DS
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("System Daemons"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Daemons"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Gloomclaw"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Gloomclaw"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Maelstrom Authority"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Maelstrom"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Avatus"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Avatus"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Megalith"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Megalith"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Mnemesis"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Mnemesis"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Hydroflux"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Hydroflux"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Pyrobane"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Pyrobane"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Visceralus"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Visceralus"])
+	BossStats:FindChild("ContainerBossKillsListDS"):FindChild("Aileron"):FindChild("Value"):SetText(self.tItems["Raids"]["GlobalStats"].KilledBossesByName["Aileron"])
 	---------------->>>>>Boss Stats<<<<<---------------------
 	
 	---------------->>>>>Loot Stats<<<<<---------------------
