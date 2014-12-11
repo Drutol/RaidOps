@@ -323,6 +323,7 @@ function DKP:OnTimer()
 end
 
 function DKP:RegisterPlayerClass(ID,strClass)
+	
 	if ID ~= -1 then
 		if self.tItems[ID].class == nil then
 			if type(strClass) ~= "string" then strClass = ktClassToString[strClass] end
@@ -630,6 +631,7 @@ function DKP:OnSave(eLevel)
 					tSave[k].TradeCap = self.tItems[k].TradeCap
 					tSave[k].EP = self.tItems[k].EP
 					tSave[k].GP = self.tItems[k].GP
+					tSave[k].class = self.tItems[k].class
 					if self.tItems[k].alts ~= nil then
 						tSave[k].alts = {}
 						local skip_counter = 0 
@@ -666,6 +668,7 @@ function DKP:OnSave(eLevel)
 			tSave["EPGP"] = self.tItems["EPGP"]
 			tSave["Standby"] = self.tItems["Standby"]
 			tSave["AwardTimer"] = self.tItems["AwardTimer"]
+			tSave["Hub"] = self.tItems["Hub"]
 		else
 			tSave["purged"] = "purged"
 		end
@@ -916,7 +919,7 @@ function DKP:Add100DKP()
 	end
 end
 function DKP:OnChatMessage(channelCurrent, tMessage)
-		if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
+	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
 			local itemStr = ""
 			local strName = ""
 			local strTextLoot = ""
@@ -942,6 +945,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			if strName ~= "" and itemStr ~= "" then
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),itemStr) end
 				if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then self:RaidProccesNewPieceOfLoot(itemStr,strName:sub(1,#strName-1)) end
+				self:HubRegisterLoot(strName:sub(1, #strName - 1),string.sub(itemStr,2))
 			end
 	end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then

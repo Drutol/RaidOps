@@ -423,7 +423,7 @@ end
 
 function DKP:RaidUpdateCurrentRaidSession() 
 
-	--[[if GroupLib.InRaid() == false then
+	if GroupLib.InRaid() == false then
 		Print("You are not in raid , close session")
 		return
 	end
@@ -443,9 +443,9 @@ function DKP:RaidUpdateCurrentRaidSession()
 					local ID = self:GetPlayerByIDByName(unit_member.strCharacterName)
 					if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + (0.00027 * self.tItems["settings"].RaidTimer) end
 				end
-			end]]
+			end
 		
-		if currentRaidID ~= nil then
+		--[[if currentRaidID ~= nil then
 		self:RaidBackupSession()
 		local currentPlayers = {}
 		for k=1,math.random(15, 20) do
@@ -454,7 +454,7 @@ function DKP:RaidUpdateCurrentRaidSession()
 		
 		for k=1,GroupLib.GetMemberCount(),1 do -- Getting Players List
 				self:ExportShowPreloadedText(tohtml(GroupLib.GetGroupMember(k)))
-		end
+		end]]
 		
 		--Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), "SUMWEAPON", "Player"..tostring(math.random(2,14))))
 		
@@ -816,14 +816,14 @@ function DKP:RaidUpdateSummaryLootDetails()
 end
 
 function DKP:RaidStartNewSession( wndHandler, wndControl, eMouseButton )
-	--[[if GroupLib.InRaid() == false then
+	if GroupLib.InRaid() == false then
 		Print("You cannot begin new session while not in raid")
 		return
 	end
 	if self.bIsRaidSession == true then
 		Print("Close previous session first") 
 		return
-	end]]
+	end
 	self.wndRaidSelection:Show(false,false)
 	self:RaidOpenSummary("New")
 end

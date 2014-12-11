@@ -31,8 +31,6 @@ function DKP:OnWait()
 	if wait_counter == 1 then 
 		if bInitialized == false then
 			self:BidCompleteInit() 
-		else
-			self:BidInsertChildren()
 		end
 	else 
 		wait_counter = wait_counter + 1 
@@ -236,8 +234,6 @@ function DKP:BidUpdateItemDatabase()
 			end
 		end
 	end
-	
-	self.wait_timer = ApolloTimer.Create(1, true, "OnWait", self)
 end
 
 --[[function DKP:BidInsertChildren()
@@ -1543,6 +1539,7 @@ function DKP:HookToMasterLootDisp()
 	if not self:IsHooked(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList") then
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck")
 		Print("Succes")
 	end
 end
@@ -1635,8 +1632,8 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 		wndCurrentItem:FindChild("ItemIcon"):SetSprite(tItem.itemDrop:GetIcon())
 		wndCurrentItem:FindChild("ItemName"):SetText(tItem.itemDrop:GetName())
 		wndCurrentItem:SetData(tItem)
-		wndCurrentItem:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
-		wndCurrentItem:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
+		--wndCurrentItem:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
+		--wndCurrentItem:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
 		local indi = Apollo.LoadForm(self.xmlDoc,"InsertItemIndicator",wndCurrentItem,self)
 		indi:Show(false,true)
 		self.InsertedIndicators[wndCurrentItem:FindChild("ItemName"):GetText()] = indi
@@ -1649,4 +1646,16 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 	
 	luaCaller.wndMasterLoot_ItemList:ArrangeChildrenVert(0)
 
+end
+
+function DKP:OnItemCheck(luaCaller,wndHandler, wndControl, eMouseButton)
+	if eMouseButton ~= GameLib.CodeEnumInputMouse.Right then
+		local tItemInfo = wndHandler:GetData()
+		if tItemInfo and tItemInfo.bIsMaster then
+			luaCaller.tMasterLootSelectedItem = tItemInfo
+			luaCaller.tMasterLootSelectedLooter = nil
+			luaCaller:OnMasterLootUpdate(true)
+			self:BidMasterItemSelected(wndHandler,wndControl)
+		end
+	end
 end
