@@ -301,7 +301,6 @@ end
 
 
 function DKP:OnTimer()
-	if self.tItems["settings"].HubAutoSession and GroupLib.InRaid() and not self.bIsRaidSession then self:RaidOpenSummary("New") end
 	if self.tItems["settings"].collect_new == 1 then
 		for k=1,GroupLib.GetMemberCount(),1 do
 		local unit_member = GroupLib.GetGroupMember(k)
@@ -529,7 +528,7 @@ function DKP:UpdateItem(playerItem)
 			elseif self.tItems["settings"].LabelOptions[i] == "Tot" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.tot)
 			elseif self.tItems["settings"].LabelOptions[i] == "Hrs" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(self.tItems[self:GetPlayerByIDByName(playerItem.name)].Hrs)
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%.4f",self.tItems[self:GetPlayerByIDByName(playerItem.name)].Hrs))
 			elseif self.tItems["settings"].LabelOptions[i] == "Spent" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(tonumber(playerItem.tot)-tonumber(playerItem.net))
 			elseif self.tItems["settings"].LabelOptions[i] == "Priority" then

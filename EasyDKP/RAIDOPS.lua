@@ -407,6 +407,7 @@ function DKP:HubSettingsRestore()
 	if self.tItems["settings"].HubCallRaidBy == nil then self.tItems["settings"].HubCallRaidBy = "Date" end
 	if self.tItems["settings"].HubCallRaidBy == "Date" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Date"):SetCheck(true) end
 	if self.tItems["settings"].HubCallRaidBy == "Name" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Name"):SetCheck(true) end
+	self.wndHubSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n /sum - For Raid Summaries \n /rops - For RaidOps windo \n")
 end
 
 function DKP:HubSettingsClose()

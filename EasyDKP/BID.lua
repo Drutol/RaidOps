@@ -313,10 +313,12 @@ function DKP:BidLooterItemSelected(wndHandler,wndControl)
 end
 
 function DKP:BidMasterItemSelected()
-	self.SelectedMasterItem = Hook.tMasterLootSelectedItem.itemDrop:GetName()
-	self.wndInsertedMasterButton:Enable(true)
-	self:BidMatchIndicatorsByItem(self.SelectedMasterItem)
-	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
+	local HookML = Apollo.GetAddon("MasterLoot")
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
+	DKPInstance.wndInsertedMasterButton:Enable(true)
+	DKPInstance:BidMatchIndicatorsByItem(DKPInstance.SelectedMasterItem)
+	DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
 end
 
 function DKP:BidMasterItemUnSelected(wndHandler,wndControl)
@@ -437,9 +439,9 @@ function DKP:BidStart(strName)
 		
 		if self.mode == "open" then
 				if self.CurrentItemChatStr == nil then	
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in /party channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in "..self.ChannelPrefix.." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
 				else
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP]Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in /party channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP]Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in " .. self.ChannelPrefix .." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
 				end
 				if self.bAllowOffspec == true then 
 					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' in current channel.After you change your mode you cannot change it again") 

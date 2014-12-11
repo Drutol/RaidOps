@@ -60,12 +60,13 @@ function DKP:RaidInit()
 	
 	if self.tItems["settings"].RaidLeaveTimer == nil then self.tItems["settings"].RaidLeaveTimer = 300 end
 	self.wndRaidOptions:FindChild("EditBox1"):SetText(self.tItems["settings"].RaidLeaveTimer)
-	
-	if self.tItems["settings"].RaidTools == nil then self.tItems["settings"].RaidTools = {l=82,t=75,r=295,b=312,opacityOn = 1,opacityOff = 0.5,show = 0 } end
+	if self.tItems["settings"].NewStartup == nil then self.tItems["settings"].RaidTools = nil end
+	if self.tItems["settings"].RaidTools == nil then self.tItems["settings"].RaidTools = {l=0,t=4,r=269,b=288,opacityOn = 1,opacityOff = 0.5,show = 0 } end
 	self.wndRaidTools:SetAnchorOffsets(self.tItems["settings"].RaidTools.l,self.tItems["settings"].RaidTools.t,self.tItems["settings"].RaidTools.r,self.tItems["settings"].RaidTools.b)
 	self.wndRaidTools:FindChild("ButtonMassAdd"):Enable(false)
 	self.wndRaidTools:FindChild("ButtonShowSummary"):Enable(false)
 	self:RaidToolsDecreaseOpacity()
+	if self.tItems["settings"].RaidTools.show == 1 then self.wndRaidTools:Show(true,false) end
 
 
 	
