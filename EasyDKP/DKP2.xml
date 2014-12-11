@@ -551,7 +551,7 @@
             <Control Class="Window" LAnchorPoint="0" LAnchorOffset="35" TAnchorPoint="0" TAnchorOffset="79" RAnchorPoint="0" RAnchorOffset="194" BAnchorPoint="0" BAnchorOffset="130" RelativeToClient="1" Font="Nameplates" Text="Date" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Date" TooltipColor="" DT_WORDBREAK="1" TextId="" DT_CENTER="1" DT_VCENTER="1" Picture="1" IgnoreMouse="1" Sprite="BK3:sprMetal_ExpandMenu_Large_Framing"/>
         </Control>
     </Form>
-    <Form Class="Window" LAnchorPoint="0" LAnchorOffset="10" TAnchorPoint="0" TAnchorOffset="10" RAnchorPoint="0" RAnchorOffset="605" BAnchorPoint="0" BAnchorOffset="92" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="ListItem" Border="1" Picture="1" SwallowMouseClicks="1" Moveable="0" Escapable="0" Overlapped="1" TooltipColor="" Sprite="AbilitiesSprites:spr_IconListTiled">
+    <Form Class="Window" LAnchorPoint="0" LAnchorOffset="10" TAnchorPoint="0" TAnchorOffset="10" RAnchorPoint="0" RAnchorOffset="605" BAnchorPoint="0" BAnchorOffset="92" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="ListItem" Border="1" Picture="1" SwallowMouseClicks="1" Moveable="0" Escapable="0" Overlapped="1" TooltipColor="" Sprite="AbilitiesSprites:spr_IconListTiled" Tooltip="">
         <Control Class="Window" LAnchorPoint="0" LAnchorOffset="6" TAnchorPoint="0" TAnchorOffset="9" RAnchorPoint="0" RAnchorOffset="74" BAnchorPoint="0" BAnchorOffset="69" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Icon" TooltipColor="" Picture="1" IgnoreMouse="1">
             <Control Class="Window" LAnchorPoint="0" LAnchorOffset="0" TAnchorPoint="0" TAnchorOffset="0" RAnchorPoint="0" RAnchorOffset="68" BAnchorPoint="0" BAnchorOffset="60" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Frame" TooltipColor="" Picture="1" IgnoreMouse="1"/>
         </Control>
@@ -649,9 +649,9 @@
                 </Control>
             </Control>
         </Control>
-        <Control Class="Window" LAnchorPoint="0" LAnchorOffset="13" TAnchorPoint="0" TAnchorOffset="-13" RAnchorPoint="0" RAnchorOffset="357" BAnchorPoint="0" BAnchorOffset="101" RelativeToClient="1" Font="CRB_Interface16_BO" Text=" Set fixed Minimum Bid value (DKP) for each item slot:" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Title" TooltipColor="" TextId="" DT_WORDBREAK="1" DT_CENTER="1" DT_RIGHT="0" DT_VCENTER="1"/>
+        <Control Class="Window" LAnchorPoint="0" LAnchorOffset="69" TAnchorPoint="0" TAnchorOffset="-13" RAnchorPoint="0" RAnchorOffset="413" BAnchorPoint="0" BAnchorOffset="101" RelativeToClient="1" Font="CRB_Interface16_BO" Text=" Set fixed Minimum Bid value (DKP) for each item slot:" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Title" TooltipColor="" TextId="" DT_WORDBREAK="1" DT_CENTER="1" DT_RIGHT="0" DT_VCENTER="1"/>
         <Control Class="Button" Base="AbilitiesSprites:btn_Close" Font="DefaultButton" ButtonType="PushButton" RadioGroup="" LAnchorPoint="0" LAnchorOffset="467" TAnchorPoint="0" TAnchorOffset="6" RAnchorPoint="0" RAnchorOffset="499" BAnchorPoint="0" BAnchorOffset="38" DT_VCENTER="1" DT_CENTER="1" BGColor="UI_BtnBGDefault" TextColor="UI_BtnTextDefault" NormalTextColor="UI_BtnTextDefault" PressedTextColor="UI_BtnTextDefault" FlybyTextColor="UI_BtnTextDefault" PressedFlybyTextColor="UI_BtnTextDefault" DisabledTextColor="UI_BtnTextDefault" TooltipType="OnCursor" Name="Button" TooltipColor="" Template="De">
-            <Event Name="ButtonSignal" Function="BidFixedMinShow"/>
+            <Event Name="ButtonSignal" Function="BidFixedMinClose"/>
         </Control>
     </Form>
 </Forms>

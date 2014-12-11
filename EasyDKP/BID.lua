@@ -718,10 +718,14 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 				end
 					strReturn = "Bid processed"
 			else
-				if self.mode == "open" then
-					strReturn = "Failure - too small difference"
-				elseif self.mode == "hidden" then
-					strReturn = "Bid processed"
+				if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
+					strReturn = "Failure - Minimum Bid value hasn't been reached"
+				else
+					if self.mode == "open" then
+						strReturn = "Failure - too small difference"
+					elseif self.mode == "hidden" then
+						strReturn = "Bid processed"
+					end
 				end
 			end
 		end
@@ -773,10 +777,14 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 							strReturn = "Bid processed"
 						end
 					else	
-						if self.mode == "open" then
-							strReturn = "Failure - too small difference"
-						elseif self.mode == "hidden" then
-							strReturn = "Bid processed"
+						if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
+							strReturn = "Failure - Minimum Bid value hasn't been reached"
+						else
+							if self.mode == "open" then
+								strReturn = "Failure - too small difference"
+							elseif self.mode == "hidden" then
+								strReturn = "Bid processed"
+							end
 						end
 					end
 				end
@@ -795,10 +803,14 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 							strReturn = "Bid processed"
 						end
 					else	
-						if self.mode == "open" then
-							strReturn = "Failure - too small difference"
-						elseif self.mode == "hidden" then
-							strReturn = "Bid processed"
+						if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
+							strReturn = "Failure - Minimum Bid value hasn't been reached"
+						else
+							if self.mode == "open" then
+								strReturn = "Failure - too small difference"
+							elseif self.mode == "hidden" then
+								strReturn = "Bid processed"
+							end
 						end
 					end
 				end
@@ -1606,26 +1618,28 @@ function DKP:HookToMasterLootDisp()
 	end
 end
 function sortMasterLootEasyDKPasc(a,b)
-	if DKP.tItems["EPGP"].Enable == 1 then
-		return DKP:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) > DKP:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	if DKPInstance.tItems["EPGP"].Enable == 1 then
+		return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) > DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
 	else
-		local IDa = DKP:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
-		local IDb = DKP:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
+		local IDa = DKPInstance:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
+		local IDb = DKPInstance:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
 		if IDa ~= -1 and IDb ~= -1 then
-			return DKP.tItems[IDa].net > DKP.tItems[IDb].net
+			return DKPInstance.tItems[IDa].net > DKPInstance.tItems[IDb].net
 		else
 			return a:FindChild("CharacterName"):GetText() < b:FindChild("CharacterName"):GetText() 
 		end
 	end
 end
 function sortMasterLootEasyDKPdesc(a,b)
-	if DKP.tItems["EPGP"].Enable == 1 then
-		return DKP:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) < DKP:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	if DKPInstance.tItems["EPGP"].Enable == 1 then
+		return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) < DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
 	else
-		local IDa = DKP:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
-		local IDb = DKP:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
+		local IDa = DKPInstance:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
+		local IDb = DKPInstance:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
 		if IDa ~= -1 and IDb ~= -1 then
-			return DKP.tItems[IDa].net < DKP.tItems[IDb].net
+			return DKPInstance.tItems[IDa].net < DKPInstance.tItems[IDb].net
 		else
 			return a:FindChild("CharacterName"):GetText() < b:FindChild("CharacterName"):GetText() 
 		end
@@ -1634,7 +1648,7 @@ end
 function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
-
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
 	if luaCaller.tMasterLootSelectedItem ~= nil then
 		for idx, tItem in pairs (tMasterLootItemList) do
 			if tItem.nLootId == luaCaller.tMasterLootSelectedItem.nLootId then
@@ -1646,15 +1660,15 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					wndCurrentLooter:FindChild("ClassIcon"):SetSprite(ktClassToIcon[unitLooter:GetClassId()])
 					wndCurrentLooter:SetData(unitLooter)
 					local strName = unitLooter:GetName()
-					local ID = self:GetPlayerByIDByName(strName)
+					local ID = DKPInstance:GetPlayerByIDByName(strName)
 					if ID ~= -1 then
-						local wndCounter = Apollo.LoadForm(self.xmlDoc,"InsertDKPIndicator",wndCurrentLooter,self)
-						wndCurrentLooter:AddEventHandler("ButtonCheck", "BidMasterPlayerSelected", self)
-						wndCurrentLooter:AddEventHandler("ButtonUncheck", "BidMasterPlayerUnSelected", self)
-						if self.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. self.tItems[ID].net)
-						else wndCounter:SetText("PR : ".. self:EPGPGetPRByName(self.tItems[ID].strName)) end
+						local wndCounter = Apollo.LoadForm(DKPInstance.xmlDoc,"InsertDKPIndicator",wndCurrentLooter,DKPInstance)
+						wndCurrentLooter:AddEventHandler("ButtonCheck", "BidMasterPlayerSelected", DKPInstance)
+						wndCurrentLooter:AddEventHandler("ButtonUncheck", "BidMasterPlayerUnSelected", DKPInstance)
+						if DKPInstance.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. DKPInstance.tItems[ID].net)
+						else wndCounter:SetText("PR : ".. DKPInstance:EPGPGetPRByName(DKPInstance.tItems[ID].strName)) end
 						wndCounter:FindChild("Indicator"):Show(false,true)
-						self.InsertedCountersList[strName] = wndCounter
+						DKPInstance.InsertedCountersList[strName] = wndCounter
 					end
 					if luaCaller.tMasterLootSelectedLooter == unitLooter then
 						wndCurrentLooter:SetCheck(true)
@@ -1676,7 +1690,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						wndCurrentLooter:Enable(false)
 					end
 				end
-				self:BidMLSortPlayers()
+				DKPInstance:BidMLSortPlayers()
 			end
 		end
 	end
@@ -1685,9 +1699,9 @@ end
 function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
-	
-	self.InsertedIndicators ={}
-	self.ActiveIndicators = {}
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	DKPInstance.InsertedIndicators ={}
+	DKPInstance.ActiveIndicators = {}
 	
 	for idx, tItem in ipairs (tMasterLootItemList) do
 		local wndCurrentItem = Apollo.LoadForm(luaCaller.xmlDoc, "ItemButton", luaCaller.wndMasterLoot_ItemList, luaCaller)
@@ -1696,9 +1710,9 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 		wndCurrentItem:SetData(tItem)
 		--wndCurrentItem:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
 		--wndCurrentItem:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
-		local indi = Apollo.LoadForm(self.xmlDoc,"InsertItemIndicator",wndCurrentItem,self)
+		local indi = Apollo.LoadForm(DKPInstance.xmlDoc,"InsertItemIndicator",wndCurrentItem,DKPInstance)
 		indi:Show(false,true)
-		self.InsertedIndicators[wndCurrentItem:FindChild("ItemName"):GetText()] = indi
+		DKPInstance.InsertedIndicators[wndCurrentItem:FindChild("ItemName"):GetText()] = indi
 		if luaCaller.tMasterLootSelectedItem ~= nil and (luaCaller.tMasterLootSelectedItem.nLootId == tItem.nLootId) then
 			wndCurrentItem:SetCheck(true)
 			luaCaller:RefreshMasterLootLooterList(tMasterLootItemList)

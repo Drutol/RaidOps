@@ -1271,31 +1271,16 @@ end
 function DKP:RaidToolsMassAdd( wndHandler, wndControl, eMouseButton )
 	
 	if self.bIsRaidSession == true then
-		if self.tItems["EPGP"].Enable == 0 then
-			local awarded = {}
-			for i=1,table.getn(self.tItems["Raids"][currentRaidID].tPlayers) do
-				table.insert(awarded,self.tItems["Raids"][currentRaidID].tPlayers[i].name)
-			end
-			for i=1,table.getn(awarded) do
-				for j=1,table.maxn(self.tItems) do
-					if self.tItems[j] ~= nil and string.lower(awarded[i]) == string.lower(self.tItems[j].strName) then
-						self.tItems[j].net = self.tItems[j].net + self.tItems["settings"].dkp
-						self.tItems[j].tot = self.tItems[j].tot + self.tItems["settings"].dkp
-						local k ={}
-						k.name = self.tItems[j].strName
-						k.net = self.tItems[j].net
-						k.wnd = self.tItems[j].wnd
-						k.tot = self.tItems[j].tot
-						self:UpdateItem(k)
-						self:DetailAddLog("MassAdd RaidName : "..self.tItems["Raids"][currentRaidID].name,tostring(self.tItems["settings"].dkp),j)
-						self:RaidRegisterDkpManipulation(self.tItems[j].strName,self.tItems["settings"].dkp)
-						break
-					end
+		if self.tItems["EPGP"].Enable == 1 then
+			self:EPGPAwardRaid(self.tItems["settings"].dkp,nil)
+		else
+			-- DKP
+			for k,player in ipairs(tAllRaidMembersInSession) do
+				local ID = self:GetPlayerByIDByName(player.name)
+				if ID ~= -1 then
+					player.net = player.net + self.tItems["settings"].dkp
 				end
 			end
-		else
-			self:EPGPAwardRaid(self.tItems["settings"].dkp,nil)
-			
 		
 		end
 		self:RaidToolsPostMassMessage()

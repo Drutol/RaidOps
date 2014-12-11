@@ -129,11 +129,9 @@ function DKP:OnDocLoaded()
 		local setButton = self.wndMain:FindChild("ButtonSet")
 		local addButton = self.wndMain:FindChild("ButtonAdd")
 		local subtractButton = self.wndMain:FindChild("ButtonSubtract")
-		local quickAddButton = self.wndMain:FindChild("Add100DKP")
 		setButton:Enable(false)
 		addButton:Enable(false)
 		subtractButton:Enable(false)
-		quickAddButton:Enable(false)
 		
 		if self.tItems["settings"] == nil then
 			self.tItems["settings"] = {}
@@ -895,7 +893,6 @@ function DKP:SubtractDKP(cycling)
 end
 
 function DKP:Add100DKP()
-	if self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):IsChecked() == true then
 		if self.tItems["EPGP"].Enable == 0 then
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			for i=1,GroupLib.GetMemberCount() do
@@ -918,7 +915,6 @@ function DKP:Add100DKP()
 		self:ResetCommentBoxFull()
 		self:ResetDKPInputBoxFull()
 		self:EnableActionButtons()
-	end
 end
 function DKP:OnChatMessage(channelCurrent, tMessage)
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
@@ -1200,19 +1196,13 @@ function DKP:EnableActionButtons( wndHandler, wndControl, strText )
 		local setButton = self.wndMain:FindChild("ButtonSet")
 		local addButton = self.wndMain:FindChild("ButtonAdd")
 		local subtractButton = self.wndMain:FindChild("ButtonSubtract")
-		local quickAddButton = self.wndMain:FindChild("Add100DKP")
+
 		setButton:Enable(true)
 		addButton:Enable(true)
 		subtractButton:Enable(true)
-		if self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):IsChecked() == true then
-			quickAddButton:Enable(true)
-		end
 	end
 	if self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):IsChecked() == false then
 		self.wndMain:FindChild("Add100DKP"):Enable(false)
-	end
-	if self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):IsChecked() == true and strText ~= "Comment" then
-		self.wndMain:FindChild("Add100DKP"):Enable(true)
 	end
 	if strDKP == "Input Value" or strDKP == "" then
 		self:ResetInputAndComment()
@@ -1224,7 +1214,7 @@ function DKP:EnableActionButtons( wndHandler, wndControl, strText )
 		local wndInputBox = self.wndMain:FindChild("Controls"):FindChild("EditBox")
 		wndInputBox:SetText("Comment")	
 	end
-	if self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):IsChecked() == true and strText ~= "Comment" then
+	if strText ~= "Comment" then
 		self.wndMain:FindChild("Add100DKP"):Enable(true)
 	end
 end
@@ -1233,11 +1223,9 @@ function DKP:ResetInputAndComment()
 	local setButton = self.wndMain:FindChild("Controls"):FindChild("ButtonSet")
 	local addButton = self.wndMain:FindChild("Controls"):FindChild("ButtonAdd")
 	local subtractButton = self.wndMain:FindChild("Controls"):FindChild("ButtonSubtract")
-	local quickAddButton = self.wndMain:FindChild("Controls"):FindChild("Add100DKP")
 	setButton:Enable(false)
 	addButton:Enable(false)
 	subtractButton:Enable(false)
-	quickAddButton:Enable(false)
 end
 
 function DKP:ResetCommentBox( wndHandler, wndControl, strText )

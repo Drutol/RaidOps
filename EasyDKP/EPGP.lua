@@ -282,7 +282,7 @@ end
 
 
 function DKP:EPGPAwardRaid(EP,GP)
-	for i=1,GroupLib.GetMembersCount() do
+	for i=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetGroupMember(i)
 		if member ~= nil then
 			local ID = self:GetPlayerByIDByName(member.strCharacterName)
