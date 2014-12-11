@@ -19,6 +19,21 @@ local ktClassToIcon =
 	[GameLib.CodeEnumClass.Spellslinger]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
 
+local defaultSlotValues = 
+{
+	["Weapon"] = 300,
+	["Shield"] = 200,
+	["Head"] = 250,
+	["Shoulders"] = 250,
+	["Chest"] = 300,
+	["Hands"] = 200,
+	["Legs"] = 300,
+	["Attachment"] = 200,
+	["Gadget"] = 150,
+	["Implant"] = 150,
+	["Feet"] = 250,
+	["Support"] = 150
+}
 local bInitialized = false
 function DKP:BidBeginInit()
 	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList","InsertLootChildren")
@@ -59,6 +74,8 @@ function DKP:BidCompleteInit()
 	self.wndInsertedLooterButton:Enable(false)
 	self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertMasterBid",Hook.wndMasterLoot,self)
 	self.wndInsertedMasterButton:Enable(false)
+	self.wndSlotValues = Apollo.LoadForm(self.xmlDoc2,"ItemValues",nil,self)
+	self.wndSlotValues:Show(false,true)
 	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-200,63)
 	--Asc/Desc
 	if self.tItems["settings"].BidSortAsc == nil then self.tItems["settings"].BidSortAsc = 1 end
@@ -82,6 +99,13 @@ function DKP:BidCompleteInit()
 	
 	self.PrevSelectedLooterItem = nil
 	self.CurrentItemChatStr = nil
+	
+	
+	
+	if self.tItems["BidSlots"] == nil then self.tItems["BidSlots"] = defaultSlotValues end
+	self:BidFillInSlotValues()
+	--BidValues
+	if self.tItems["BidSlots"].Enable == 1 then self.wndSettings:FindChild("ButtonSettingsForceBidMinValues"):SetCheck(true) end
 	
 	-- Anchors stuff
 	
@@ -146,6 +170,39 @@ function DKP:BidCompleteInit()
 	if self.tItems["BidRes"] ~= nil then self:BidResumeSession() end
 	
 	--self:BidInsertChildren()
+end
+
+function DKP:BidFillInSlotValues()
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Weapon"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Shield"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Head"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Shoulders"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Chest"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Hands"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Legs"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Feet"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Attachment"])
+	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Support"])
+          self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Gadget"])
+          self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Implant"])
+end
+
+
+function DKP:BidFixedPriceChanged(wndHandler,wndControl,strText)
+	if tonumber(strText) ~= nil then
+		self.tItems["BidSlots"][wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
+	else
+		wndControl:SetText(self.tItems["BidSlots"][wndControl:GetParent():FindChild("Name"):GetText()])
+	end
+end
+
+function DKP:BidFixedMinShow()
+	self.wndSlotValues:Show(true,false)
+	self.wndSlotValues:ToFront()
+end
+
+function DKP:BidFixedMinClose()
+	self.wndSlotValues:Show(false,false)
 end
 
 function DKP:BidResumeSession()
@@ -336,6 +393,10 @@ function DKP:BidSetUpWindow(tCustomData)
 				if self.ItemDatabase[self.SelectedLooterItem] ~= nil then
 					self.CurrentItemChatStr = self.ItemDatabase[self.SelectedLooterItem].strChat
 					self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("ItemIcon"):SetSprite(self.ItemDatabase[self.SelectedLooterItem].sprite)
+				end
+				if self.tItems["BidSlots"].Enable == 1 and self.ItemDatabase[self.SelectedLooterItem] ~= nil then
+					self.tItems["settings"].BidMin = self.tItems["BidSlots"][self:EPGPGetSlotStringByID(self.ItemDatabase[self.SelectedLooterItem].slot)]
+					self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):SetText(self.tItems["settings"].BidMin)
 				end
 			else
 				self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):SetText(self.SelectedMasterItem)

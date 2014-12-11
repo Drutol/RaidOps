@@ -670,6 +670,7 @@ function DKP:OnSave(eLevel)
 			tSave["Standby"] = self.tItems["Standby"]
 			tSave["AwardTimer"] = self.tItems["AwardTimer"]
 			tSave["Hub"] = self.tItems["Hub"]
+			tSave["BidSlots"] = self.tItems["BidSlots"]
 		else
 			tSave["purged"] = "purged"
 		end
@@ -2436,6 +2437,8 @@ function DKP:SettingsRestore()
 	self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):SetCheck(true)
 	if self.tItems["removed"] ~= nil then removed = self.tItems["removed"] end
 	
+	
+	
 	--Slider
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
 	
@@ -2594,6 +2597,14 @@ function DKP:SettingsSetPrecision( wndHandler, wndControl, fNewValue, fOldValue 
 		self.tItems["settings"].Precision = math.floor(fNewValue)
 		self:ShowAll()
 	end
+end
+
+function DKP:SettingsEnableFillingBidMinValues()
+	self.tItems["BidSlots"].Enable = 1
+end
+
+function DKP:SettingsDisableFillingBidMinValues()
+	self.tItems["BidSlots"].Enable = 0
 end
 
 ---------------------------------------------------------------------------------------------------
