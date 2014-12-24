@@ -174,17 +174,17 @@ function DKP:OnDocLoaded()
 		self:RaidOpsInit()
 		
 		self:CloseBigPOPUP()
-		--if self.tItems["settings"].NewStartup1 == nil then
-		--	self.wndMain:FindChild("BIGPOPUP"):Show(true,false)
-		--	self.tItems["settings"].NewStartup1 = "DONE"
-		--end
+		if self.tItems["settings"].NewStartup2 == nil then
+			self.wndMain:FindChild("BIGPOPUP"):Show(true,false)
+			self.tItems["settings"].NewStartup2 = "DONE"
+		end
 		--self.tItems["settings"].NewStartup = nil
 
 		
 		
 		
 		-- Inits
-		self:SettingsRestore()
+
 		self:LabelUpdateList() --<<<< With Show ALL
 		self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):SetCheck(false)
 		self.wndSettings:FindChild("EditBoxFetchedName"):Enable(false)
@@ -203,6 +203,7 @@ function DKP:OnDocLoaded()
 			self.wndMain:FindChild("LabelAuction"):Show(false)
 		end
 		if self.tItems["settings"].RaidTools.show == 1 then self:RaidToolsEnable() end
+		self:SettingsRestore()
 	end
 end
 
@@ -937,9 +938,10 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if collectingItem == true then
 					itemStr = itemStr .." ".. words[i]
 				elseif words[i] ~= "to" then
-					strName = strName .. words[i]
+					strName = strName .. " " .. words[i]
 				end
 			end
+			strName = string.sub(strName,2)
 			if strName ~= "" and itemStr ~= "" then
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),itemStr) end
 				if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then self:RaidProccesNewPieceOfLoot(itemStr,strName:sub(1,#strName-1)) end
@@ -2425,8 +2427,9 @@ function DKP:SettingsRestore()
 	self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):SetCheck(true)
 	if self.tItems["removed"] ~= nil then removed = self.tItems["removed"] end
 	
-	
-	
+	--Networking
+	--if self.tItems["settings"]["Bid2"].networking == 1 then self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(true) end
+	 self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):Enable(false)
 	--Slider
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
 	
@@ -2578,6 +2581,16 @@ end
 
 function DKP:SettingsDisableFilter( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].CheckAffiliation = 0
+end
+
+function DKP:SettingsEnableNetworking()
+	self.tItems["settings"].networking = 1
+	self:BidJoinChannel()
+end
+
+function DKP:SettingsDisableNetworking()
+	self.tItems["settings"].networking = 0
+	self.channel = nil
 end
 
 function DKP:SettingsSetPrecision( wndHandler, wndControl, fNewValue, fOldValue )
@@ -2845,7 +2858,11 @@ function DKP:PopUpWindowOpen(strName,strItem)
 		item.strName = strName
 		item.strItem = strItem
 		item.ID = ID_popup
-		item.itemID = self.ItemDatabase[string.sub(strItem,2)].ID
+		if self.ItemDatabase[string.sub(strItem,2)] then
+			item.itemID = self.ItemDatabase[string.sub(strItem,2)].ID
+		else
+			item.itemID = self.ItemDatabase[strItem].ID
+		end
 		table.insert(PopUpItemQueue,1,item)
 		if CurrentPopUpID == nil then --First Iteration
 			self.wndPopUp:FindChild("LabelName"):SetText(strName)

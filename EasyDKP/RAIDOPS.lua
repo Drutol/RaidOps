@@ -166,9 +166,7 @@ function DKP:HubRefresh()
 end
 
 function DKP:HubRegisterLoot(strName,strItem)
-	Print("Try")
 	if self.ItemDatabase[strItem] ~= nil then
-		Print("Pass")
 		if self.tItems["Hub"]["News"] == nil then self.tItems["Hub"]["News"] = {} end
 		table.insert(self.tItems["Hub"]["News"],{looter = strName , itemID = self.ItemDatabase[strItem].ID})
 		if #self.tItems["Hub"]["News"] > 5 then table.remove(self.tItems["Hub"]["News"],1) end
@@ -301,21 +299,25 @@ function DKP:LootListIconWindowPopulate()
 	local icons = self.wndIconList:FindChild("IconWindow")
 	icons:DestroyChildren()
 	local counter = 0
+	local inserted = {}
 	for k=table.maxn(self.tItems["Raids"]),1,-1 do
 		if self.tItems["Raids"][k] ~= nil then							
 			for i=1,#self.tItems["Raids"][k].tPlayers do
 				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
-					local wnd = Apollo.LoadForm(self.xmlDoc2,"ItemIcon",icons,self)
 					local item = Item.GetDataFromId(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].ID)
-					wnd:FindChild("Icon"):SetSprite(item:GetIcon())
-					wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
-					wnd:FindChild("Recipent"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
-					wnd:SetData({itemData = item , raidData = k , cost = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp, currency = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency})
-					Tooltip.GetItemTooltipForm(self, wnd:FindChild("Icon") , item , {bPrimary = true, bSelling = false})
-					counter = counter + 1
-					if counter >= self.tItems["settings"].HubItemCount then
-						icons:ArrangeChildrenTiles(0)
-						return
+					if inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] == nil or self.tItems["settings"].HubRemDup == 0 then
+						local wnd = Apollo.LoadForm(self.xmlDoc2,"ItemIcon",icons,self)
+						wnd:FindChild("Icon"):SetSprite(item:GetIcon())
+						wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+						wnd:FindChild("Recipent"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
+						wnd:SetData({itemData = item , raidData = k , cost = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp, currency = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency})
+						Tooltip.GetItemTooltipForm(self, wnd:FindChild("Icon") , item , {bPrimary = true, bSelling = false})
+						counter = counter + 1
+						if counter >= self.tItems["settings"].HubItemCount then
+							icons:ArrangeChildrenTiles(0)
+							return
+						end
+						inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
 					end
 				end
 			end
@@ -355,22 +357,27 @@ function DKP:LootListListWindowPopulate()
 	local list = self.wndListList:FindChild("List")
 	list:DestroyChildren()
 	local counter = 0
+	local inserted = {}
 	for k=table.maxn(self.tItems["Raids"]),1,-1 do
 		if self.tItems["Raids"][k] ~= nil then							
 			for i=1,#self.tItems["Raids"][k].tPlayers do
 				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
-					local wnd = Apollo.LoadForm(self.xmlDoc2,"ListItem",list,self)
 					local item = Item.GetDataFromId(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].ID)
-					wnd:FindChild("Icon"):SetSprite(item:GetIcon())
-					wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
-					wnd:FindChild("Looter"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
-					wnd:FindChild("Date"):SetText(self.tItems["Raids"][k].date.strDate)
-					wnd:FindChild("Cost"):SetText(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp .. " " .. self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp)
-					Tooltip.GetItemTooltipForm(self,wnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
-					counter = counter + 1
-					if counter >= self.tItems["settings"].HubItemCount then
-						icons:ArrangeChildrenTiles(0)
-						return
+					if inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] == nil or self.tItems["settings"].HubRemDup == 0 then
+						local wnd = Apollo.LoadForm(self.xmlDoc2,"ListItem",list,self)
+						
+						wnd:FindChild("Icon"):SetSprite(item:GetIcon())
+						wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+						wnd:FindChild("Looter"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
+						wnd:FindChild("Date"):SetText(self.tItems["Raids"][k].date.strDate)
+						wnd:FindChild("Cost"):SetText(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp .. " " .. self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency)
+						Tooltip.GetItemTooltipForm(self,wnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
+						counter = counter + 1
+						if counter >= self.tItems["settings"].HubItemCount then
+							icons:ArrangeChildrenTiles(0)
+							return
+						end
+						inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
 					end
 				end
 			end
@@ -407,7 +414,12 @@ function DKP:HubSettingsRestore()
 	if self.tItems["settings"].HubCallRaidBy == nil then self.tItems["settings"].HubCallRaidBy = "Date" end
 	if self.tItems["settings"].HubCallRaidBy == "Date" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Date"):SetCheck(true) end
 	if self.tItems["settings"].HubCallRaidBy == "Name" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Name"):SetCheck(true) end
+	if self.tItems["settings"].HubRemDup == nil then self.tItems["settings"].HubRemDup = 1 end
+	if self.tItems["settings"].HubRemDup == 1 then self.wndHubSettings:FindChild("OptionRemDup"):FindChild("Value"):SetCheck(true) end
+	
 	self.wndHubSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n /sum - For Raid Summaries \n /rops - For RaidOps windo \n")
+
+	
 end
 
 function DKP:HubSettingsClose()
@@ -435,6 +447,14 @@ end
 
 function DKP:HubCheckForAutoSession()
 	if GroupLib.InRaid() and not self.bIsRaidSession then self:RaidOpenSummary("New") end
+end
+
+function DKP:HubSettingsRemDupEnable()
+	self.tItems["settings"].HubRemDup = 1
+end
+
+function DKP:HubSettingsRemDupDisable()
+	self.tItems["settings"].HubRemDup = 0
 end
 
 function DKP:HubSettingsSetNewsCount(wndHandler,wndControl,strText)

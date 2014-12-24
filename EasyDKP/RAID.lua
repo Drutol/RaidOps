@@ -60,7 +60,7 @@ function DKP:RaidInit()
 	
 	if self.tItems["settings"].RaidLeaveTimer == nil then self.tItems["settings"].RaidLeaveTimer = 300 end
 	self.wndRaidOptions:FindChild("EditBox1"):SetText(self.tItems["settings"].RaidLeaveTimer)
-	if self.tItems["settings"].NewStartup == nil then self.tItems["settings"].RaidTools = nil end
+	--if self.tItems["settings"].NewStartup == nil then self.tItems["settings"].RaidTools = nil end
 	if self.tItems["settings"].RaidTools == nil then self.tItems["settings"].RaidTools = {l=0,t=4,r=269,b=288,opacityOn = 1,opacityOff = 0.5,show = 0 } end
 	self.wndRaidTools:SetAnchorOffsets(self.tItems["settings"].RaidTools.l,self.tItems["settings"].RaidTools.t,self.tItems["settings"].RaidTools.r,self.tItems["settings"].RaidTools.b)
 	self.wndRaidTools:FindChild("ButtonMassAdd"):Enable(false)
@@ -391,7 +391,6 @@ function DKP:RaidRegisterEPManipulation(strName,modifier)
 	end
 	for i=1,table.getn(tAllRaidMembersInSession) do
 		if string.lower(tAllRaidMembersInSession[i].name) == string.lower(strName) then
-			Print(strName)
 			tAllRaidMembersInSession[i].dkpMod = tAllRaidMembersInSession[i].dkpMod + modifier
 		end
 	end
@@ -610,7 +609,7 @@ end
 function DKP:RaidPostWelcomeMsg()
 	if currentRaidID == nil then return end
 	if self.wndRaidOptions:FindChild("Button"):IsChecked() == false then return end
-	local strToSend = " [EasyDKP] Ahoy! Raid Session has just started with " .. self.tItems["Raids"][currentRaidID].tMisc.allPlayersCount .. " players on board.Fair winds!"
+	local strToSend = " [EasyDKP] Raid Session has just started with " .. self.tItems["Raids"][currentRaidID].tMisc.allPlayersCount .. " players on board."
 	ChatSystemLib.Command("/party" .. strToSend)
 end
 
@@ -803,7 +802,7 @@ function DKP:RaidUpdateSummaryLootDetails()
 				if self.tItems["EPGP"].Enable == 1 and Item.GetDataFromId(itemID):IsEquippable()  then 
 					wnd:FindChild("Cost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
 				else
-					wnd:FindChild("Cost"):SetText("--")
+					wnd:FindChild("Cost"):SetText("xxx")
 				end
 				wnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(itemID):GetItemQuality()))
 				wnd:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(itemID):GetIcon())
@@ -1330,9 +1329,24 @@ function DKP:RaidToolsMoved( wndHandler, wndControl, nOldLeft, nOldTop, nOldRigh
 end
 
 function DKP:RaidToolsPostMassMessage()
-	ChatSystemLib.Command("/party [EasyDKP] Every raid member has been granted with " .. self.tItems["settings"].dkp .. " DKP.")
+	ChatSystemLib.Command("/party [EasyDKP] Every raid member has been granted with " .. self.tItems["settings"].dkp .. self.tItems[EPGP].Enable == 1 and "EP." or "GP.")
 end
 
+function DKP:RaidToolsStartSummary()
+	if GroupLib.InRaid() == false then
+		Print("You cannot begin new session while not in raid")
+		return
+	end
+	if self.bIsRaidSession == true then
+		Print("Close previous session first") 
+		return
+	end
+	self:RaidOpenSummary("New")
+end
+
+function DKP:RaidToolsCloseSummary()
+	self:RaidSubmitSession() 
+end
 ---------------------------------------------------------------------------------------------------
 -- RaidGlobalSummary Functions
 ---------------------------------------------------------------------------------------------------
