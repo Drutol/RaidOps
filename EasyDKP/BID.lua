@@ -53,6 +53,7 @@ local defaultSlotValues =
 	["Support"] = 150
 }
 local bInitialized = false
+local timeout = 10
 function DKP:BidBeginInit()
 	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList","InsertLootChildren")
 	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList","InsertLooterChildren")
@@ -1719,7 +1720,8 @@ function DKP:InitBid2()
 		self:BidJoinChannel()
 	end
 	self:Bid2BroadcastMySuperiority()
-	self:Bid2FetchAuctions()
+	self:Bid2GetRandomML() -- start fetching auction chain
+	
 	self:BidAddNewAuction(40076,true)
 	--[[Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
 	Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
@@ -1732,11 +1734,25 @@ function DKP:InitBid2()
 	self.ActiveAuctions[1].wnd:FindChild("Responses"):ArrangeChildrenTiles()]]
 end
 
-function DKP:Bid2FetchAuctions()
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{"GimmeAuctions"}) end
+function DKP:Bid2OnAuctionsFetched()
+	self:Bid2RestoreMyChoices()
+	self:Bid2FetchVotes()
 end
 
+function DKP:Bid2FetchAuctions(strML)
+	if self.channel then self.channel:SendPrivateMessage({[1] = strML},{"GimmeAuctions"}) end -- requesting auctions from the ML
+end
 
+function DKP:Bid2RestoreMyChoices()
+	for k,choice in ipairs(self.MyChoices) do
+		for l,auction in ipairs(self.ActiveAuctions) do
+			if auction.wnd:GetData() == choice.item then
+				
+			end
+		end
+	end
+	self.MyChoices = {}
+end
 
 
 -- Netorking
@@ -1764,12 +1780,45 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self:BidAddNewAuction(tMsg.item,false)
 		elseif tMsg.type == "GimmeAuctions" then
 			for k,auction in ipairs(self.ActiveAuctions) do
-				self.channel:SendPrivateMessage({[1] = strSender},{type = "ActiveAuction" ,item = auction.wnd:GetData(),bAllowOffspec = self.tItems["settings"]["Bid2"].bAllowOffspec ,cost = string.sub(self:EPGPGetItemCostByID(auction.wnd:GetData()),36),duration = self.tItems["settings"]["Bid2"].duration,progress = auction.nTimeLeft})
+				self.channel:SendPrivateMessage({[1] = strSender},{type = "ActiveAuction" ,item = auction.wnd:GetData(),progress = auction.nTimeLeft,biddersCount = #auction.bidders,votersCount = #auction.votes})
 			end
 		elseif tMsg.type == "ActiveAuction" then
-			self:BidAddNewAuction(tMsg.item,nil,tMsg.progress)
+			self:Bid2RestoreFetchedAuctionFromID(tMsg.item,tMsg.progress,tMsg.biddersCount,tMsg.votersCount) -- we got an auction info
+		elseif tMsg.type == "IamML" then
+			if self.searchingML then -- waiting for one else close -> restore from saved ones
+				self.LastML = strSender
+				self.Bid2FetchAuctions(strSender) -- got one -> we are happy
+				self:Bid2CloseTimeout()
+				self.searchingML = false
+			end
 		end
 		
+	end
+end
+
+function DKP:Bid2StartAuctionFetchTimeout()
+	Apollo.RegisterTimerHandler(1,"AuctionsTimeout",self)
+	self.timeoutAuctionsTimer = ApolloTimer.Create(1,true,"AuctionsTimeout",self)
+end
+
+function DKP:Bid2CloseTimeout()
+	self.timeoutAuctionsTimer:Stop()
+	Apollo.RemoveEventHandler("AuctionsTimeout",self)
+end
+
+function DKP:AuctionsTimeout()
+	timeout = timeout - 1
+	if timeout == 0 then
+		self:AuctionFetchTimedOut()
+	end
+end
+
+function DKP:AuctionFetchTimedOut()
+	self.timeoutAuctionsTimer:Stop()
+	Apollo.RemoveEventHandler("AuctionsTimeout",self)
+	self.searchingML = false
+	for k,auction in ipairs(self.tItems["Auctions"]) do
+		self:BidAddNewAuction(auction.itemID,auction.bMaster,auction.progress)
 	end
 end
 
@@ -1777,6 +1826,47 @@ function DKP:BidRegisterCheckResponse(strPlayer)
 	self.wndBid2Responses:FindChild("List"):SetText(self.wndBid2Responses:FindChild("List"):GetText() .. "\n" .. strPlayer)
 end
 
+function DKP:Bid2RestoreFetchedAuctionFromIDAuctionFromID(itemID,progress,biddersCount,votersCount)
+	for k,auction in ipairs(self.tItems["Auctions"]) do -- going through saved ones
+		if auction.itemID == itemID then -- checking whether it's the one
+			if #auction.bidders == biddersCount and #auction.votes == votersCount then -- verification
+				self:BidAddNewAuction(auction.itemID,auction.bMaster,auctionprogress) -- nothing happened just add
+			else -- different
+				self:Bid2RestoreAuctionFromNewInfo(auction.itemID,auction.progress,k) -- something happened we have to investigate
+			end
+		end
+	end
+end
+
+function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index)
+	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetNewTargetsTable(self.tItems["Auctions"][index].bidders),{type = "SendMeThemChoices", item = itemID}) end -- request for sending choice info once more
+	self:BidAddNewAuction(itemID,nil,progress)
+	self.ActiveAuction[#self.ActiveAuctions].nTimeLeft = progress
+	if #self.ActiveAuctions == 1 then 
+		self:Bid2AuctionTimerStart() 
+	end
+end
+
+function DKP:Bid2GetNewTargetsTable(tOldTarets)
+	local arr = self:Bid2GetTargetsTable()
+	for k,player in ipairs(arr) do
+		for l,oldPlayer in ipairs(tOldTarets) do
+			if player == oldPlayer.strName then 
+				table.remove(arr,k)
+				break
+			end
+		end
+	end
+	return arr
+end
+
+function DKP:Bid2GetRandomML()
+	if self.channel then 
+		self.searchingML = true
+		self:Bid2StartAuctionFetchTimeout()
+		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ArUaML"}) -- expecting to get (1) response
+	end
+end
 
 function DKP:BidReqestConfirmation()
 	self.wndBid2Responses:Show(true,false)
@@ -1890,7 +1980,6 @@ function DKP:Bid2ArrangeResponses(auction)
 		end
 		if bidder.votes > 0 then wnd:FindChild("Choice"):FindChild("Votes"):SetText(bidder.votes) end
 	end
-	
 	auction.wnd:FindChild("Responses"):ArrangeChildrenTiles()
 end
 
@@ -2005,10 +2094,15 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress)
 			targetWnd:Lock(true)
 		end
 		if bMaster == nil then 
-				local bMaster = false
-				for k,child in (Hook.wndMasterLoot_ItemList) do
-					if child:GetData().itemDrop:GetItemId() == itemID then
-						if child:GetData().bIsMaster then bMaster = true end
+				if #Hook.wndMasterLoot_ItemList:GetChildren() == 0 then bMaster = false else
+					bMaster = false
+					for k,child in (Hook.wndMasterLoot_ItemList) do
+						if child:GetData().itemDrop:GetItemId() == itemID then
+							if child:GetData().bIsMaster then 
+								bMaster = true
+								break
+							end
+						end
 					end
 				end
 		end
@@ -2024,7 +2118,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress)
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
 		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
-		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, assistants = {}})
+		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {}})
 		
 		self.wndBid2:Show(true,false)
 	end
@@ -2177,6 +2271,8 @@ end
 function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 	local found = false
 	local currAuction
+	local ofID
+	local previousWho
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == itemID then 
 			currAuction = auction 
@@ -2184,9 +2280,12 @@ function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 		end
 	end
 	
-	for k,assistant in ipairs(currAuction.assistants) do
-		if assistant == strAssistant then 
+	
+	for k,assistant in ipairs(currAuction.votes) do
+		if vote.assistant == strAssistant then 
 			found = true 
+			ofID = k
+			previousWho = vote.who
 			break
 		end
 	end
@@ -2196,11 +2295,27 @@ function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 		for k,bidder in ipairs(auction.bidders) do
 			if bidder.strName == strName then 
 				bidder.votes = bidder.votes + 1 
-				table.insert(currAuction.assistants,strAssistant)
+				table.insert(currAuction.voters,{assistant = strAssistant,who = strName})
 				break
 			end
 		end
+	elseif currAuction and found and ofID then
+		local tasks = 2
+		for k,bidder in ipairs(auction.bidders) do
+			if bidder.strName == strName then 
+				bidder.votes = bidder.votes + 1 
+				table.insert(currAuction.voters,{assistant = strAssistant,who = strName})
+				tasks = tasks - 1
+			end
+			if bidder.strName == previousWho then
+				bidder.votes = bidder.votes - 1
+				table.remove(auction.bidders,ofID)
+				tasks = tasks - 1
+			end
+			if tasks == 0 then break end
+		end
 	end
+	self:Bid2ArrangeResponses()
 end
 
 function DKP:Bid2AssignItem(wndHandler,wndControl)
@@ -2288,7 +2403,7 @@ end
 
 function DKP:Bid2IsPlayerOnWhitelist(strName)
 	for k,player in ipairs(self.tItems["settings"]["Bid2"].tWhitelisted) do
-		if string.lower(strName) == string.lower(player) then return true
+		if string.lower(strName) == string.lower(player) then return true end
 	end
 	return false
 end

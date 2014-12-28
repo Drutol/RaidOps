@@ -670,6 +670,10 @@ function DKP:OnSave(eLevel)
 			tSave["AwardTimer"] = self.tItems["AwardTimer"]
 			tSave["Hub"] = self.tItems["Hub"]
 			tSave["BidSlots"] = self.tItems["BidSlots"]
+			tSave["Auctions"] = {}
+			for k,auction in ipairs(self.ActiveAuctions) do
+				table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft})
+			end
 		else
 			tSave["purged"] = "purged"
 		end
@@ -689,6 +693,7 @@ function DKP:OnRestore(eLevel, tData)
 		if tData["alts"] == nil then
 			self.tItems["alts"] = {}
 		end
+		
  end
 
 
