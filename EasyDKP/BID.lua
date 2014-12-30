@@ -1677,15 +1677,6 @@ end
 
 -- Bidding v2
 
-local statuses = {
-
-	["N"] = "Need",
-	["G"] = "Greed",
-	["P"] = "Pass",
-	["W"] = "Waiting",
-	["T"] = "Timed out",
-}
-
 function DKP:InitBid2()
 	self.wndBid2 = Apollo.LoadForm(self.xmlDoc2,"BiddingManagerv2",nil,self)
 	self.wndBid2Settings = Apollo.LoadForm(self.xmlDoc2,"BiddingManagerSettings",nil,self)
@@ -1709,9 +1700,9 @@ function DKP:InitBid2()
 	if self.tItems["settings"]["Bid2"].bLootCouncil == nil then self.tItems["settings"]["Bid2"].bLootCouncil = false end
 	if self.tItems["settings"]["Bid2"].bWhitelist == nil then self.tItems["settings"]["Bid2"].bWhitelist = false end
 	if self.tItems["settings"]["Bid2"].tWhitelisted == nil then self.tItems["settings"]["Bid2"].tWhitelisted = {} end
+	if self.tItems["settings"]["Bid2"].bRegisterPass == nil then self.tItems["settings"]["Bid2"].bRegisterPass = false end
 	
 	self.ActiveAuctions = {}
-	self.AuctionResponses = {}
 	self:Bid2RestoreSettings()
 	
 	if self.tItems["settings"].networking == 0 then
@@ -1719,9 +1710,9 @@ function DKP:InitBid2()
 	else
 		self:BidJoinChannel()
 	end
+	self.OtherMLs = {}
 	self:Bid2BroadcastMySuperiority()
 	self:Bid2GetRandomML() -- start fetching auction chain
-	
 	self:BidAddNewAuction(40076,true)
 	--[[Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
 	Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
@@ -1743,16 +1734,16 @@ function DKP:Bid2FetchAuctions(strML)
 	if self.channel then self.channel:SendPrivateMessage({[1] = strML},{"GimmeAuctions"}) end -- requesting auctions from the ML
 end
 
-function DKP:Bid2RestoreMyChoices()
-	for k,choice in ipairs(self.MyChoices) do
-		for l,auction in ipairs(self.ActiveAuctions) do
-			if auction.wnd:GetData() == choice.item then
+-- function DKP:Bid2RestoreMyChoices()
+	-- for k,choice in ipairs(self.MyChoices) do
+		-- for l,auction in ipairs(self.ActiveAuctions) do
+			-- if auction.wnd:GetData() == choice.item then
 				
-			end
-		end
-	end
-	self.MyChoices = {}
-end
+			-- end
+		-- end
+	-- end
+	-- self.MyChoices = {}
+-- end
 
 
 -- Netorking
@@ -1777,22 +1768,33 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 		elseif tMsg.type == "MyVote" then
 			self:Bid2RegisterVote(tMsg.who,tMsg.item,strSender)
 		elseif tMsg.type == "NewAuction" then
-			self:BidAddNewAuction(tMsg.item,false)
+			self:BidAddNewAuction(tMsg.item,false,nil,tMsg.pass)
 		elseif tMsg.type == "GimmeAuctions" then
 			for k,auction in ipairs(self.ActiveAuctions) do
 				self.channel:SendPrivateMessage({[1] = strSender},{type = "ActiveAuction" ,item = auction.wnd:GetData(),progress = auction.nTimeLeft,biddersCount = #auction.bidders,votersCount = #auction.votes})
 			end
 		elseif tMsg.type == "ActiveAuction" then
 			self:Bid2RestoreFetchedAuctionFromID(tMsg.item,tMsg.progress,tMsg.biddersCount,tMsg.votersCount) -- we got an auction info
-		elseif tMsg.type == "IamML" then
-			if self.searchingML then -- waiting for one else close -> restore from saved ones
+		elseif tMsg.type == "IamML" then -- searching for one at random else stockpile them in table
+			if self.searchingML then -- waiting for one , else close -> restore from saved ones
 				self.LastML = strSender
-				self.Bid2FetchAuctions(strSender) -- got one -> we are happy
+				self.Bid2FetchAuctions(strSender) -- got one -> we are happy and verifying changes
 				self:Bid2CloseTimeout()
 				self.searchingML = false
 			end
+			self.OtherMLs[strSender] = 1
+			self:Bid2UpdateMLTooltip()
 		end
 		
+	end
+end
+
+function DKP:Bid2UpdateMLTooltip()
+	for k,auction in ipairs(self.ActiveAuctions) do
+		auction.wnd:FindChild("FoundAssistants"):SetTooltip("All clients declaring themselves as assistants:\n")
+		for k,l in pairs(self.OtherMLs) do
+			auction.wnd:FindChild("FoundAssistants"):SetTooltip(k.."\n")
+		end
 	end
 end
 
@@ -1826,11 +1828,11 @@ function DKP:BidRegisterCheckResponse(strPlayer)
 	self.wndBid2Responses:FindChild("List"):SetText(self.wndBid2Responses:FindChild("List"):GetText() .. "\n" .. strPlayer)
 end
 
-function DKP:Bid2RestoreFetchedAuctionFromIDAuctionFromID(itemID,progress,biddersCount,votersCount)
+function DKP:Bid2RestoreFetchedAuctionFromID(itemID,progress,biddersCount,votersCount)
 	for k,auction in ipairs(self.tItems["Auctions"]) do -- going through saved ones
 		if auction.itemID == itemID then -- checking whether it's the one
 			if #auction.bidders == biddersCount and #auction.votes == votersCount then -- verification
-				self:BidAddNewAuction(auction.itemID,auction.bMaster,auctionprogress) -- nothing happened just add
+				self:BidAddNewAuction(auction.itemID,auction.bMaster,auction.progress,self.tItems["settings"]["Bid2"].bRegisterPass) -- nothing happened just add
 			else -- different
 				self:Bid2RestoreAuctionFromNewInfo(auction.itemID,auction.progress,k) -- something happened we have to investigate
 			end
@@ -1839,9 +1841,15 @@ function DKP:Bid2RestoreFetchedAuctionFromIDAuctionFromID(itemID,progress,bidder
 end
 
 function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index)
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetNewTargetsTable(self.tItems["Auctions"][index].bidders),{type = "SendMeThemChoices", item = itemID}) end -- request for sending choice info once more
-	self:BidAddNewAuction(itemID,nil,progress)
-	self.ActiveAuction[#self.ActiveAuctions].nTimeLeft = progress
+	local newTargets = self:Bid2GetNewTargetsTable(self.tItems["Auctions"][index].bidders)
+	if self.channel then 
+		self.channel:SendPrivateMessage(newTargets,{type = "SendMeThemChoices", item = itemID}) -- request for sending choice info once more
+	end 
+	self:BidAddNewAuction(itemID,nil,progress,self.tItems["settings"]["Bid2"].bRegisterPass)
+	self.ActiveAuctions[#self.ActiveAuctions].nTimeLeft = progress
+	self.ActiveAuctions[#self.ActiveAuctions].nRemainingPlayers = #newPlayers
+	self.ActiveAuctions[#self.ActiveAuctions].wnd:FindChild("LoadingOverlay"):Show(true,false)
+	self.ActiveAuctions[#self.ActiveAuctions].wnd:FindChild("LoadingOverlay"):FindChild("Status"):SetText("Fetching Data waiting for: "..#newTargets.. " Players.")
 	if #self.ActiveAuctions == 1 then 
 		self:Bid2AuctionTimerStart() 
 	end
@@ -1858,6 +1866,10 @@ function DKP:Bid2GetNewTargetsTable(tOldTarets)
 		end
 	end
 	return arr
+end
+
+function DKP:Bid2LoadingOverlayForceClose(wndHandler,wndControl)
+	wndControl:GetParent():Show(false,false)
 end
 
 function DKP:Bid2GetRandomML()
@@ -1892,6 +1904,11 @@ function DKP:BidRegisterChoice(strSender,option,item,currItem)
 			end
 			if not found then
 				table.insert(auction.bidders,{strName = strSender, option = string.lower(option), currItem = currItem,pr = self:EPGPGetPRByName(strSender) , votes = 0})
+				if auction.nRemainingPlayers and auction.nRemainingPlayers > 0 then
+					auction.nRemainingPlayers = auction.nRemainingPlayers - 1
+					wnd:FindChild("LoadingOverlay"):FindChild("Status"):SetText("Fetching Data waiting for: "..auction.nRemainingPlayers.. " Players.")
+					if auction.nRemainingPlayers == 0 then auction.wnd:FindChild("LoadingOverlay"):Show(false,false) end
+				end
 			else -- found
 				auction.bidders[ofID].option = string.lower(option)
 			end
@@ -1902,7 +1919,7 @@ function DKP:BidRegisterChoice(strSender,option,item,currItem)
 end
 
 function easyDKpsortBid2Bidders(a,b)
-	return a.pr*(a.votes+10) < b.pr*(b.votes+10)
+	return a.pr*(a.votes+100) < b.pr*(b.votes+100)
 end
 
 function DKP:Bid2ArrangeResponses(auction)
@@ -1991,6 +2008,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		msg.bAllowOffspec = self.tItems["settings"]["Bid2"].bAllowOffspec 
 		msg.cost = string.sub(self:EPGPGetItemCostByID(itemID),36)
 		msg.duration = self.tItems["settings"]["Bid2"].duration
+		msg.pass = self.tItems["settings"]["Bid2"].bRegisterPass
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
 	end
 end
@@ -2075,7 +2093,7 @@ function DKP:Bid2BroadcastMySuperiority()
 end
 
 
-function DKP:BidAddNewAuction(itemID,bMaster,progress)
+function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 	
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == itemID then return end
@@ -2119,7 +2137,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress)
 		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
 		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {}})
-		
+		self:Bid2UpdateMLTooltip()
 		self.wndBid2:Show(true,false)
 	end
 end
@@ -2144,9 +2162,11 @@ end
 function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	local item = Item.GetDataFromId(wndControl:GetParent():GetParent():GetData())
 	local itemComparee
+	local bPass
+	for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd:GetData() == item:GetItemId() then bPass = auction.bPass break end end
 	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
 	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),string.lower(wndControl:GetName()),wndControl:GetParent():GetParent():GetData(),itemComparee)
-	self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , item = wndControl:GetParent():GetParent():GetData(), option = wndControl:GetName(), itemCompare = itemComparee})
+	if bPass then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , item = wndControl:GetParent():GetParent():GetData(), option = wndControl:GetName(), itemCompare = itemComparee}) end
 end
 
 function DKP:BidUpdateTabProgress(wndHandler,wndControl)
@@ -2229,6 +2249,7 @@ function DKP:Bid2RestoreSettings()
 	self.wndBid2Settings:FindChild("AllowOffpsec"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bAllowOffspec)
 	self.wndBid2Settings:FindChild("LootCouncilMode"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bLootCouncil)
 	self.wndBid2Settings:FindChild("WhitelistOption"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bWhitelist)
+	self.wndBid2Settings:FindChild("RegisterPass"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bRegisterPass)
 end
 
 function DKP:BidSetAuctionTime(wndHandler,wndControl,strText)
@@ -2304,7 +2325,7 @@ function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 		for k,bidder in ipairs(auction.bidders) do
 			if bidder.strName == strName then 
 				bidder.votes = bidder.votes + 1 
-				table.insert(currAuction.voters,{assistant = strAssistant,who = strName})
+				table.insert(currAuction.votes,{assistant = strAssistant,who = strName})
 				tasks = tasks - 1
 			end
 			if bidder.strName == previousWho then
@@ -2368,13 +2389,23 @@ function DKP:Bid2DisableWhitelist()
 	self.tItems["settings"]["Bid2"].bWhitelist = false
 end
 
-function DKP:Bid2ShowWhitelist()
+function DKP:Bid2ShowWhiteList()
 	self.wndBid2Whitelist:Show(true,false)
+	self:Bid2PopulateWhitelist()
 	self.wndBid2Whitelist:ToFront()
+end
+
+function DKP:Bid2DisablePass()
+	self.tItems["settings"]["Bid2"].bRegisterPass = false
+end
+
+function DKP:Bid2EnablePass()
+	self.tItems["settings"]["Bid2"].bRegisterPass = true
 end
 
 function DKP:Bid2AddWhitelistedName(wndHandler,wndControl,strText)
 	table.insert(self.tItems["settings"]["Bid2"].tWhitelisted,strText)
+	self:Bid2PopulateWhitelist()
 end
 
 function DKP:Bid2RemoveWhitelistedPlayer()
@@ -2388,7 +2419,7 @@ function DKP:Bid2RemoveWhitelistedPlayer()
 	self:Bid2PopulateWhitelist()
 end
 
-function DKP:Bid2WhiteListLisItemSelected(wndHandler,wndControl)
+function DKP:Bid2WhiteListItemSelected(wndHandler,wndControl)
 	self.WhiteListedPlayer = wndControl:FindChild("PlayerName"):GetText()
 end
 
@@ -2619,3 +2650,5 @@ function DKP:MLSettingsArrangeLootTypeChanged(wndHandler,wndControl)
 	if wndControl:GetName() == "TilesLoot" then self.tItems["settings"]["ML"].bArrItemTiles = true else self.tItems["settings"]["ML"].bArrItemTiles = false end
 	Hook:OnMasterLootUpdate(true)
 end
+
+
