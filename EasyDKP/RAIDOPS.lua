@@ -184,6 +184,9 @@ function DKP:HubDispatch(wndHandler,wndControl)
 		self:AttendancePopulate()
 	elseif wndControl:GetName() == "LootList" then
 		self:LootListShow()
+	elseif wndControl:GetName() == "NetworkBidding" then
+		self.wndBid2:Show(true,false)
+		self.wndBid2:ToFront()
 	end
 end
 
@@ -374,7 +377,7 @@ function DKP:LootListListWindowPopulate()
 						Tooltip.GetItemTooltipForm(self,wnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
 						counter = counter + 1
 						if counter >= self.tItems["settings"].HubItemCount then
-							icons:ArrangeChildrenTiles(0)
+							list:ArrangeChildrenTiles(0)
 							return
 						end
 						inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
