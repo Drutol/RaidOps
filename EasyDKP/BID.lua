@@ -2071,13 +2071,14 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 			break
 		end
 	end
-	if self.wndBid2:FindChild("Auctions") == nil then
+	if self.wndBid2:FindChild("Auctions") == nil and #self.ActiveAuctions == 0 then
 		local wnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2,self)
 		wnd:SetName("Auctions")
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Status"):SetText("No Active Auctions")
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Button"):Show(false)
-	
+	else
+		self.ActiveAuctions[1].wnd:SetName("Auctions")
 	end
 end
 
@@ -2158,7 +2159,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
 		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
-		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {}})
+		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {},bPass = bPass})
 		self:Bid2UpdateMLTooltip()
 		self.wndBid2:Show(true,false)
 	end
