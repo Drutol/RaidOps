@@ -2402,22 +2402,33 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
 		local selectedOne
 		local selectedItem
+		if self.tItems["settings"]["Bid2"].assignAction == "select" then
+			for k,child in ipairs(children) do
+				child:SetCheck(false)
+			end
+		end
 		for k,child in ipairs(children) do
 			if string.lower(child:FindChild("CharacterName"):GetText()) == string.lower(self.Bid2SelectedPlayerName) then
 				selectedOne = child
+				if self.tItems["settings"]["Bid2"].assignAction == "select" then child:SetCheck(true) end
 				break
 			end
 		end
 		children = Hook.wndMasterLoot_ItemList:GetChildren()
 		local item = Item.GetDataFromId(wndControl:GetParent():GetData())
-		
+		if self.tItems["settings"]["Bid2"].assignAction == "select" then
+			for k,child in ipairs(children) do
+				child:SetCheck(false)
+			end
+		end
 		for k,child in ipairs(children) do
 			if item:GetName() == child:GetData().itemDrop:GetName() then
 				selectedItem = child:GetData()
+				if self.tItems["settings"]["Bid2"].assignAction == "select" then child:SetCheck(true) end
 				break
 			end
 		end
-		
+		if self.tItems["settings"]["Bid2"].assignAction == "select" then Hook.wndMasterLoot:FindChild("Assign"):Enable(true) end
 		Hook.tMasterLootSelectedLooter = selectedOne:GetData()
 		Hook.tMasterLootSelectedItem = selectedItem
 		
@@ -2425,7 +2436,7 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		if self.tItems["settings"]["Bid2"].tWinners == nil then self.tItems["settings"]["Bid2"].tWinners = {} end
 		self.tItems["settings"]["Bid2"].tWinners[selectedOne:GetData():GetName()] = selectedItem:GetItemId()
 		 
-		Hook:OnAssignDown()
+		if self.tItems["settings"]["Bid2"].assignAction == "assign" then Hook:OnAssignDown() end
 		
 		self:Bid2RemoveAuction(nil,wndControl)
 	else
@@ -2436,6 +2447,10 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		end
 	end
 	
+end
+
+function DKP:Bid2CloseResponses(wndHandler,wndControl)
+	wndControl:GetParent():Show(false,false)
 end
 
 function DKP:Bid2EnableWhitelist()
