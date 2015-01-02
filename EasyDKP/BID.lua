@@ -53,7 +53,7 @@ local defaultSlotValues =
 	["Support"] = 150
 }
 local bInitialized = false
-local timeout = 10
+local timeout = 5
 function DKP:BidBeginInit()
 	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList","InsertLootChildren")
 	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList","InsertLooterChildren")
@@ -1717,6 +1717,7 @@ function DKP:InitBid2()
 	self.OtherMLs = {}
 	self:Bid2BroadcastMySuperiority()
 	self:Bid2GetRandomML() -- start fetching auction chain
+	Print("[Network Bidding] - Restoring Auctions")
 	--self:BidAddNewAuction(40076,true)
 	--[[Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
 	Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
@@ -1735,6 +1736,7 @@ function DKP:Bid2OnAuctionsFetched()
 end
 
 function DKP:Bid2FetchAuctions(strML)
+	Print("[Network Bidding] - Fetching Auctions")
 	if self.channel then self.channel:SendPrivateMessage({[1] = strML},{"GimmeAuctions"}) end -- requesting auctions from the ML
 end
 
@@ -1778,7 +1780,7 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			end
 		elseif tMsg.type == "ActiveAuction" then
 			self:Bid2RestoreFetchedAuctionFromID(tMsg.item,tMsg.progress,tMsg.biddersCount,tMsg.votersCount) -- we got an auction info
-		elseif tMsg.type == "IamML" then -- searching for one at random else stockpile them in table
+		elseif tMsg.type == "IamML" then -- searching for one at random and stockpile them in table
 			if self.searchingML then -- waiting for one , else close -> restore from saved ones
 				self.LastML = strSender
 				self.Bid2FetchAuctions(strSender) -- got one -> we are happy and verifying changes
@@ -1822,8 +1824,21 @@ function DKP:AuctionFetchTimedOut()
 	self.timeoutAuctionsTimer:Stop()
 	Apollo.RemoveEventHandler("AuctionsTimeout",self)
 	self.searchingML = false
+	Print("[Network Bidding] - Auction fetch timeout")
+	if self.tItems["Auctions"] and # self.tItems["Auctions"]>0 then Print("[Netorking Bidding] - Restoring from saved data") else Print("[Network Bidding] - Nothing to restore") end
 	for k,auction in ipairs(self.tItems["Auctions"]) do
 		self:BidAddNewAuction(auction.itemID,auction.bMaster,auction.progress)
+		self.ActiveAuctions[#self.ActiveAuctions].bidders = auction.bidders
+		self.ActiveAuctions[#self.ActiveAuctions].votes = auction.votes
+		self:Bid2ArrangeResponses(self.ActiveAuctions[#self.ActiveAuctions])
+		self:Bid2SendUpdateInfo(self.ActiveAuctions[#self.ActiveAuctions])
+	end
+end
+
+function DKP:Bid2SendUpdateInfo(auction)
+	if self.channel then
+		self.channel:SendPrivateMessage(self:Bid2GetNewTargetsTable(auction.bidders),{type = "SendMeThemChoices",item = auction.wnd:GetData()})
+		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "AuctionTimeUpdate",item = auction.wnd:GetData(),progress = auction.nTimeLeft})
 	end
 end
 
@@ -1858,7 +1873,7 @@ function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index)
 	end
 end
 
-function DKP:Bid2GetNewTargetsTable(tOldTarets)
+function DKP:Bid2GetNewTargetsTable(tOldTarets) -- gives every person who isn;t in tOldTarets
 	local arr = self:Bid2GetTargetsTable()
 	for k,player in ipairs(arr) do
 		for l,oldPlayer in ipairs(tOldTarets) do
@@ -2140,6 +2155,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		targetWnd:FindChild("TimeLeft"):SetProgress(progress,100)
 		targetWnd:FindChild("TimeLeft"):SetMax(self.tItems["settings"]["Bid2"].duration)
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
+		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
 		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
 		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {}})
@@ -2296,6 +2312,27 @@ function DKP:Bid2PopulatePlayerInfo(bidder,container)
 	end
 	
 
+end
+
+function DKP:Bid2ShowAuctionVotes(wndHandler,wndControl)
+	wndControl:GetParent():FindChild("Votes1"):Show(true,false)
+	for k,auction in ipairs(self.ActiveAuctions) do
+		if auction.wnd == wndControl:GetParent() then self:Bid2PopulateAuctionVotes(auction) break end
+	end
+end
+
+function DKP:Bid2HideAuctionVotes(wndHandler,wndControl)
+	wndControl:GetParent():FindChild("Votes1"):Show(false,false)
+end
+
+function DKP:Bid2PopulateAuctionVotes(auction)
+	local box = auction.wnd:FindChild("Votes1"):FindChild("votes")
+	local strVoters = ""
+	for k,vote in ipairs(auction.votes) do
+		strVoters = strVoters .. vote.assistant .. "    " .. vote.who .. "\n"
+	end
+	if strVoters == "" then strVoters = "No registered votes" end
+	box:SetText(strVoters)
 end
 
 function DKP:Bid2AddTestAuction()
