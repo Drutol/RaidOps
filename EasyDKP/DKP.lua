@@ -671,6 +671,7 @@ function DKP:OnSave(eLevel)
 			tSave["Hub"] = self.tItems["Hub"]
 			tSave["BidSlots"] = self.tItems["BidSlots"]
 			tSave["Auctions"] = {}
+			tSave["MyChoices"] = self.MyChoices
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
 			end

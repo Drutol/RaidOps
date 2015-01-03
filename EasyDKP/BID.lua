@@ -1693,6 +1693,16 @@ function DKP:InitBid2()
 	self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
 	self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Status"):SetText("No Active Auctions")
 	self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Button"):Show(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Stop"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Start"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Assign"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("need"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("pass"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("slight"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("greed"):Enable(false)
+	
 	
 	if self.tItems["settings"]["Bid2"] == nil then 
 		self.tItems["settings"]["Bid2"] = {} 
@@ -1717,6 +1727,9 @@ function DKP:InitBid2()
 	self.OtherMLs = {}
 	self:Bid2BroadcastMySuperiority()
 	self:Bid2GetRandomML() -- start fetching auction chain
+	self.MyChoices = self.tItems["MyChoices"]
+	self.tItems["MyChoices"] = nil
+	if self.MyChoices == nil then self.MyChoices = {} end
 	Print("[Network Bidding] - Restoring Auctions")
 	--self:BidAddNewAuction(40076,true)
 	--[[Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
@@ -1730,26 +1743,19 @@ function DKP:InitBid2()
 	self.ActiveAuctions[1].wnd:FindChild("Responses"):ArrangeChildrenTiles()]]
 end
 
-function DKP:Bid2OnAuctionsFetched()
-	self:Bid2RestoreMyChoices()
-	self:Bid2FetchVotes()
-end
-
 function DKP:Bid2FetchAuctions(strML)
 	Print("[Network Bidding] - Fetching Auctions")
 	if self.channel then self.channel:SendPrivateMessage({[1] = strML},{"GimmeAuctions"}) end -- requesting auctions from the ML
 end
 
--- function DKP:Bid2RestoreMyChoices()
-	-- for k,choice in ipairs(self.MyChoices) do
-		-- for l,auction in ipairs(self.ActiveAuctions) do
-			-- if auction.wnd:GetData() == choice.item then
-				
-			-- end
-		-- end
-	-- end
-	-- self.MyChoices = {}
--- end
+function DKP:Bid2RestoreMyChoices(auction)
+	 for k,choice in ipairs(self.MyChoices) do
+		if auction.wnd:GetData() == choice.item then
+			auction.wnd:FindChild("Controls"):FindChild(choice.option):SetCheck(true)
+			break
+		end
+	end
+end
 
 
 -- Netorking
@@ -1858,16 +1864,16 @@ function DKP:Bid2RestoreFetchedAuctionFromID(itemID,progress,biddersCount,voters
 	end
 end
 
-function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index)
+function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index) -- aka there are bidders who made choices while server was offline
 	local newTargets = self:Bid2GetNewTargetsTable(self.tItems["Auctions"][index].bidders)
 	if self.channel then 
 		self.channel:SendPrivateMessage(newTargets,{type = "SendMeThemChoices", item = itemID}) -- request for sending choice info once more
 	end 
 	self:BidAddNewAuction(itemID,nil,progress,self.tItems["settings"]["Bid2"].bRegisterPass)
 	self.ActiveAuctions[#self.ActiveAuctions].nTimeLeft = progress
-	self.ActiveAuctions[#self.ActiveAuctions].nRemainingPlayers = #newPlayers
+	self.ActiveAuctions[#self.ActiveAuctions].nRemainingPlayers = #newTargets
 	self.ActiveAuctions[#self.ActiveAuctions].wnd:FindChild("LoadingOverlay"):Show(true,false)
-	self.ActiveAuctions[#self.ActiveAuctions].wnd:FindChild("LoadingOverlay"):FindChild("Status"):SetText("Fetching Data waiting for: "..#newTargets.. " Players.")
+	self.ActiveAuctions[#self.ActiveAuctions].wnd:FindChild("LoadingOverlay"):FindChild("Status"):SetText("Fetching Data - waiting for: "..#newTargets.. " Players.")
 	if #self.ActiveAuctions == 1 then 
 		self:Bid2AuctionTimerStart() 
 	end
@@ -2068,6 +2074,12 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 			table.remove(self.ActiveAuctions,k)
 			auction.wnd:Detach()
 			auction.wnd:Destroy()
+			for l,choice in ipairs(self.MyChoices) do
+				if choice.item == auction.wnd:GetData() then
+					table.remove(self.MyChoices,l)
+					break
+				end
+			end
 			break
 		end
 	end
@@ -2077,6 +2089,16 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Status"):SetText("No Active Auctions")
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Button"):Show(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Stop"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Start"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Assign"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("need"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("pass"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("slight"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("greed"):Enable(false)
+		
 	else
 		self.ActiveAuctions[1].wnd:SetName("Auctions")
 	end
@@ -2142,6 +2164,15 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		if targetWnd:FindChild("LoadingOverlay"):IsShown() then
 			targetWnd:FindChild("LoadingOverlay"):Show(false,false)
 			targetWnd:FindChild("LoadingOverlay"):FindChild("Button"):Show(true,false)	
+			targetWnd:FindChild("Auctions"):FindChild("Stop"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Start"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Assign"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("ShowVotes"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("need"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("pass"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("slight"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("greed"):Enable(true)
 		end
 		if bMaster == nil then 
 				if #Hook.wndMasterLoot_ItemList:GetChildren() == 0 then bMaster = false else bMaster = true end
@@ -2160,6 +2191,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
 		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {},bPass = bPass})
+		self:Bid2RestoreMyChoices(self.ActiveAuctions[#self.ActiveAuctions])
 		self:Bid2UpdateMLTooltip()
 		self.wndBid2:Show(true,false)
 	end
@@ -2183,6 +2215,9 @@ function DKP:Bid2AuctionStart(wndHandler, wndControl, eMouseButton)
 end
 
 function DKP:BID2ChoiceChanged(wndHandler,wndControl)
+	for k,choice in ipairs(self.MyChoices) do
+	if choice.item == wndControl:GetParent():GetParent():GetData() then table.remove(self.MyChoices,k) break end
+	end
 	local item = Item.GetDataFromId(wndControl:GetParent():GetParent():GetData())
 	local itemComparee
 	local bPass
@@ -2190,6 +2225,7 @@ function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
 	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),string.lower(wndControl:GetName()),wndControl:GetParent():GetParent():GetData(),itemComparee)
 	if bPass then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , item = wndControl:GetParent():GetParent():GetData(), option = wndControl:GetName(), itemCompare = itemComparee}) end
+	table.insert(self.MyChoices,{item = item:GetItemId(),option = wndControl:GetName()})
 end
 
 function DKP:BidUpdateTabProgress(wndHandler,wndControl)
