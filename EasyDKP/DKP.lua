@@ -34,6 +34,15 @@ local ktClassToString =
 	[GameLib.CodeEnumClass.Engineer]    	= "Engineer",
 	[GameLib.CodeEnumClass.Spellslinger]  	= "Spellslinger",
 }
+local ktStringToIcon =
+{
+	["Medic"]       	= "Icon_Windows_UI_CRB_Medic",
+	["Esper"]       	= "Icon_Windows_UI_CRB_Esper",
+	["Warrior"]     	= "Icon_Windows_UI_CRB_Warrior",
+	["Stalker"]     	= "Icon_Windows_UI_CRB_Stalker",
+	["Engineer"]    	= "Icon_Windows_UI_CRB_Engineer",
+	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
+}
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -496,6 +505,7 @@ function DKP:AddItem(i,ID)
 	end
 	i.wnd = wnd
 	self.tItems[ID].wnd = i.wnd
+	i.class = self.tItems[ID].class
 	self:UpdateItem(i)
 	self.wndItemList:ArrangeChildrenVert()
 end
@@ -549,6 +559,7 @@ function DKP:UpdateItem(playerItem)
 			end
 		end
 	end
+	if playerItem.class then playerItem.wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[playerItem.class]) else playerItem.wnd:FindChild("ClassIcon"):Show(false,false) end
 	if playerItem.alt ~=nil then
 		playerItem.wnd:FindChild("AltNote"):SetTooltip("Playing as : " .. i.alt)
 	else
@@ -672,6 +683,7 @@ function DKP:OnSave(eLevel)
 			tSave["BidSlots"] = self.tItems["BidSlots"]
 			tSave["Auctions"] = {}
 			tSave["MyChoices"] = self.MyChoices
+			tSave["MyVotes"] = self.MyVotes
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
 			end

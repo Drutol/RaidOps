@@ -1729,7 +1729,10 @@ function DKP:InitBid2()
 	self:Bid2GetRandomML() -- start fetching auction chain
 	self.MyChoices = self.tItems["MyChoices"]
 	self.tItems["MyChoices"] = nil
-	if self.MyChoices == nil then self.MyChoices = {} end
+	if self.MyChoices == nil then self.MyChoices = {} end	
+	self.MyVotes = self.tItems["MyVotes"]
+	self.tItems["MyVotes"] = nil
+	if self.MyVotes == nil then self.MyVotes = {} end
 	Print("[Network Bidding] - Restoring Auctions")
 	--self:BidAddNewAuction(40076,true)
 	--[[Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",self.ActiveAuctions[1].wnd:FindChild("Responses"),self)
@@ -1795,10 +1798,40 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			end
 			self.OtherMLs[strSender] = 1
 			self:Bid2UpdateMLTooltip()
+		elseif tMsg.type == "GimmeVotes" then
+			for k,auction in ipairs(self.ActiveAuctions) do
+				if auction.wnd:GetData() == tMsg.item then
+					
+				end
+			end
+		elseif tMsg.type == "AuctionPaused" then
+			self:Bid2OnAuctionPasused(tMsg.item)
+		elseif tMsg.type == "AuctionResumed" then
+			self:Bid2OnAuctionResumed(tMsg.item)
 		end
 		
 	end
 end
+
+
+function DKP:Bid2OnAuctionResumed(itemID)
+	for k,auction in ipairs(self.ActiveAuctions) do
+		if auction.wnd:GetData() == itemID then
+			auction.bActive = true
+			break
+		end
+	end
+end
+
+function DKP:Bid2OnAuctionPasused(itemID)
+	for k,auction in ipairs(self.ActiveAuctions) do
+		if auction.wnd:GetData() == itemID then
+			auction.bActive = false
+			break
+		end
+	end
+end
+
 
 function DKP:Bid2UpdateMLTooltip()
 	for k,auction in ipairs(self.ActiveAuctions) do
@@ -1866,9 +1899,13 @@ end
 
 function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index) -- aka there are bidders who made choices while server was offline
 	local newTargets = self:Bid2GetNewTargetsTable(self.tItems["Auctions"][index].bidders)
+	local newVoters = self:Bid2GetNewTargetsTableVotes(self.tItems["Auctions"][index].voters)
 	if self.channel then 
 		self.channel:SendPrivateMessage(newTargets,{type = "SendMeThemChoices", item = itemID}) -- request for sending choice info once more
+		self.channel:SendPrivateMessage(newVoters,{type = "GimmeVotes",item = itemID})
 	end 
+
+	
 	self:BidAddNewAuction(itemID,nil,progress,self.tItems["settings"]["Bid2"].bRegisterPass)
 	self.ActiveAuctions[#self.ActiveAuctions].nTimeLeft = progress
 	self.ActiveAuctions[#self.ActiveAuctions].nRemainingPlayers = #newTargets
@@ -1879,7 +1916,7 @@ function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index) -- aka there a
 	end
 end
 
-function DKP:Bid2GetNewTargetsTable(tOldTarets) -- gives every person who isn;t in tOldTarets
+function DKP:Bid2GetNewTargetsTable(tOldTarets) -- gives every person who isn;t in tOldTarets (bidders)
 	local arr = self:Bid2GetTargetsTable()
 	for k,player in ipairs(arr) do
 		for l,oldPlayer in ipairs(tOldTarets) do
@@ -1888,6 +1925,21 @@ function DKP:Bid2GetNewTargetsTable(tOldTarets) -- gives every person who isn;t 
 				break
 			end
 		end
+	end
+	return arr
+end
+
+function DKP:Bid2GetNewTargetsTableVotes(tOldTarets) -- gives every ML who isn;t in tOldTarets (voters)
+	local arr = {}
+	for k,player in pairs(self.OtherMLs) do
+		local found = false
+		for l,oldPlayer in ipairs(tOldTarets) do
+			if k == oldPlayer.assistant then 
+				found = true
+				break
+			end
+		end
+		if not found then table.insert(arr,k) end
 	end
 	return arr
 end
@@ -1946,6 +1998,10 @@ function easyDKpsortBid2Bidders(a,b)
 	return a.pr*(a.votes+100) < b.pr*(b.votes+100)
 end
 
+function easyDKpsortBid2BiddersLootCouncil(a,b)
+	return a.votes < b.votes
+end
+
 function DKP:Bid2ArrangeResponses(auction)
 	local needs = {}
 	local greeds = {}
@@ -1963,10 +2019,18 @@ function DKP:Bid2ArrangeResponses(auction)
 			table.insert(slights,bidder)
 		end
 	end
-	table.sort(needs,easyDKpsortBid2Bidders)
-	table.sort(passes,easyDKpsortBid2Bidders)
-	table.sort(slights,easyDKpsortBid2Bidders)
-	table.sort(greeds,easyDKpsortBid2Bidders)
+	if not self.tItems["settings"].bLootCouncil then
+		table.sort(needs,easyDKpsortBid2Bidders)
+		table.sort(passes,easyDKpsortBid2Bidders)
+		table.sort(slights,easyDKpsortBid2Bidders)
+		table.sort(greeds,easyDKpsortBid2Bidders)
+	else
+		table.sort(needs,easyDKpsortBid2BiddersLootCouncil)
+		table.sort(passes,easyDKpsortBid2BiddersLootCouncil)
+		table.sort(slights,easyDKpsortBid2BiddersLootCouncil)
+		table.sort(greeds,easyDKpsortBid2BiddersLootCouncil)
+	
+	end
 	
 	auction.wnd:FindChild("Responses"):DestroyChildren()
 	for k,bidder in ipairs(needs) do
@@ -2030,7 +2094,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		msg.type = "NewAuction"
 		msg.itemID = itemID
 		msg.bAllowOffspec = self.tItems["settings"]["Bid2"].bAllowOffspec 
-		msg.cost = string.sub(self:EPGPGetItemCostByID(itemID),36)
+		msg.cost = self.tItems["settings"].bLootCouncil and nil or string.sub(self:EPGPGetItemCostByID(itemID),36)
 		msg.duration = self.tItems["settings"]["Bid2"].duration
 		msg.pass = self.tItems["settings"]["Bid2"].bRegisterPass
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
@@ -2066,7 +2130,16 @@ function DKP:Bid2GetTargetsTable()
 	end
 	return targets
 end
+
 --  Wnd Logic
+
+function DKP:Bid2EnableLootCouncilMode(wndHandler,wndControl)
+	self.tItems["settings"].bLootCouncil = true
+end
+
+function DKP:Bid2DisableLootCouncilMode(wndHandler,wndControl)
+	self.tItems["settings"].bLootCouncil = false
+end
 
 function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 	for k,auction in ipairs(self.ActiveAuctions) do
@@ -2077,6 +2150,12 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 			for l,choice in ipairs(self.MyChoices) do
 				if choice.item == auction.wnd:GetData() then
 					table.remove(self.MyChoices,l)
+					break
+				end
+			end
+			for l,vote in ipairs(self.MyVotes) do
+				if vote.item == auction.wnd:GetData() then
+					table.remove(self.MyVotes,l)
 					break
 				end
 			end
@@ -2189,11 +2268,26 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
 		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
 		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
+		if self.tItems["settings"].bLootCouncil then targetWnd:FindChild("ItemCost"):Show(false,false) end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
 		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {},bPass = bPass})
 		self:Bid2RestoreMyChoices(self.ActiveAuctions[#self.ActiveAuctions])
+		self:Bid2RestoreMyVotes(self.ActiveAuctions[#self.ActiveAuctions])
 		self:Bid2UpdateMLTooltip()
 		self.wndBid2:Show(true,false)
+	end
+end
+
+function DKP:Bid2RestoreMyVotes(auction)
+	 for k,vote in ipairs(self.MyVotes) do
+		if auction.wnd:GetData() == vote.item then
+			for l,wndBidder in ipairs(auction.wnd:FindChild("Responses"):GetChildren()) do
+				if wndBidder:FindChild("CharacterName"):GetText() == vote.who then
+					wndBidder:FindChild("GlowingThing"):Show(true,false)
+					return
+				end
+			end
+		end
 	end
 end
 
@@ -2328,6 +2422,7 @@ end
 function DKP:Bid2LooterSelected(wndHandler,wndControl)
 	self:Bid2PopulatePlayerInfo(wndControl:GetData(),wndControl:GetParent():GetParent():FindChild("Info"))
 	self.Bid2SelectedPlayerName = wndControl:GetData().strName
+	self.Bid2SelectedPlayerTile = wndControl
 end
 
 function DKP:Bid2PopulatePlayerInfo(bidder,container)
@@ -2472,7 +2567,12 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		if self.tItems["settings"]["Bid2"].tWinners == nil then self.tItems["settings"]["Bid2"].tWinners = {} end
 		self.tItems["settings"]["Bid2"].tWinners[selectedOne:GetData():GetName()] = selectedItem:GetItemId()
 		 
-		if self.tItems["settings"]["Bid2"].assignAction == "assign" then Hook:OnAssignDown() end
+		if self.tItems["settings"]["Bid2"].assignAction == "assign" then 
+			Hook:OnAssignDown() 
+		else
+			self.Bid2SelectedPlayerTile:FindChild("GlowingThing"):Show(true,false)
+			table.insert(self.MyVotes,{item = item:GetItemId(),who = self.Bid2SelectedPlayerName})
+		end
 		
 		self:Bid2RemoveAuction(nil,wndControl)
 	else
