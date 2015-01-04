@@ -240,6 +240,7 @@ end
 
 
 function DKP:RaidResumeSession()
+	self:BidUpdateItemDatabase()
 	currentRaidID = self.tItems["Raids"]["Save"].ID
 	self.bIsRaidSession = true
 	tAllRaidMembersInSession = self.tItems["Raids"]["Save"].allPlayers

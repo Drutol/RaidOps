@@ -199,6 +199,8 @@ end
 function DKP:AttendanceInit()
 	self.wndAttendance = Apollo.LoadForm(self.xmlDoc2,"AttendanceGrid",nil,self)
 	self.wndAttendance:Show(false,true)
+	self.wndAttendance:FindChild("Grid"):AddEventHandler("GridSelChange","UpdatePlayerAttendance",self)
+
 end
 
 function DKP:AttendanceShow()
@@ -213,6 +215,34 @@ end
 function DKP:AttendanceClose()
 	self.wndAttendance:Show(false,false)
 end
+
+local ktNextAttendance = {
+	["Left"] = "!Left",
+	["!Left"] = "NotAtAll",
+	["NotAtAll"] = "Left",
+}
+
+function DKP:UpdatePlayerAttendance(wndHandler,wndCotrol,iRow,iCol)
+	local cellData = self.wndAttendance:FindChild("Grid"):GetCellData(iRow,iCol)
+	local grid = self.wndAttendance:FindChild("Grid")
+	if cellData then
+		local player = self.tItems["Raids"][cellData.raid].tPlayers[cellData.inRaidID]
+		self.tItems["Raids"][cellData.raid].tPlayers[cellData.inRaidID].bLeft = ktNextAttendance[player.bLeft]
+		player.bLeft = ktNextAttendance[player.bLeft]
+		cellData.left = player.bLeft
+		if player.bLeft == "Left" then
+			grid:SetCellData(iRow, iCol,"","ClientSprites:LootCloseBox_Holo",cellData)
+			grid:SetCellImageColor(iRow, iCol,"white") 
+		elseif player.bLeft == "!Left" then
+			grid:SetCellData(iRow, iCol,"","achievements:sprAchievements_Icon_Complete",cellData)
+			grid:SetCellImageColor(iRow, iCol,"white") 
+		elseif player.bLeft == "NotAtAll" then
+			grid:SetCellData(iRow, iCol,"","ClientSprites:LootCloseBox_Holo",cellData)
+			grid:SetCellImageColor(iRow, iCol,"xkcdApple") 
+		end
+	end
+end
+
 function DKP:AttendancePopulate()
 	local grid = self.wndAttendance:FindChild("Grid")
 	grid:DeleteAll()
@@ -240,13 +270,16 @@ function DKP:AttendancePopulate()
 						for j=1,#self.tItems["Raids"][k].tPlayers do
 							if addedPlayers[self.tItems[i].strName] ~= nil and string.lower(self.tItems[i].strName) == string.lower(self.tItems["Raids"][k].tPlayers[j].name) and self:string_starts(self.tItems[i].strName, self.wndAttendance:FindChild("Search"):GetText() ~= "Search" and self.wndAttendance:FindChild("Search"):GetText() or self.tItems[i].strName) then
 								if self.tItems["Raids"][k].tPlayers[j].bLeft == "Left" then
-									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo","f")
-								else
-									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","achievements:sprAchievements_Icon_Complete","t")
+									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo",{strName = self.tItems[i].strName,raid = k,inRaidID = j, left = "Left"})
+								elseif self.tItems["Raids"][k].tPlayers[j].bLeft == "!Left" then
+									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","achievements:sprAchievements_Icon_Complete",{strName = self.tItems[i].strName,raid = k,inRaidID = j, left = "!Left"})
+								elseif self.tItems["Raids"][k].tPlayers[j].bLeft == "NotAtAll" then
+									grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo",{strName = self.tItems[i].strName,raid = k,inRaidID = j, left = "NotAtAll"})
+									grid:SetCellImageColor(addedPlayers[self.tItems[i].strName], k+1,"xkcdApple") 
 								end
 								break
 							elseif j == #self.tItems["Raids"][k].tPlayers and addedPlayers[self.tItems[i].strName] ~= nil then 
-								grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo","f")
+								grid:SetCellData(addedPlayers[self.tItems[i].strName], k+1,"","ClientSprites:LootCloseBox_Holo",{strName = self.tItems[i].strName,raid = k,inRaidID = j, left = "NotAtAll"})
 								grid:SetCellImageColor(addedPlayers[self.tItems[i].strName], k+1,"xkcdApple") 
 							end
 						end

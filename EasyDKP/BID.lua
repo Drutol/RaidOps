@@ -1799,15 +1799,25 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self.OtherMLs[strSender] = 1
 			self:Bid2UpdateMLTooltip()
 		elseif tMsg.type == "GimmeVotes" then
-			for k,auction in ipairs(self.ActiveAuctions) do
-				if auction.wnd:GetData() == tMsg.item then
-					
+			for k,vote in ipairs(self.MyVotes) do
+				if vote.item == tMsg.item then
+					self.channel:SendPrivateMessage({[1] = strSender},{type = "MyVote",who = vote.who,item = vote.item})
+					break
 				end
 			end
 		elseif tMsg.type == "AuctionPaused" then
 			self:Bid2OnAuctionPasused(tMsg.item)
 		elseif tMsg.type == "AuctionResumed" then
 			self:Bid2OnAuctionResumed(tMsg.item)
+		elseif tMsg.type == "AuctionTimeUpdate" then
+			for k,auction in ipairs(self.ActiveAuctions) do
+				if auction.wnd:GetData() == tMsg.item then
+					auction.bActive = false
+					auction.nTimeLeft = tMsg.progress
+					self:BidUpdateTabProgress(nil,auction.wnd)
+					break
+				end
+			end
 		end
 		
 	end
@@ -2267,7 +2277,11 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		targetWnd:FindChild("TimeLeft"):SetMax(self.tItems["settings"]["Bid2"].duration)
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
 		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
-		if not bMaster then targetWnd:FindChild("Assign"):SetText("Vote") end
+		if not bMaster then 
+			targetWnd:FindChild("Assign"):SetText("Vote")
+			targetWnd:FindChild("Start"):Enable(false)
+			targetWnd:FindChild("Stop"):Enable(false)
+		end
 		if self.tItems["settings"].bLootCouncil then targetWnd:FindChild("ItemCost"):Show(false,false) end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
 		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {},bPass = bPass})
@@ -2334,7 +2348,6 @@ function DKP:BidUpdateTabProgress(wndHandler,wndControl)
 end
 
 function DKP:Bid2StopAuction(wndHandler,wndControl)
-
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd == wndControl:GetParent() then 
 			auction.bActive = false
