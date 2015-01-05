@@ -159,7 +159,7 @@ function DKP:BidCompleteInit()
 		self.tItems["settings"].BidAnchorInsertion = 1
 	end
 
-	
+	self:BidUpdateItemDatabase()
 	
 	-- Proper Bidding window
 	
@@ -480,6 +480,10 @@ function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 			
 		end
 	else
+		Print(self.SelectedMasterItem)
+		for k,l in pairs(self.ItemDatabase) do
+			Print(k)
+		end
 		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
 	end
 end
@@ -2273,7 +2277,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		if not self.tItems["settings"]["Bid2"].bAllowOffspec then targetWnd:FindChild("Controls"):FindChild("Greed"):Enable(false) end
 		targetWnd:SetData(itemID)
 		targetWnd:SetText(item:GetName())
-		targetWnd:FindChild("TimeLeft"):SetProgress(progress,100)
+		targetWnd:FindChild("TimeLeft"):SetProgress(progress,1000)
 		targetWnd:FindChild("TimeLeft"):SetMax(self.tItems["settings"]["Bid2"].duration)
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
 		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
@@ -2447,6 +2451,9 @@ function DKP:Bid2PopulatePlayerInfo(bidder,container)
 		container:FindChild("ItemFrameCompare"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 		container:FindChild("ItemFrameCompare"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
 		Tooltip.GetItemTooltipForm(self, container:FindChild("ItemFrameCompare"):FindChild("ItemIcon") ,  item, {bPrimary = true, bSelling = false, itemCompare = Item.GetDataFromId(container:GetParent():GetData())})
+	else
+		container:FindChild("ItemFrameCompare"):SetSprite("CRB_Tooltips:sprTooltip_SquareFrame_Orange")
+		container:FindChild("ItemFrameCompare"):FindChild("ItemIcon"):SetSprite("IconSprites:Icon_ItemArmorTrinket_Unidentified_Trinket_0009")
 	end
 	local ID = self:GetPlayerByIDByName(bidder.strName)
 	if self.tItems["settings"]["Bid2"].tWinners and  self.tItems["settings"]["Bid2"].tWinners[bidder.strName] then
@@ -2454,8 +2461,13 @@ function DKP:Bid2PopulatePlayerInfo(bidder,container)
 		container:FindChild("ItemFrameLast"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 		container:FindChild("ItemFrameLast"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
 		Tooltip.GetItemTooltipForm(self, container:FindChild("ItemFrameLast"):FindChild("ItemIcon") ,item , {bPrimary = true, bSelling = false})
+	else
+		for k,child in ipairs(container:FindChild("ItemFrameLast"):FindChild("ItemIcon"):GetChildren()) do
+			Print(child:GetName())
+		end
+		container:FindChild("ItemFrameLast"):SetSprite("CRB_Tooltips:sprTooltip_SquareFrame_Orange")
+		container:FindChild("ItemFrameLast"):FindChild("ItemIcon"):SetSprite("IconSprites:Icon_ItemArmorTrinket_Unidentified_Trinket_0009")
 	end
-	
 
 end
 
@@ -2535,7 +2547,8 @@ function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 end
 
 function DKP:Bid2AssignItem(wndHandler,wndControl)
-	local bMaster
+	local bMaster = true
+	
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd == wndHandler then
 			bMaster = auction.bMaster
@@ -2572,27 +2585,24 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 				break
 			end
 		end
-		if self.tItems["settings"]["Bid2"].assignAction == "select" then Hook.wndMasterLoot:FindChild("Assign"):Enable(true) end
+		if self.tItems["settings"]["Bid2"].assignAction == "select" then Hook.wndMasterLoot:FindChild("Assignment"):Enable(true) end
 		Hook.tMasterLootSelectedLooter = selectedOne:GetData()
 		Hook.tMasterLootSelectedItem = selectedItem
 		
-		self.channel:SendPrivateMessage(self:Bid2GetNewTargetsTable(),{type = "ItemResults",item = selectedItem:GetItemId(),winner = selectedOne:GetData():GetName()})
+		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ItemResults",item = item:GetItemId(),winner = selectedOne:GetData():GetName()})
 		if self.tItems["settings"]["Bid2"].tWinners == nil then self.tItems["settings"]["Bid2"].tWinners = {} end
-		self.tItems["settings"]["Bid2"].tWinners[selectedOne:GetData():GetName()] = selectedItem:GetItemId()
+		self.tItems["settings"]["Bid2"].tWinners[selectedOne:GetData():GetName()] = item:GetItemId()
 		 
 		if self.tItems["settings"]["Bid2"].assignAction == "assign" then 
 			Hook:OnAssignDown() 
-		else
-			self.Bid2SelectedPlayerTile:FindChild("GlowingThing"):Show(true,false)
-			table.insert(self.MyVotes,{item = item:GetItemId(),who = self.Bid2SelectedPlayerName})
+			wndControl:Enable(false)
 		end
-		
-		self:Bid2RemoveAuction(nil,wndControl)
 	else
 		if self.Bid2SelectedPlayerName and wndControl:GetParent():GetData() then 
 			self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(){type = "MyVote" , who = self.Bid2SelectedPlayerName, item = wndControl:GetParent():GetData()})
 			self:Bid2RegisterVote(self.Bid2SelectedPlayerName,wndHandler:GetData(),GameLib:GetPlayerUnit():GetName())
-			wndControl:Enable(false)
+			self.Bid2SelectedPlayerTile:FindChild("GlowingThing"):Show(true,false)
+			table.insert(self.MyVotes,{item = item:GetItemId(),who = self.Bid2SelectedPlayerName})
 		end
 	end
 	
