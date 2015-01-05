@@ -2556,6 +2556,11 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 	end
 	
 	if bMaster then
+		for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
+			if child:IsChecked() then Hook.tMasterLootSelectedItem = child:GetData() break end
+		end
+		Hook.OnMasterLootUpdate(true)
+		
 		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
 		local selectedOne
 		local selectedItem
