@@ -95,7 +95,7 @@ end
 function DKP:OnDocLoaded()
 
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
-	    self.wndMain = Apollo.LoadForm(self.xmlDoc, "DKPMain", nil, self)
+		self.wndMain = Apollo.LoadForm(self.xmlDoc, "DKPMain", nil, self)
 		self.wndDetail = Apollo.LoadForm(self.xmlDoc, "MemberDetails" , nil , self)
 		self.wndSettings = Apollo.LoadForm(self.xmlDoc, "Settings" , nil , self)
 		self.wndExport = Apollo.LoadForm(self.xmlDoc, "Export" , nil , self)
@@ -105,7 +105,10 @@ function DKP:OnDocLoaded()
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
 		end
-		
+		if self.wndMainLoc then 
+			self.wndMain:MoveToLocation(self.wndMainLoc) 
+			self.wndMainLoc = nil
+		end
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
 		self.wndMain:Show(false, true)
@@ -428,7 +431,11 @@ end
 function DKP:Search( wndHandler, wndControl, strText )
 	if strText ~= "" then
 		self.SearchString = strText
+	else
+		wndControl:SetText("Search")
+		self.SearchString = nil
 	end
+	if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else self:RefreshMainItemList() end
 end
 function DKP:string_starts(String,Start)
 	return string.sub(string.lower(String),1,string.len(Start))==string.lower(Start)
@@ -569,6 +576,7 @@ function DKP:OnSave(eLevel)
 			tSave["Auctions"] = {}
 			tSave["MyChoices"] = self.MyChoices
 			tSave["MyVotes"] = self.MyVotes
+			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
 			end
@@ -591,6 +599,7 @@ function DKP:OnRestore(eLevel, tData)
 		if tData["alts"] == nil then
 			self.tItems["alts"] = {}
 		end
+		self.wndMainLoc = WindowLocation.new(tData.wndMainLoc)
 		
  end
 
@@ -1393,14 +1402,13 @@ function DKP:RefreshMainItemList()
 		end
 	end
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
-	self:ResetSearchBox()
 	self:UpdateItemCount()
 	self.wndSelectedListItem = nil
 end
 
-function DKP:UpdateItem(playerItem,k)
+function DKP:UpdateItem(playerItem,k,bAddedClass)
 	if playerItem.wnd == nil then return end
-	if k and k == 1 then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
+	if k and k == 1 or not bAddedClass then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
 	for i=1,5 do
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
 			if self.tItems["settings"].LabelOptions[i] == "Name" then
@@ -1431,6 +1439,7 @@ function DKP:UpdateItem(playerItem,k)
 				end
 			end
 		end
+		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
 	end
 	if playerItem.class then playerItem.wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[playerItem.class]) else playerItem.wnd:FindChild("ClassIcon"):Show(false,false) end
 	if playerItem.alt ~=nil then
@@ -1512,8 +1521,8 @@ function DKP:LabelAddTooltipByValue(value)
 	elseif value == "Spent" then return "Value of DKP player has spent."
 	elseif value == "Hrs" then return "How much time has this player spent Raiding.This is automatically tracked during raid session or optionally you can track it in Timed Awards module."
 	elseif value == "Priority" then return "Value calculated by dividing the Tot value by the Spent Value.AKA Relational DKP."
-	elseif value == "EP" then return "Value of player Effort Points."
-	elseif value == "GP" then return "Value of player Gear Points."
+	elseif value == "EP" then return "Value of player's Effort Points."
+	elseif value == "GP" then return "Value of player's Gear Points."
 	elseif value == "PR" then return "Value calculated by dividing the EP value by GP value"
 	end
 end
@@ -1555,13 +1564,13 @@ function easyDKPSortPlayerbyLabel(a,b)
 		local label = "Stat"..DKPInstance.SortedLabel
 		if DKPInstance.tItems["settings"].LabelSortOrder == "asc" then
 			if sortBy ~= "Name" then
-				return tonumber(a:FindChild(label):GetText()) > tonumber(b:FindChild(label):GetText())
+				return tonumber(a:FindChild(label):GetText()) or 0 > tonumber(b:FindChild(label):GetText()) or 0
 			else
-				return a:FindChild(label):GetText() > b:FindChild("Stat"..DKPInstance.SortedLabel):GetText()
+				return a:FindChild(label):GetText() > b:FindChild(label):GetText()
 			end
 		else
 			if sortBy ~= "Name" then
-				return tonumber(a:FindChild(label):GetText()) < tonumber(b:FindChild(label):GetText())
+				return tonumber(a:FindChild(label):GetText()) or 0 < tonumber(b:FindChild(label):GetText()) or 0
 			else
 				return a:FindChild(label):GetText() < b:FindChild(label):GetText()
 			end
@@ -1622,22 +1631,22 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	
 	for k,player in ipairs(self.tItems) do
 		if player.class ~= nil then
-				if player.class == "Esper" then
-					table.insert(esp,player)
-				elseif player.class == "Engineer" then
-					table.insert(eng,player)
-				elseif player.class == "Medic" then
-					table.insert(med,player)
-				elseif player.class == "Warrior" then
-					table.insert(war,player)
-				elseif player.class == "Stalker" then
-					table.insert(sta,player)
-				elseif player.class == "Spellslinger" then
-					table.insert(spe,player)
-				else
-					table.insert(unknown,player)
-				end
+			if player.class == "Esper" then
+				table.insert(esp,player)
+			elseif player.class == "Engineer" then
+				table.insert(eng,player)
+			elseif player.class == "Medic" then
+				table.insert(med,player)
+			elseif player.class == "Warrior" then
+				table.insert(war,player)
+			elseif player.class == "Stalker" then
+				table.insert(sta,player)
+			elseif player.class == "Spellslinger" then
+				table.insert(spe,player)
 			end
+		else
+			table.insert(unknown,player)
+		end
 	end
 	table.sort(esp,easyDKPSortPlayerbyLabelNotWnd)
 	table.sort(eng,easyDKPSortPlayerbyLabelNotWnd)
@@ -1647,16 +1656,24 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	table.sort(spe,easyDKPSortPlayerbyLabelNotWnd)
 	table.sort(unknown,easyDKPSortPlayerbyLabelNotWnd)
 	
+	local addedM = false
+	local addedEs = false
+	local addedEn = false
+	local addedW = false
+	local addedS = false
+	local addedSt = false
+	local addedU = false
+	
 	for k,player in ipairs(esp) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-	
 			if not self.MassEdit then
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedEs)
 			player.wnd:SetData(k)
+			addedEs = true
 		end
 	end	
 	for k,player in ipairs(eng) do
@@ -1666,8 +1683,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedEn)
 			player.wnd:SetData(k)
+			addedEn = true
 		end
 	end	
 	for k,player in ipairs(med) do
@@ -1677,8 +1695,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedM)
 			player.wnd:SetData(k)
+			addedM = true
 		end
 	end	
 	for k,player in ipairs(war) do
@@ -1688,8 +1707,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedW)
 			player.wnd:SetData(k)
+			addedW = true
 		end
 	end	
 	for k,player in ipairs(sta) do
@@ -1699,8 +1719,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedSt)
 			player.wnd:SetData(k)
+			addedSt = true
 		end
 	end	
 	for k,player in ipairs(spe) do
@@ -1710,10 +1731,11 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedS)
 			player.wnd:SetData(k)
+			addedS = true
 		end
-	end	
+	end
 	for k,player in ipairs(unknown) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.MassEdit then
@@ -1721,35 +1743,58 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			else
 				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 			end
-			self:UpdateItem(player,k)
+			self:UpdateItem(player,k,addedU)
 			player.wnd:SetData(k)
+			addedU = true
 		end
 	end
 	
 	self.wndItemList:ArrangeChildrenVert()
-	self:ResetSearchBox()
 	self:UpdateItemCount()
 	self.wndSelectedListItem = nil
 
 end
 
-function DKP:LabelSort(wndHandler,wndControl)
-	if wndControl then 
-		if self:LabelIsSortable(wndControl:GetText()) then
-			if wndControl:GetData() then 
-				self:LabelSwapSortIndicator(wndControl)
-			else 
-				self:LabelSetSortIndicator(wndControl,"desc")
+function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
+	if eMouseButton ~= GameLib.CodeEnumInputMouse.Right then 
+		if wndControl then 
+			if self:LabelIsSortable(wndControl:GetText()) then
+				if wndControl:GetData() then 
+					self:LabelSwapSortIndicator(wndControl)
+				else 
+					self:LabelSetSortIndicator(wndControl,"desc")
+				end
+				self.SortedLabel = self:LabelGetColumnNumberForValue(wndControl:GetText())
+				if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else 
+					self.wndMain:FindChild("ItemList"):ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel) 
+					self:LabelUpdateColorHighlight()
+				end
 			end
-			self.SortedLabel = self:LabelGetColumnNumberForValue(wndControl:GetText())
-			if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else self.wndMain:FindChild("ItemList"):ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel) end
+		elseif self.SortedLabel then
+				if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else 
+					self.wndMain:FindChild("ItemList"):ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel) 
+					self:LabelUpdateColorHighlight()
+				end
 		end
-	elseif self.SortedLabel then
-			if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else self.wndMain:FindChild("ItemList"):ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel) end
+		
+	else
+		self.SortedLabel = nil
+		self:RefreshMainItemList()
 	end
 	self:LabelHideIndicators()
 end
 
+function DKP:LabelUpdateColorHighlight()
+	if self.SortedLabel then
+		local label = "Stat"..self.SortedLabel
+		for k,child in ipairs(self.wndItemList:GetChildren()) do	
+			for j,stat in ipairs(child:GetChildren()) do
+				if stat:GetName() == label then stat:SetTextColor("ChannelAdvice") else stat:SetTextColor("white") end
+			end
+		end
+	end
+
+end
 function DKP:LabelHideIndicators()
 	local wndLabelBar = self.wndMain:FindChild("LabelBar")
 	for i=1,5 do
@@ -1802,18 +1847,6 @@ function DKP:DecayCheckPeriod( wndHandler, wndControl, eMouseButton )
 			self.wndMain:FindChild("Decay"):FindChild("Raidly"):SetCheck(true)
 		end
 	end
-end
-
-function DKP:DecayShowExtension( wndHandler, wndControl, eMouseButton )
-	self.wndMain:FindChild("DecayExt"):Show(true,false)
-	local l,t,r,b = self.wndMain:GetAnchorOffsets()
-	self.wndMain:SetAnchorOffsets(l,t,r+155,b)
-end
-
-function DKP:DecayHideExtension( wndHandler, wndControl, eMouseButton )
-	self.wndMain:FindChild("DecayExt"):Show(true,false)
-	local l,t,r,b = self.wndMain:GetAnchorOffsets()
-	self.wndMain:SetAnchorOffsets(l,t,r-155,b)
 end
 
 function DKP:DecayChangeValue( wndHandler, wndControl, strText )
@@ -1915,7 +1948,7 @@ function DKP:DecayRestore()
 	end
 	
 	if self.tItems["settings"].DecayTreshold == nil then self.tItems["settings"].DecayTreshold = 0 end
-	self.wndMain:FindChild("DecayExt"):FindChild("EditBox"):SetText(self.tItems["settings"].DecayTreshold)
+	self.wndMain:FindChild("Decay"):FindChild("DecayExt"):FindChild("EditBox"):SetText(self.tItems["settings"].DecayTreshold)
 	if self.tItems["settings"].DecayPeriod == "w" then
 		self.wndMain:FindChild("Decay"):FindChild("Weekly"):SetCheck(true)
 	elseif self.tItems["settings"].DecayPeriod == "m" then
@@ -1927,7 +1960,6 @@ function DKP:DecayRestore()
 		self.wndMain:FindChild("Decay"):FindChild("Enable"):SetCheck(true)
 	end
 	
-	self.wndMain:FindChild("DecayExt"):Show(false,true)
 	self:DecayUpdateTimer()
 	self:DecayUpdateHelp()
 	self:DecayCheckConditions()
@@ -2048,12 +2080,6 @@ end
 
 function DKP:DecayHide( wndHandler, wndControl, eMouseButton )
 	self.wndMain:FindChild("Decay"):Show(false,false)
-	if self.wndMain:FindChild("Decay"):FindChild("DecExt"):IsChecked()  then
-		self.wndMain:FindChild("DecayExt"):Show(false,false)
-		self.wndMain:FindChild("Decay"):FindChild("DecExt"):SetCheck(false)
-		local l,t,r,b = self.wndMain:GetAnchorOffsets()
-		self.wndMain:SetAnchorOffsets(l,t,r-155,b)
-	end
 end
 ---------------------------------------------------------------------------------------------------
 -- MemberDetails Functions
