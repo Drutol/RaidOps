@@ -320,6 +320,7 @@
         <Event Name="ButtonCheck" Function="OnListItemSelected"/>
         <Event Name="ButtonCheck" Function="EnableActionButtons"/>
         <Event Name="MouseButtonUp" Function="ShowDetails"/>
+        <Event Name="ButtonUncheck" Function="OnListItemDeselected"/>
     </Form>
     <Form Class="Window" LAnchorPoint="0" LAnchorOffset="876" TAnchorPoint="0" TAnchorOffset="143" RAnchorPoint="0" RAnchorOffset="1420" BAnchorPoint="0" BAnchorOffset="707" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Holo_Background_General" TooltipType="OnCursor" Name="MemberDetails" Border="1" Picture="1" SwallowMouseClicks="1" Moveable="1" Escapable="0" Overlapped="1" TooltipColor="" Tooltip="">
         <Control Class="Window" LAnchorPoint="0" LAnchorOffset="19" TAnchorPoint="0" TAnchorOffset="2" RAnchorPoint="0" RAnchorOffset="505" BAnchorPoint="0" BAnchorOffset="25" RelativeToClient="1" Font="Default" Text="--TITLE GOES HERE--" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Title" TooltipColor="" TextId="" DT_CENTER="1" DT_VCENTER="1"/>

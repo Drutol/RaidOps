@@ -376,11 +376,11 @@ function DKP:SetDKP(cycling)
 					wndTot:SetText(tostring(currentTot))
 				end
 				self:DetailAddLog(comment,modifierTot,ID)
-				if cycling ~= true then
-					self:ResetCommentBoxFull()
-					self:ResetDKPInputBoxFull()
-					self:ResetInputAndComment()
-				end
+				-- if cycling ~= true then
+					-- self:ResetCommentBoxFull()
+					-- self:ResetDKPInputBoxFull()
+					-- self:ResetInputAndComment()
+				-- end
 				self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifierTot)
 			else
 					local ID = self:GetPlayerByIDByName(strName)
@@ -461,6 +461,10 @@ end
 function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
 	self.wndSelectedListItem = wndControl
+end
+
+function DKP:OnListItemDeselected()
+	self.wndSelectedListItem = nil
 end
 
 function DKP:ShowDetails(wndHandler,wndControl,eMouseButton)
@@ -665,11 +669,11 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					end	
 				end
 				
-				if cycling ~= true then
-					self:ResetCommentBoxFull()
-					self:ResetDKPInputBoxFull()
-					self:ResetInputAndComment()
-				end
+				-- if cycling ~= true then
+					-- self:ResetCommentBoxFull()
+					-- self:ResetDKPInputBoxFull()
+					-- self:ResetInputAndComment()
+				-- end
 				
 			end
 		else
@@ -744,11 +748,11 @@ function DKP:SubtractDKP(cycling)
 			end
 			
 			
-				if cycling ~= true then
-					self:ResetCommentBoxFull()
-					self:ResetDKPInputBoxFull()
-					self:ResetInputAndComment()
-				end
+				-- if cycling ~= true then
+					-- self:ResetCommentBoxFull()
+					-- self:ResetDKPInputBoxFull()
+					-- self:ResetInputAndComment()
+				-- end
 		else
 			Print("Name Label is required")
 		end
@@ -776,9 +780,9 @@ function DKP:Add100DKP()
 		end
 				
 		self:ShowAll()
-		self:ResetInputAndComment()
-		self:ResetCommentBoxFull()
-		self:ResetDKPInputBoxFull()
+		-- self:ResetInputAndComment()
+		-- self:ResetCommentBoxFull()
+		-- self:ResetDKPInputBoxFull()
 		self:EnableActionButtons()
 end
 function DKP:OnChatMessage(channelCurrent, tMessage)
