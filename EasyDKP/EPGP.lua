@@ -138,6 +138,16 @@ function DKP:EPGPGetSlotSpriteByQuality(ID)
 	end
 end
 
+function DKP:EPGPGetSlotSpriteByQualityRectangle(ID)
+	if ID == 5 then return "BK3:UI_BK3_ItemQualityPurple"
+	elseif ID == 6 then return "BK3:UI_BK3_ItemQualityOrange"
+	elseif ID == 4 then return "BK3:UI_BK3_ItemQualityBlue"
+	elseif ID == 3 then return "BK3:UI_BK3_ItemQualityGreen"
+	elseif ID == 2 then return "BK3:UI_BK3_ItemQualityWhite"
+	else return "BK3:UI_BK3_ItemQualityGrey"
+	end
+end
+
 function DKP:EPGPGetItemCostByName(strItem)
 	return math.ceil(self.ItemDatabase[strItem].Power/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(self.ItemDatabase[strItem].quality)] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(self.ItemDatabase[strItem].slot)])
 end

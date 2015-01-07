@@ -460,26 +460,15 @@ end
 
 function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
-	if self.wndSelectedListItem ~= nil and self.wndSelectedListItem ~= wndControl then
-		local children = self.wndSelectedListItem:GetChildren()
-		for k,child in ipairs(children) do
-			child:SetTextColor(kcrNormalText)
-		end
-	end
-	if self.wndSelectedListItem ~= nil and self.wndSelectedListItem == wndControl then
+	self.wndSelectedListItem = wndControl
+end
+
+function DKP:ShowDetails(wndHandler,wndControl,eMouseButton)
+	if eMouseButton == GameLib.CodeEnumInputMouse.Right then 
 		self:OnDetailsClose()
-		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
+		if self:LabelGetColumnNumberForValue("Name") ~= -1 and wndControl:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))) then
 			self:DetailShow(wndControl:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText())
-		else
-			Print("Name Label is Required")
-		end
-	else
-		local children  = wndControl:GetChildren()
-		for k,child in ipairs(children) do
-			child:SetTextColor(kcrSelectedText)
-		end
-		self.wndSelectedListItem = wndControl
-	
+		end 
 	end
 end
 
@@ -1408,7 +1397,7 @@ end
 
 function DKP:UpdateItem(playerItem,k,bAddedClass)
 	if playerItem.wnd == nil then return end
-	if k and k == 1 or not bAddedClass then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
+	if k and k == 1 or  bAddedClass == false then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
 	for i=1,5 do
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
 			if self.tItems["settings"].LabelOptions[i] == "Name" then
@@ -1417,6 +1406,17 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.net)
 			elseif self.tItems["settings"].LabelOptions[i] == "Tot" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.tot)
+			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
+			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
+				if self.tItems["settings"]["Bid2"].tWinners then
+					local item = Item.GetDataFromId(self.tItems["settings"]["Bid2"].tWinners[playerItem.strName])
+					if item then
+						playerItem.wnd:FindChild("Stat"..tostring(i)):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+						playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(item:GetName())
+						Tooltip.GetItemTooltipForm(self,playerItem.wnd:FindChild("Stat"..tostring(i)), item  ,{bPrimary = true, bSelling = false})
+					end
+				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Hrs" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%.4f",playerItem.Hrs))
 			elseif self.tItems["settings"].LabelOptions[i] == "Spent" then
@@ -1482,11 +1482,11 @@ function DKP:LabelTypeChanged( wndHandler, wndControl, eMouseButton )
 	
 	if self.CurrentlyEditedLabel ~= nil then
 		for i=1,5 do
-			if self.tItems["settings"].LabelOptions[i] == wndControl:GetText() then
+			if self.tItems["settings"].LabelOptions[i] == wndControl:GetName() then
 				 self.tItems["settings"].LabelOptions[i] = "Nil"
 			end
 		end
-		self.tItems["settings"].LabelOptions[self.CurrentlyEditedLabel] = wndControl:GetText()
+		self.tItems["settings"].LabelOptions[self.CurrentlyEditedLabel] = wndControl:GetName()
 	end
 	self:LabelUpdateList()
 end
@@ -1524,6 +1524,8 @@ function DKP:LabelAddTooltipByValue(value)
 	elseif value == "EP" then return "Value of player's Effort Points."
 	elseif value == "GP" then return "Value of player's Gear Points."
 	elseif value == "PR" then return "Value calculated by dividing the EP value by GP value"
+	elseif value == "Raids" then return "Value of player's attended raids"
+	elseif value == "Item" then return "Last item received.Recoreded via bidding (chat and network)"
 	end
 end
 
@@ -1562,17 +1564,19 @@ function easyDKPSortPlayerbyLabel(a,b)
 	if DKPInstance.SortedLabel then
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
 		local label = "Stat"..DKPInstance.SortedLabel
-		if DKPInstance.tItems["settings"].LabelSortOrder == "asc" then
-			if sortBy ~= "Name" then
-				return tonumber(a:FindChild(label):GetText()) or 0 > tonumber(b:FindChild(label):GetText()) or 0
+		if a:FindChild(label) and b:FindChild(label) then
+			if DKPInstance.tItems["settings"].LabelSortOrder == "asc" then
+				if sortBy ~= "Name" then
+					return tonumber(a:FindChild(label):GetText()) > tonumber(b:FindChild(label):GetText())
+				else
+					return a:FindChild(label):GetText() > b:FindChild(label):GetText()
+				end
 			else
-				return a:FindChild(label):GetText() > b:FindChild(label):GetText()
-			end
-		else
-			if sortBy ~= "Name" then
-				return tonumber(a:FindChild(label):GetText()) or 0 < tonumber(b:FindChild(label):GetText()) or 0
-			else
-				return a:FindChild(label):GetText() < b:FindChild(label):GetText()
+				if sortBy ~= "Name" then
+					return tonumber(a:FindChild(label):GetText()) < tonumber(b:FindChild(label):GetText())
+				else
+					return a:FindChild(label):GetText() < b:FindChild(label):GetText()
+				end
 			end
 		end
 	end

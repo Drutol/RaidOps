@@ -196,7 +196,8 @@ function DKP:BidCompleteInit()
 	--self:InsertLooterChildren()
 	-- Resume
 
-
+	--Post Update To generate Labels for Main DKP window
+	if self:LabelGetColumnNumberForValue("Item") ~= - 1 then self:LabelUpdateList() end
 	
 	--self:BidInsertChildren()
 end

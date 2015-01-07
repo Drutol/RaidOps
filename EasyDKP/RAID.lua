@@ -211,6 +211,14 @@ function DKP:RaidSubmitSession()
 	if currentRaidID ~= nil then
 		self:RaidRunMiscSummaries(currentRaidID)
 		self.tItems["Raids"][currentRaidID].tPlayers = tAllRaidMembersInSession
+		
+		for k,player in ipairs(tAllRaidMembersInSession) do
+			local ID = self:GetPlayerByIDByName(player.name)
+			if ID ~= -1 then
+				if self.tItems[ID].raids then self.tItems[ID].raids = self.tItems[ID].raids + 1 else self.tItems[ID].raids = 1 end	
+			end
+		end
+		if self:LabelGetColumnNumberForValue("Raids") ~= - 1 then self:LabelUpdateList() end
 		tAllRaidMembersInSession = {}
 		self.bIsRaidSession = false
 		if self.RaidTimer ~= nil then
