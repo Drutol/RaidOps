@@ -1816,7 +1816,7 @@ function DKP:LabelHideIndicators()
 end
 
 function DKP:LabelIsSortable(strLabel) 
-	if strLabel == "Last Item" then return false else return true end
+	if strLabel == "Item" then return false else return true end
 end
 
 function DKP:LabelSwapSortIndicator(wnd)
@@ -2108,6 +2108,7 @@ end
 
 function DKP:DetailShow(strToFind)
 	self.wndDetail:Show(true,false)
+	self.wndDetail:ToFront()
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil then
 			if string.lower(self.tItems[i].strName) == string.lower(strToFind) then
