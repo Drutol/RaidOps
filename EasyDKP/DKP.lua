@@ -785,6 +785,7 @@ function DKP:Add100DKP()
 		-- self:ResetDKPInputBoxFull()
 		self:EnableActionButtons()
 end
+
 function DKP:OnChatMessage(channelCurrent, tMessage)
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
 			local itemStr = ""
@@ -939,51 +940,28 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					ChatSystemLib.Command("/w " .. senderStr .. " Your current GP is : " ..self.tItems[ID].GP)
 				end
 			elseif strMessage == "!pr" then
-				local ID = self:GetPlayerByIDByName(senderStr)
-				if ID ~= -1 then
-					if self.tItems[ID].GP ~= 0 then
-						ChatSystemLib.Command("/w " .. senderStr .. " Your current PR is : " .. tostring(string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP / self.tItems[ID].GP)))
-					else
-						ChatSystemLib.Command("/w " .. senderStr .. " Your current PR is : 0")
-					end
-				end
+				ChatSystemLib.Command("/w " .. senderStr .. " Your current PR is : " .. self:EPGPGetPRByName(senderStr))
 			elseif strMessage == "!top5" then
-				if self.tItems["EPGP"].Enable == 1 then 
-					local sortedIDs = {}
-					for i=1,table.maxn(self.tItems) do
-						if self.tItems[i] ~= nil then
-							if self.tItems[i].GP ~= 0 then
-								table.insert(sortedIDs,{ID = i,value = (self.tItems[i].EP/self.tItems[i].GP)})
-							else
-								table.insert(sortedIDs,{ID = i,value = 0})
-							end
-						end
-					end
-					table.sort(sortedIDs,compare_easyDKP)
-					for k , entry in ipairs(sortedIDs) do
-						if k > 5 then break end
-						if self.tItems[entry.ID].GP ~= 0 then
-							ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:   " .. string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[entry.ID].EP / self.tItems[entry.ID].GP))
-						else
-							ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:    0" )
-						end
-					end
-				else
-					local sortedIDs = {}
-					for i=1,table.maxn(self.tItems) do
-						if self.tItems[i] ~= nil then
-								table.insert(sortedIDs,{ID = i,value = self.tItems[i].net})
-						end
-					end
-					table.sort(sortedIDs,compare_easyDKP)
-					for k , entry in ipairs(sortedIDs) do
-						if k > 5 then break end
-						ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:   " .. string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[entry.ID].EP / self.tItems[entry.ID].GP))
-						
+				local arr = {}
+				for i=1,table.maxn(self.tItems) do
+					if self.tItems[i]~= nil then
+						table.insert(arr,{ID = i ,strName = self.tItems[i].strName, value = self.tItems["EPGP"].Enable == 1 and tonumber(self:EPGPGetPRByName(self.tItems[i].strName)) or tonumber(self.tItems[i].net)})
 					end
 				end
-				
-			
+				table.sort(arr,compare_easyDKPRaidOps)
+				local retarr = {}
+				for k,entry in ipairs(arr) do
+					table.insert(retarr,entry)
+					if k == 5 then break end
+				end
+				for k , entry in ipairs(retarr) do
+					if k > 5 then break end
+					if self.tItems["EPGP"].Enable == 1 then
+						ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   PR:   " .. self:EPGPGetPRByName(entry.strName))
+					else
+						ChatSystemLib.Command("/w " .. senderStr .. " " .. k ..". " .. self.tItems[entry.ID].strName .. "   DKP:   " .. self.tItems[entry.ID].net)
+					end
+				end
 			end
 		end
 	end
@@ -1006,6 +984,7 @@ function DKP:InputBoxTextReset( wndHandler, wndControl, strText )
 		self:ResetInputAndComment()
 	end
 end
+
 function compare_easyDKP(a,b)
 	return a.value > b.value
 end

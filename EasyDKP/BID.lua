@@ -783,6 +783,7 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 				strReturn = "Offspec is not allowed"
 			end
 		else
+			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > self.tItems[self:GetPlayerByIDByName(tData.strSender)].net then return "You don't have enough DKP." end
 			local modifier = tonumber(tData.strMsg) - self.CurrentBidSession.HighestBidEver.value
 			if modifier > self.tItems["settings"].BidOver and tonumber(tData.strMsg) > self.tItems["settings"].BidMin then 
 				newBidder.HighestBid = tonumber(tData.strMsg)
@@ -835,6 +836,8 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 				strReturn = "Offspec is not allowed"
 			end
 		else
+			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > self.tItems[self:GetPlayerByIDByName(tData.strSender)].net then return "You don't have enough DKP." end
+			
 			if self.CurrentBidSession.Bidders[nBidderID].offspec == false then
 				local value = tonumber(tData.strMsg)
 				
