@@ -1755,8 +1755,11 @@ function DKP:InitBid2()
 end
 
 function DKP:Bid2FetchAuctions(strML)
-	Print("[Network Bidding] - Fetching Auctions")
+	Print("[Network Bidding] - Fetching Auctions from".. strML)
 	if self.channel then self.channel:SendPrivateMessage({[1] = strML},{"GimmeAuctions"}) end -- requesting auctions from the ML
+	timeout = 5
+	Apollo.RegisterTimerHandler(1,"AuctionsTimeout",self)
+	self.timeoutAuctionsTimer = ApolloTimer.Create(1,true,"AuctionsTimeout",self)
 end
 
 function DKP:Bid2RestoreMyChoices(auction)
@@ -1881,6 +1884,7 @@ function DKP:AuctionFetchTimedOut()
 	self.timeoutAuctionsTimer:Stop()
 	Apollo.RemoveEventHandler("AuctionsTimeout",self)
 	self.searchingML = false
+	self.waitingForAuctions = false
 	Print("[Network Bidding] - Auction fetch timeout")
 	if self.tItems["Auctions"] and # self.tItems["Auctions"]>0 then Print("[Netorking Bidding] - Restoring from saved data") else Print("[Network Bidding] - Nothing to restore") end
 	for k,auction in ipairs(self.tItems["Auctions"]) do
@@ -1904,6 +1908,8 @@ function DKP:BidRegisterCheckResponse(strPlayer)
 end
 
 function DKP:Bid2RestoreFetchedAuctionFromID(itemID,progress,biddersCount,votersCount)
+	if self.timeoutAuctionsTimer then self.timeoutAuctionsTimer:Stop() end
+	Apollo.RemoveEventHandler("AuctionsTimeout",self)
 	for k,auction in ipairs(self.tItems["Auctions"]) do -- going through saved ones
 		if auction.itemID == itemID then -- checking whether it's the one
 			if #auction.bidders == biddersCount and #auction.votes == votersCount then -- verification

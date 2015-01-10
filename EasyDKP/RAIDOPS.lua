@@ -115,14 +115,16 @@ function DKP:HubGetTop3Stats()
 	local arr = {}
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i]~= nil then
-			table.insert(arr,{strName = self.tItems[i].strName, value = self.tItems["EPGP"].Enable == 1 and self:EPGPGetPRByName(self.tItems[i].strName) or tonumber(self.tItems[i].net)})
+			if self.tItems["EPGP"].Enable == 1 then
+				table.insert(arr,{strName = self.tItems[i].strName, value = tonumber(self:EPGPGetPRByName(self.tItems[i].strName))})
+			else
+				table.insert(arr,{strName = self.tItems[i].strName, value = tonumber(self.tItems[i].net)})
+			end
 		end
 	end
 	table.sort(arr,compare_easyDKPRaidOps)
 	local retarr = {}
 	for k,entry in ipairs(arr) do
-		
-		
 		table.insert(retarr,entry)
 		if k == 3 then break end
 	end
