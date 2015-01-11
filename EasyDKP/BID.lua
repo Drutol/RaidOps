@@ -783,7 +783,7 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 				strReturn = "Offspec is not allowed"
 			end
 		else
-			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > self.tItems[self:GetPlayerByIDByName(tData.strSender)].net then return "You don't have enough DKP." end
+			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > tonumber(self.tItems[self:GetPlayerByIDByName(tData.strSender)].net) then return "You don't have enough DKP." end
 			local modifier = tonumber(tData.strMsg) - self.CurrentBidSession.HighestBidEver.value
 			if modifier > self.tItems["settings"].BidOver and tonumber(tData.strMsg) > self.tItems["settings"].BidMin then 
 				newBidder.HighestBid = tonumber(tData.strMsg)
@@ -836,7 +836,7 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 				strReturn = "Offspec is not allowed"
 			end
 		else
-			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > self.tItems[self:GetPlayerByIDByName(tData.strSender)].net then return "You don't have enough DKP." end
+			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > tonumber(self.tItems[self:GetPlayerByIDByName(tData.strSender)].net) then return "You don't have enough DKP." end
 			
 			if self.CurrentBidSession.Bidders[nBidderID].offspec == false then
 				local value = tonumber(tData.strMsg)
@@ -979,7 +979,11 @@ function DKP:BidPerformCountdown()
 		
 		if self.CurrentBidSession.HighestBidEver.name ~= "" then
 			ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Bidding has ended, and the winner is...")
-			ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestBidEver.name .. " for " .. self.CurrentBidSession.HighestBidEver.value .. self.tItems["EPGP"].Enable == 1 and " GP" or " DKP")
+			if self.tItems["EPGP"].Enable == 1 then
+				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestBidEver.name .. " for " .. self.CurrentBidSession.HighestBidEver.value ..   " GP")
+			else
+				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestBidEver.name .. " for " .. self.CurrentBidSession.HighestBidEver.value ..   " DKP")
+			end
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()] = {}
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].strName = self.CurrentBidSession.HighestBidEver.name
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].cost = self.CurrentBidSession.HighestBidEver.value
@@ -987,7 +991,11 @@ function DKP:BidPerformCountdown()
 			if Hook.wndMasterLoot:IsShown() == true then self:BidMatchIndicatorsByItem(self.CurrentBidSession.strItem) end
 		elseif self.CurrentBidSession.HighestOffBid.name ~= "" then
 			ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Bidding has ended, and the winner is... (offspec)")
-			ChatSystemLib.Command(self.ChannelPrefix .. self.CurrentBidSession.HighestOffBid.name .. " for " .. self.CurrentBidSession.HighestOffBid.value .. self.tItems["EPGP"].Enable == 1 and " GP" or " DKP")
+			if self.tItems["EPGP"].Enable == 1 then
+				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestOffBid.name .. " for " .. self.CurrentBidSession.HighestOffBid.value ..   " GP")
+			else
+				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestOffBid.name .. " for " .. self.CurrentBidSession.HighestOffBid.value ..   " DKP")
+			end
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()] = {}
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].strName = self.CurrentBidSession.HighestOffBid.name
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].cost = self.CurrentBidSession.HighestOffBid.value

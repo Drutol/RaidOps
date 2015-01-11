@@ -2890,6 +2890,7 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 		self:RaidProccesNewPieceOfLoot(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName)
 		if self.tItems["EPGP"].Enable == 0 then self:RaidAddCostInfo(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())*-1) end
 	end
+	self:RefreshMainItemList()
 	self:PopUpWindowClose()
 	self:PopUpUpdateQueueLength()
 end
@@ -2968,7 +2969,7 @@ function DKP:PopUpWindowOpen(strName,strItem)
 			CurrentPopUpID = ID_popup
 		end
 		if self.RegistredBidWinners[string.sub(strItem,2)] ~= nil and self.tItems["EPGP"].Enable == 0 then
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[strItem].cost)
+			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[string.sub(strItem,2)].cost)
 		end
 		self.wndPopUp:Show(true,false)
 		if #PopUpItemQueue > 1 then self.wndPopUp:FindChild("ButtonSkip"):Enable(true) else self.wndPopUp:FindChild("ButtonSkip"):Enable(false) end

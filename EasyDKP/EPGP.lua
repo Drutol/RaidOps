@@ -71,7 +71,7 @@ function DKP:OnLootedItem(item)
 				self.ItemDatabase[item:GetName()].slot = item:GetSlot()
 			end
 			--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
-			Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Player"..tostring(math.random(2,14))))
+			Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Drutol Windchaser"))
 end
 
 function DKP:EPGPRestore()
