@@ -1735,9 +1735,7 @@ function DKP:InitBid2()
 	self.ActiveAuctions = {}
 	self:Bid2RestoreSettings()
 	
-	if self.tItems["settings"].networking == 0 then
-		
-	else
+	if self.tItems["settings"].networking then
 		self:BidJoinChannel()
 	end
 	self.OtherMLs = {}

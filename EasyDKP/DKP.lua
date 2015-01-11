@@ -171,6 +171,9 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].Precision == nil then self.tItems["settings"].Precision = 1 end
 		if self.tItems["settings"].CheckAffiliation == nil then self.tItems["settings"].CheckAffiliation = 0 end
 		if self.tItems["settings"].GroupByClass == nil then  self.tItems["settings"].GroupByClass = false end
+		if self.tItems["settings"].FilterEquippable == nil then self.tItems["settings"].FilterEquippable = false end
+		if self.tItems["settings"].FilterWords == nil then self.tItems["settings"].FilterWords = false end
+		if self.tItems["settings"].networking == nil then self.tItems["settings"].networking = true end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -796,7 +799,10 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			end
 			local words = {}
 			for word in string.gmatch(strTextLoot,"%S+") do
-	  	    	table.insert(words,word)
+				if self.tItems["settings"].FilterWords then 
+					if word == "Gift" or word == "Sign" or word == "Pattern" then return end
+				end
+				table.insert(words,word)
 			end
 			
 			if words[1] ~= "The"  then return end
@@ -811,6 +817,10 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				end
 			end
 			strName = string.sub(strName,2)
+			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
+				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
+				if not item:IsEquippable() then return end
+			end
 			if strName ~= "" and itemStr ~= "" then
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),itemStr) end
 				if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then self:RaidProccesNewPieceOfLoot(itemStr,strName:sub(1,#strName-1)) end
@@ -2504,8 +2514,10 @@ function DKP:SettingsRestore()
 	self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):SetCheck(self.tItems["settings"].GroupByClass)
 	
 	--Networking
-	--if self.tItems["settings"]["Bid2"].networking == 1 then self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(true) end
-	 self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):Enable(false)
+	self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(self.tItems["settings"].networking)
+	self.wndSettings:FindChild("ButtonSettingsEquip"):SetCheck(self.tItems["settings"].FilterEquippable)
+	self.wndSettings:FindChild("ButtonSettingsFilter"):SetCheck(self.tItems["settings"].FilterWords)
+	
 	--Slider
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
 	
@@ -2649,6 +2661,22 @@ end
 
 function DKP:SettingsPopupDisable( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].PopupEnable = 0
+end
+
+function DKP:SettingsFilterWordsEnable()
+	self.tItems["settings"].FilterWords = true
+end
+
+function DKP:SettingsFilterWordsDisable()
+	self.tItems["settings"].FilterWords = false
+end
+
+function DKP:SettingsTrackEquipableEnable()
+	self.tItems["settings"].FilterEquippable = true
+end
+
+function DKP:SettingsTrackEquipableDisable()
+	self.tItems["settings"].FilterEquippable = false
 end
 
 function DKP:SettingsEnableFilter( wndHandler, wndControl, eMouseButton )
