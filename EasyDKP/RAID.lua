@@ -803,29 +803,40 @@ function DKP:RaidUpdateSummaryLootDetails()
 	for i=1,table.getn(tAllRaidMembersInSession) do
 		if tAllRaidMembersInSession[i].tClaimedLoot ~= nil then
 			for j=1,table.getn(tAllRaidMembersInSession[i].tClaimedLoot) do
-				local wnd = Apollo.LoadForm(self.xmlDoc, "RaidLootItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
-				wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].name)
-				wnd:FindChild("Looter"):SetText(tAllRaidMembersInSession[i].name)
-				local itemID = tAllRaidMembersInSession[i].tClaimedLoot[j].ID
-				
-				if self.tItems["EPGP"].Enable == 1 and Item.GetDataFromId(itemID):IsEquippable()  then 
-					wnd:FindChild("Cost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
-				else
-					wnd:FindChild("Cost"):SetText("xxx")
-				end
-				wnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(itemID):GetItemQuality()))
-				wnd:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(itemID):GetIcon())
-				Tooltip.GetItemTooltipForm(self, wnd:FindChild("ItemIcon") , Item.GetDataFromId(itemID), {bPrimary = true, bSelling = false})
-				
-				if self.tItems["EPGP"].Enable == 0 then
-						wnd:FindChild("Cost"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)
-				end
+				if not self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonLoot"):FindChild("Button"):IsChecked() or self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonLoot"):FindChild("Button"):IsChecked() and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Gift") == nil and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Sign") == nil and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Pattern") == nil and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Module") == nil then
+					Print("LOL")
+					local wnd = Apollo.LoadForm(self.xmlDoc, "RaidLootItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
+					wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].name)
+					wnd:FindChild("Looter"):SetText(tAllRaidMembersInSession[i].name)
+					local itemID = tAllRaidMembersInSession[i].tClaimedLoot[j].ID
+					
+					if self.tItems["EPGP"].Enable == 1 and Item.GetDataFromId(itemID):IsEquippable()  then 
+						wnd:FindChild("Cost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
+					else
+						wnd:FindChild("Cost"):SetText("xxx")
+					end
+					wnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(itemID):GetItemQuality()))
+					wnd:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(itemID):GetIcon())
+					Tooltip.GetItemTooltipForm(self, wnd:FindChild("ItemIcon") , Item.GetDataFromId(itemID), {bPrimary = true, bSelling = false})
+					
+					if self.tItems["EPGP"].Enable == 0 then
+							wnd:FindChild("Cost"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].dkp)
+					end
 					table.insert(self.tLootItems,wnd)
+				end
 			end
 		end
 	end
 	self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems"):ArrangeChildrenVert()
 	if self.bIsRaidSession == false then tAllRaidMembersInSession = {} end
+end
+
+function DKP:RaidFilteWordsDisable()
+	if self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonLoot"):IsChecked() then self:RaidSummaryListShowLoot() end
+end
+
+function DKP:RaidFilteWordsEnable()
+	if self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonLoot"):IsChecked() then self:RaidSummaryListShowLoot() end
 end
 
 function DKP:RaidStartNewSession( wndHandler, wndControl, eMouseButton )
