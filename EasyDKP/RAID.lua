@@ -804,7 +804,6 @@ function DKP:RaidUpdateSummaryLootDetails()
 		if tAllRaidMembersInSession[i].tClaimedLoot ~= nil then
 			for j=1,table.getn(tAllRaidMembersInSession[i].tClaimedLoot) do
 				if not self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonLoot"):FindChild("Button"):IsChecked() or self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("ButtonLoot"):FindChild("Button"):IsChecked() and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Gift") == nil and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Sign") == nil and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Pattern") == nil and string.find(tAllRaidMembersInSession[i].tClaimedLoot[j].name,"Module") == nil then
-					Print("LOL")
 					local wnd = Apollo.LoadForm(self.xmlDoc, "RaidLootItem" , self.wndRaidSummary:FindChild("DetailsContainer"):FindChild("RaidItems") , self)
 					wnd:FindChild("Name"):SetText(tAllRaidMembersInSession[i].tClaimedLoot[j].name)
 					wnd:FindChild("Looter"):SetText(tAllRaidMembersInSession[i].name)
