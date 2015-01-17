@@ -105,9 +105,11 @@ function DKP:OnDocLoaded()
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
 		end
-		if self.wndMainLoc then 
-			self.wndMain:MoveToLocation(self.wndMainLoc) 
-			self.wndMainLoc = nil
+		if self.wndMainLoc ~= nil then 
+			if self.tItems.wndMainLoc and self.tItems.wndMainLoc.nOffsets[1] ~= 0 then --and self.wndMainLoc.nOffsets[2] ~= 0 and self.wndMainLoc.nOffsets[3] ~= 0 and self.wndMainLoc.nOffsets[4] ~= 0 then
+				self.wndMain:MoveToLocation(self.wndMainLoc) 
+				self.wndMainLoc = nil
+			end
 		end
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
