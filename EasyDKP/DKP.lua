@@ -186,11 +186,6 @@ function DKP:OnDocLoaded()
 		self:RaidOpsInit()
 		
 		self:CloseBigPOPUP()
-		if self.tItems["settings"].NewStartup2 == nil then
-			self.wndMain:FindChild("BIGPOPUP"):Show(true,false)
-			self.tItems["settings"].NewStartup2 = "DONE"
-		end
-		--self.tItems["settings"].NewStartup = nil
 
 		
 		
