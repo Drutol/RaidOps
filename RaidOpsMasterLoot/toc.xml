@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="Drutol@Jabbit" APIVersion="9" Name="RaidOpsMasterLoot" Description="">
+    <Script Name="libs/GeminiHook-1.0.lua"/>
+    <Script Name="RaidOpsMasterLoot.lua"/>
+    <Form Name="RaidOpsMasterLoot.xml"/>
+</Addon>

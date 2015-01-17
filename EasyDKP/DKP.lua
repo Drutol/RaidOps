@@ -124,6 +124,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("sum", "RaidShowMainWindow", self)
 		Apollo.RegisterSlashCommand("dkpbid", "BidOpen", self)
 		Apollo.RegisterSlashCommand("rops", "HubShow", self)
+		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
@@ -273,7 +274,6 @@ function DKP:OnUnitCreated(unit,isStr)
 				self:UpdateItem(i)
 			end
 			if self.tItems[existingID].listed == 0 then
-				self:AddItem(i,existingID)
 				self.tItems[existingID].listed = 1
 			end
 	elseif isNew == true and self.tItems["settings"].CheckAffiliation == 0 or isNew == true and self.tItems["settings"].CheckAffiliation == 1 and isStr == nil or isNew == true and isStr and self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):GetText() ~= "Input New Entry Name" then
@@ -331,7 +331,7 @@ end
 -- DKP Functions
 -----------------------------------------------------------------------------------------------
 function DKP:OnDKPOn()
-	self.wndMain:Invoke()
+	self.wndMain:Show(true,false)
 end
 
 
@@ -588,6 +588,12 @@ function DKP:OnRestore(eLevel, tData)
 			self.tItems["EPGP"].Loot = nil
 		end
 		
+		if self.tItems["EPGP"] == nil then 
+			self.tItems["EPGP"] = {}
+			self.tItems["EPGP"].Enable = 0 
+		end
+		
+		
 		counter=table.maxn(self.tItems)+1
 		if tData["alts"] == nil then
 			self.tItems["alts"] = {}
@@ -651,6 +657,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPAdd(strName,nil,nil)
+							Print(self.tItems["EPGP"].Enable)
 							Print("Nothing added , check EP or GP in the controls box")
 						end
 					end					

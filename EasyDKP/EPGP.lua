@@ -39,11 +39,11 @@ function DKP:EPGPInit()
 	self.wndEPGPItems = Apollo.LoadForm(self.xmlDoc2,"CostList",nil,self)
 	self.wndEPGPSettings:Show(false,true)
 	self.wndEPGPItems:Show(false,true)
-	if self.tItems["EPGP"] == nil then
+	if self.tItems["EPGP"] == nil or self.tItems["EPGP"].SlotValues == nil then
 		self.tItems["EPGP"] = {}
 		self.tItems["EPGP"].SlotValues = defaultSlotValues
 		self.tItems["EPGP"].QualityValues = defaultQualityValues
-		self.tItems["EPGP"].Enabled = 0
+		self.tItems["EPGP"].Enable = 0
 		self.tItems["EPGP"].FormulaModifier = 0.5
 		self.tItems["EPGP"].BaseGP = 1
 		self.tItems["EPGP"].MinEP = 100
