@@ -2045,6 +2045,7 @@ function DKP:BidRegisterChoice(strSender,option,item,currItem)
 	if ID == -1 then return end
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == item then
+
 			local found = false
 			local ofID
 			for k,bidder in ipairs(auction.bidders) do
@@ -2389,12 +2390,12 @@ end
 
 function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	for k,choice in ipairs(self.MyChoices) do
-	if choice.item == wndControl:GetParent():GetParent():GetData() then table.remove(self.MyChoices,k) break end
+		if choice.item == wndControl:GetParent():GetParent():GetData() then table.remove(self.MyChoices,k) break end
 	end
 	local item = Item.GetDataFromId(wndControl:GetParent():GetParent():GetData())
 	local itemComparee
 	local bPass
-	
+	Print("LOL")
 	for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd:GetData() == item:GetItemId() then bPass = auction.bPass break end end
 	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
 	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),string.lower(wndControl:GetName()),wndControl:GetParent():GetParent():GetData(),itemComparee)

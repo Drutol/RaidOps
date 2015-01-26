@@ -1429,11 +1429,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			elseif self.tItems["settings"].LabelOptions[i] == "GP" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.GP)
 			elseif self.tItems["settings"].LabelOptions[i] == "PR" then
-				if  playerItem.GP ~= 0 then
-					playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].Precision).."f", tonumber( self.tItems[self:GetPlayerByIDByName(playerItem.name)].EP / self.tItems[self:GetPlayerByIDByName(playerItem.name)].GP)))
-				else
-					playerItem.wnd:FindChild("Stat"..tostring(i)):SetText("0")
-				end
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(self:EPGPGetPRByName(playerItem.strName))
 			end
 		end
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
