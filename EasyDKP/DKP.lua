@@ -618,7 +618,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 	
 	if self.wndSelectedListItem ~=nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
-			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
+			local strName = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			local ID = self:GetPlayerByIDByName(strName)
@@ -787,6 +787,7 @@ function DKP:Add100DKP()
 		end
 				
 		self:ShowAll()
+		
 		-- self:ResetInputAndComment()
 		-- self:ResetCommentBoxFull()
 		-- self:ResetDKPInputBoxFull()
@@ -1321,22 +1322,12 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
-	local removedIDs = {}
 	for k,wnd in ipairs(selectedMembers) do 
-		local ID = self:GetPlayerByIDByName(wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText())
-		if ID ~= -1 then
-			self.tItems[ID].wnd:Destroy()
-			self.tItems[ID] = nil
-			table.insert(removedIDs,k)
+		if wnd:GetData() then
+			table.remove(self.tItems,self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()))
 		end
 	end
-	for k,ID in ipairs(removedIDs) do
-		table.remove(selectedMembers,ID)
-	end
-	self:ShowAll()
-	for k,wnd in ipairs(selectedMembers) do
-		wnd:SetCheck(true)
-	end
+	self:RefreshMainItemList()
 end
 
 function DKP:MassEditModify(what) -- "Add" "Sub" "Set" 
@@ -1376,6 +1367,7 @@ end
 function DKP:RefreshMainItemList()
 	if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() return end
 	self.wndItemList:DestroyChildren()
+	local nameLabel = self:LabelGetColumnNumberForValue("Name")
 	for k,player in ipairs(self.tItems) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.MassEdit then
@@ -1390,6 +1382,7 @@ function DKP:RefreshMainItemList()
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
 	self:UpdateItemCount()
 	self.wndSelectedListItem = nil
+	selectedMembers = {}
 end
 
 function DKP:UpdateItem(playerItem,k,bAddedClass)
@@ -1749,6 +1742,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	self.wndItemList:ArrangeChildrenVert()
 	self:UpdateItemCount()
 	self.wndSelectedListItem = nil
+	selectedMembers = {}
 
 end
 
