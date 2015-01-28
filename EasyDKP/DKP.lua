@@ -265,7 +265,7 @@ function DKP:OnUnitCreated(unit,isStr)
 	if isNew == false then
 			local i = {}
 			i = self.tItems[existingID]
-			i.name = self.tItems[existingID].strName
+			i.strName = self.tItems[existingID].strName
 			if altName ~= nil then
 				i.alt = altName
 			end
@@ -2316,14 +2316,9 @@ function DKP:DetailDeleteAltByName( wndHandler, wndControl, eMouseButton )
 end
 	
 function DKP:DetailDeleteEntryFinish( wndHandler, wndControl, eMouseButton )
-	self.tItems[detailedEntryID].wnd:Destroy()
-	self.tItems[detailedEntryID] = nil
+	table.remove(self.tItems,detailedEntryID)
 	self:OnDetailsClose()
-	if self.wndMain:FindChild("Controls"):FindChild("ButtonShowCurrentRaid"):IsChecked() == true then
-		self:ForceRefresh()
-	else
-		self:ShowAll()
-	end
+	self:RefreshMainItemList()
 	self.wndSelectedListItem = nil
 end
 
@@ -2724,21 +2719,31 @@ end
 ---------------------------------------------------------------------------------------------------
 
 function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
-	if self.wndExport:FindChild("EPGP"):IsChecked() then
-		if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVEPGP())
-		elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLEPGP())
-		elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLEPGP())
+	if not self.wndExport:FindChild("List"):IsChecked() then
+		if self.wndExport:FindChild("EPGP"):IsChecked() then
+			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVEPGP())
+			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLEPGP())
+			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLEPGP())
+			end
+		elseif self.wndExport:FindChild("DKP"):IsChecked() then
+			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVDKP())
+			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLDKP())
+			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLDKP())
+			end
 		end
-	elseif self.wndExport:FindChild("DKP"):IsChecked() then
+	else
 		if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVDKP())
+			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVList())
 		elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLDKP())
+			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLList())
 		elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLDKP())
+			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLList())
 		end
 	end
 	
@@ -2784,6 +2789,23 @@ function DKP:ExportAsCSVEPGP()
 	return strCSV
 end
 
+function DKP:ExportAsCSVList()
+	local strCSV = ""
+	for k=1,5 do
+		if self.tItems["settings"].LabelOptions[k] then
+			strCSV = strCSV .. self.tItems["settings"].LabelOptions[k] .. ";"
+		end
+	end
+	strCSV = strCSV .. "\n"
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		for j=1,5 do
+			strCSV = strCSV .. child:FindChild("Stat"..j):GetText() .. ";"
+		end
+		strCSV = strCSV .. "\n"
+	end
+	return strCSV
+end
+
 
 
 function DKP:ExportAsCSVDKP()
@@ -2813,6 +2835,20 @@ function DKP:ExportAsHTMLEPGP()
 
 end
 
+function DKP:ExportAsHTMLList()
+	local strHTML = "<!DOCTYPE html><html><head><style>\ntable, th, td {    border: 1px solid black;    border-collapse: collapse;}th, td {    padding: 5px;}</style></head>\n<body><table style=".."width:100%"..">\n"
+	strHTML = strHTML .. "<tr><th>" .. self.tItems["settings"].LabelOptions[1] .. "</th><th>" .. self.tItems["settings"].LabelOptions[2] .. "</th><th>" .. self.tItems["settings"].LabelOptions[3] .. "</th><th>" .. self.tItems["settings"].LabelOptions[4] .."</th><th>" .. self.tItems["settings"].LabelOptions[5] ..  "</th></tr>\n<tr>"
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		for j=1,5 do
+			strHTML = strHTML .. "<th>" .. child:FindChild("Stat"..j):GetText() .. "</th>"
+		end
+		strHTML = strHTML .. "</tr>\n<tr>"
+	end
+	strHTML = strHTML .. "\n</table>\n</body>\n</html>"
+	return strHTML
+
+end
+
 function DKP:ExportAsFormattedHTMLEPGP()
 	local formatedTable ={}
 	for i=1,table.maxn(self.tItems) do
@@ -2835,6 +2871,15 @@ function DKP:ExportAsFormattedHTMLEPGP()
 			end
 			if formatedTable[self.tItems[i].strName]["Logs"] ~= nil and #formatedTable[self.tItems[i].strName]["Logs"] < 1 then formatedTable[self.tItems[i].strName]["Logs"] = nil end
 		end
+	end
+
+	return tohtml(formatedTable)
+end
+
+function DKP:ExportAsFormattedHTMLList()
+	local formatedTable ={}
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		table.insert(formatedTable,{[self.tItems["settings"].LabelOptions[1]] = child:FindChild("Stat1"):GetText(),[self.tItems["settings"].LabelOptions[2]] = child:FindChild("Stat2"):GetText(),[self.tItems["settings"].LabelOptions[3]] = child:FindChild("Stat3"):GetText(),[self.tItems["settings"].LabelOptions[4]] = child:FindChild("Stat4"):GetText(),[self.tItems["settings"].LabelOptions[5]] = child:FindChild("Stat5"):GetText()})
 	end
 
 	return tohtml(formatedTable)
