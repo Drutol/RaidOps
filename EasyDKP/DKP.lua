@@ -1366,23 +1366,66 @@ end
 
 function DKP:RefreshMainItemList()
 	if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() return end
+	local selectedPlayer = ""
+	if self:LabelGetColumnNumberForValue("Name") > 0 then
+		if self.MassEdit then
+			selectedPlayer = {}
+			for k,player in ipairs(selectedMembers) do
+				--for k,wnd in ipairs(player:GetChildren()) do Print(wnd:GetName()) end
+				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+			end
+		elseif self.wndSelectedListItem then
+			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
+		end
+	end
+	selectedMembers = {}
+	self.wndSelectedListItem = nil
 	self.wndItemList:DestroyChildren()
 	local nameLabel = self:LabelGetColumnNumberForValue("Name")
 	for k,player in ipairs(self.tItems) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player)
+				if not self.MassEdit then
+					if player.strName == selectedPlayer then
+						self.wndSelectedListItem = player.wnd
+						player.wnd:SetCheck(true)	
+					end
+				else
+					local found = false
+					
+					for k,prevPlayer in ipairs(selectedPlayer) do
+						if prevPlayer == player.strName then
+							found = true
+							break
+						end
+					end
+					if found then
+						table.insert(selectedMembers,player.wnd)
+						player.wnd:SetCheck(true)
+					end
+					
+				end
+				player.wnd:SetData(k)
 			end
-			self:UpdateItem(player)
-			player.wnd:SetData(k)
 		end
 	end
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
 	self:UpdateItemCount()
-	self.wndSelectedListItem = nil
-	selectedMembers = {}
+end
+
+function DKP:IsPlayerInRaid(strPlayer)
+	local raid = self:Bid2GetTargetsTable()
+	table.insert(raid,GameLib.GetPlayerUnit():GetName())
+	for k,player in ipairs(raid) do
+		if strPlayer == player then return true end
+	end
+	return false
 end
 
 function DKP:UpdateItem(playerItem,k,bAddedClass)
@@ -1610,6 +1653,19 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 end
 
 function DKP:RefreshMainItemListAndGroupByClass()
+	local selectedPlayer = ""
+	if self:LabelGetColumnNumberForValue("Name") > 0 then
+		if self.MassEdit then
+			selectedPlayer = {}
+			for k,player in ipairs(selectedMembers) do
+				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+			end
+		elseif self.wndSelectedListItem then
+			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
+		end
+	end
+	
+	selectedMembers = {}
 	self.wndItemList:DestroyChildren()
 	local esp = {}
 	local war = {}
@@ -1656,94 +1712,129 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	
 	for k,player in ipairs(esp) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedEs)
-			player.wnd:SetData(k)
-			addedEs = true
 		end
 	end	
 	for k,player in ipairs(eng) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedEn)
-			player.wnd:SetData(k)
-			addedEn = true
 		end
 	end	
 	for k,player in ipairs(med) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedM)
-			player.wnd:SetData(k)
-			addedM = true
 		end
 	end	
 	for k,player in ipairs(war) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedW)
-			player.wnd:SetData(k)
-			addedW = true
 		end
 	end	
 	for k,player in ipairs(sta) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedSt)
-			player.wnd:SetData(k)
-			addedSt = true
 		end
 	end	
 	for k,player in ipairs(spe) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedS)
-			player.wnd:SetData(k)
-			addedS = true
 		end
 	end
 	for k,player in ipairs(unknown) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.MassEdit then
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-			else
-				player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if not self.MassEdit then
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+				else
+					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				end
+				self:UpdateItem(player,k,addedEs)
+				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+				addedEs = true
 			end
-			self:UpdateItem(player,k,addedU)
-			player.wnd:SetData(k)
-			addedU = true
+		end
+	end
+	if self:LabelGetColumnNumberForValue("Name") > 0 then
+		for k,child in ipairs(self.wndItemList:GetChildren()) do
+			if not self.MassEdit then
+				if self.tItems[child:GetData()].strName == selectedPlayer then
+					self.wndSelectedListItem = child
+					child:SetCheck(true)	
+				end
+			else
+				local found = false
+				
+				for k,prevPlayer in ipairs(selectedPlayer) do
+					if prevPlayer ==  self.tItems[child:GetData()].strName then
+						found = true
+						break
+					end
+				end
+				if found then
+					table.insert(selectedMembers,child)
+					child:SetCheck(true)
+				end
+			end
 		end
 	end
 	
+	
 	self.wndItemList:ArrangeChildrenVert()
 	self:UpdateItemCount()
-	self.wndSelectedListItem = nil
-	selectedMembers = {}
-
 end
 
 function DKP:LabelSort(wndHandler,wndControl,eMouseButton)

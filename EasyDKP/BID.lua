@@ -2395,7 +2395,6 @@ function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	local item = Item.GetDataFromId(wndControl:GetParent():GetParent():GetData())
 	local itemComparee
 	local bPass
-	Print("LOL")
 	for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd:GetData() == item:GetItemId() then bPass = auction.bPass break end end
 	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
 	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),string.lower(wndControl:GetName()),wndControl:GetParent():GetParent():GetData(),itemComparee)
