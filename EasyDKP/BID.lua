@@ -1751,9 +1751,10 @@ function DKP:InitBid2()
 	if self.tItems["settings"]["Bid2"].bRegisterPass == nil then self.tItems["settings"]["Bid2"].bRegisterPass = false end
 	
 	self.ActiveAuctions = {}
+	self:DSInit()
 	self:Bid2RestoreSettings()
 	
-	if self.tItems["settings"].networking then
+	if self.tItems["settings"].networking or self.tItems["settings"].DS.enable then
 		self:BidJoinChannel()
 	end
 	self.OtherMLs = {}
@@ -1794,6 +1795,8 @@ end
 function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
 	self.tItems["settings"]["Bid2"].strChannel = strText
 	self.wndBid2Settings:FindChild("Channel"):FindChild("Value"):SetText(strText)
+	self.wndMLSettings:FindChild("ChannelName"):SetText(strText)
+	self.wndDS:FindChild("Channel"):SetText(strText)
 	self.BidJoinChannel()
 end
 
@@ -1858,6 +1861,8 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self.tEquippedItems[strSender] = {}
 			self.tEquippedItems[strSender][item:GetSlot()] = tMsg.item
 			self:UpdatePlayerTileBar(strSender,item)
+		elseif tMsg.type =="SendMeThemStandings" then
+			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedStandings" , strData = self:DSGetEncodedStandings(strPlayer)})
 		end
 	end
 end

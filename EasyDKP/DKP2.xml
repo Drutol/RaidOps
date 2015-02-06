@@ -785,7 +785,7 @@
         </Control>
         <Control Class="Window" LAnchorPoint="0" LAnchorOffset="18" TAnchorPoint="0" TAnchorOffset="134" RAnchorPoint="0" RAnchorOffset="410" BAnchorPoint="0" BAnchorOffset="198" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Holo_Background_General" TooltipType="OnCursor" Name="Channel" TooltipColor="">
             <Control Class="EditBox" LAnchorPoint="0" LAnchorOffset="10" TAnchorPoint="0" TAnchorOffset="21" RAnchorPoint="0" RAnchorOffset="388" BAnchorPoint="0" BAnchorOffset="57" RelativeToClient="1" Font="Nameplates" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Holo_InputBox" TooltipType="OnCursor" Name="Value" TooltipColor="" Border="1" UseTemplateBG="1" TextId="" Tooltip="All members will have to input the same channel name in client addon." TooltipId="" DT_CENTER="1" DT_VCENTER="1">
-                <Event Name="EditBoxReturn" Function="Bid2SetChannelName"/>
+                <Event Name="EditBoxReturn" Function="SetChannelAndRecconect"/>
             </Control>
             <Control Class="Window" LAnchorPoint="0" LAnchorOffset="-7" TAnchorPoint="0" TAnchorOffset="-6" RAnchorPoint="0" RAnchorOffset="391" BAnchorPoint="0" BAnchorOffset="33" RelativeToClient="1" Font="Nameplates" Text="Guild Channel Name" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Default" TooltipType="OnCursor" Name="Title" TooltipColor="" TextId="" DT_CENTER="1" DT_VCENTER="1"/>
         </Control>

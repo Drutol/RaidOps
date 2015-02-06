@@ -38,6 +38,17 @@ local defaultQualityValues =
 	["Purple"] = .15,
 	["Orange"] = .1
 }
+
+
+local ktStringToIcon =
+{
+	["Medic"]       	= "Icon_Windows_UI_CRB_Medic",
+	["Esper"]       	= "Icon_Windows_UI_CRB_Esper",
+	["Warrior"]     	= "Icon_Windows_UI_CRB_Warrior",
+	["Stalker"]     	= "Icon_Windows_UI_CRB_Stalker",
+	["Engineer"]    	= "Icon_Windows_UI_CRB_Engineer",
+	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
+}
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -78,13 +89,15 @@ function RaidOpsMM:OnDocLoaded()
 		self.wndAnchor = Apollo.LoadForm(self.xmlDoc,"Anchor",nil,self)
 		self.wndLootList = Apollo.LoadForm(self.xmlDoc,"LootList",nil,self)
 		self.wndCost = Apollo.LoadForm(self.xmlDoc,"ItemCostFormula",nil,self)
+		self.wndStandings = Apollo.LoadForm(self.xmlDoc,"StandingsMain",nil,self)
 
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)	
 		self.wndSettings:Show(false, true)
 		self.wndAnchor:Show(false, true)
 		self.wndLootList:Show(false, true)
 		self.wndCost:Show(false, true)
-		
+		self.wndStandings:Show(false, true)
+
 		self.wndLootList:MoveToLocation(self.wndAnchorloc)
 		self.wndAnchor:MoveToLocation(self.wndAnchorloc)
 		if self.settings == nil then
@@ -95,6 +108,7 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.tooltips == nil then self.settings.tooltips = true end
 		self.ActiveAuctions = {}
 		self.MyChoices = {}
+		if self.tItems == nil then self.tItems = {} end
 		if self.SlotValues == nil then self.SlotValues = defaultSlotValues end
 		if self.QualityValues == nil then self.QualityValues = defaultQualityValues end
 		if self.CustomModifier == nil then self.CustomModifier = .5 end
@@ -102,6 +116,7 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.bAutoClose == nil then self.settings.bAutoClose = false end
 		if self.settings.tooltips == true then self:EPGPHookToETooltip() end
 		if self.settings.bKeepOnTop == nil then self.settings.bKeepOnTop = true end
+		
 		if self.settings.enable then 
 			self:JoinGuildChannel()
 		end
@@ -115,8 +130,51 @@ function RaidOpsMM:OnDocLoaded()
 		
 		self.tMLs = {}
 		Apollo.RegisterSlashCommand("ropsmm", "OnRaidOpsMMOn", self)
+		Apollo.RegisterSlashCommand("ropsmms", "StandingsShow", self)
 		Apollo.RegisterTimerHandler(1,"InitDelay",self)
 		self.delayTimer = ApolloTimer.Create(1,true,"InitDelay",self)
+		
+		self.searchString = ""
+		self.settings.SortOrder = "desc"
+		self.wndStandings:FindChild("Standings"):FindChild("Label1"):SetData("desc")
+		self.wndStandings:FindChild("Standings"):FindChild("Label2"):SetData("desc")
+		self.wndStandings:FindChild("Standings"):FindChild("Label3"):SetData("desc")
+		self.wndStandings:FindChild("Standings"):FindChild("Label4"):SetData("desc")		
+		
+		self.wndStandings:FindChild("Standings"):FindChild("Label1"):FindChild("SortIndicator"):Show(false)
+		self.wndStandings:FindChild("Standings"):FindChild("Label2"):FindChild("SortIndicator"):Show(false)
+		self.wndStandings:FindChild("Standings"):FindChild("Label3"):FindChild("SortIndicator"):Show(false)
+		self.wndStandings:FindChild("Standings"):FindChild("Label4"):FindChild("SortIndicator"):Show(false)
+
+		--[[self.tItems["EPGP"] = 1
+		self.tItems["Lol1"] = {}
+		self.tItems["Lol1"].net = 500
+		self.tItems["Lol1"].EP = 70
+		self.tItems["Lol1"].GP = 67		
+		self.tItems["Lol1"].PR = 200		
+		self.tItems["Lol1"].tot = 1000		
+		self.tItems["Lol1"].class = "Medic"		
+		
+		self.tItems["Lol2"] = {}
+		self.tItems["Lol2"].EP = 159
+		self.tItems["Lol2"].GP = 47
+		self.tItems["Lol2"].PR = 20
+		self.tItems["Lol2"].net = 300
+		self.tItems["Lol2"].tot = 1200
+		self.tItems["Lol2"].class = "Esper"		
+		
+		self.tItems["Lol3"] = {}
+		self.tItems["Lol3"].EP = 578
+		self.tItems["Lol3"].GP = 35
+		self.tItems["Lol3"].PR = 123
+		self.tItems["Lol3"].net = 456
+		self.tItems["Lol3"].tot = 2000
+		self.tItems["Lol3"].class = "Esper"]]
+		
+		if self.settings.lastFetch == nil then self.settings.lastFetch = 0 end
+		if self.settings.strSource == nil then self.settings.strSource = "Type something here!" end
+		self.wndStandings:FindChild("Source"):SetText(self.settings.strSource)
+		--self:StandingsFetched("ZG8gbG9jYWwgXz17WyJOZWVyYSBaeW5uIl09e1BSPSIyLjUiLGNsYXNzPSJNZWRpYyIsR1A9NjAxLEVQPTE1MDB9LFsiTG9yZCBCcmFwcGluZ3RvbiJdPXtQUj0iMS4wIixjbGFzcz0iRW5naW5lZXIiLEdQPTYwMSxFUD02MDB9LFsiTWlyYWxpcyB2YW5IZWFsc2luZyJdPXtQUj0iMTYwMC4wIixjbGFzcz0iTWVkaWMiLEdQPTEsRVA9MTYwMH0sRVBHUD0xLFsiTXVnYWJlIFNjcnVic2xhcHBlciJdPXtQUj0iMzAwLjAiLGNsYXNzPSJTcGVsbHNsaW5nZXIiLEdQPTEsRVA9MzAwfSxbIlJ1bmRvIFRyZWVmb2NrZXIiXT17UFI9IjExMDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTExMDB9LFsiQW5oaSBCdWdlYXJlZCJdPXtQUj0iODAwLjAiLGNsYXNzPSJTdGFsa2VyIixHUD0xLEVQPTgwMH0sWyJNZWVrbyBCcmlhcnRob3JuIl09e1BSPSI2MDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTYwMH0sWyJTb2thaWkgU2hpbmRhZ2VtdSJdPXtQUj0iMTQwMC4wIixjbGFzcz0iRW5naW5lZXIiLEdQPTEsRVA9MTQwMH0sWyJzZXJPbiB6ZXJPIl09e1BSPSI4MDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTgwMH0sWyJWZW5vbXVzIEthbWFpIl09e1BSPSIxMDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTEwMH0sWyJEcnV0b2wgV2luZGNoYXNlciJdPXtQUj0iMTAwLjAiLGNsYXNzPSJFc3BlciIsR1A9MSxFUD0xMDB9LFsiT3ggc3RhbGtlciJdPXtQUj0iOTAwLjAiLGNsYXNzPSJTdGFsa2VyIixHUD0xLEVQPTkwMH0sWyJQcmluY2UgVmVnZXRhIl09e1BSPSI4MDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTgwMH0sWyJUYXVubmlzIEJ1YmJsZXMiXT17UFI9IjMwMC4wIixjbGFzcz0iRXNwZXIiLEdQPTEsRVA9MzAwfSxbIkVtYmVyIEJlYXJzIl09e1BSPSI4MDAuMCIsY2xhc3M9IlNwZWxsc2xpbmdlciIsR1A9MSxFUD04MDB9LFsiTWFsbGllIEdhbGVzdGFyIl09e1BSPSIxMDAuMCIsY2xhc3M9IlN0YWxrZXIiLEdQPTEsRVA9MTAwfSxbIlNhdmlvdXIgQW5nZWwiXT17UFI9IjEwMC4wIixjbGFzcz0iU3BlbGxzbGluZ2VyIixHUD0xLEVQPTEwMH0sWyJoYWVkdWx1cyBlbmdpbmVlciJdPXtQUj0iMS4yIixjbGFzcz0iRW5naW5lZXIiLEdQPTEyMDEsRVA9MTQwMH0sWyJBbG9uYSBNYXJvIl09e1BSPSIxMDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTEwMH0sWyJEcmFhZ3Jlb3YgRmFydGJlbmRlciJdPXtQUj0iMTQwMC4wIixjbGFzcz0iTWVkaWMiLEdQPTEsRVA9MTQwMH19O3JldHVybiBfO2VuZA==")
 	end
 end
 local delay = 2
@@ -188,6 +246,7 @@ end
 function RaidOpsMM:OnSave(eLevel)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 	tSave = {}
+	tSave.tItems = self.tItems
 	tSave.settings = self.settings
 	tSave.loc = self.wndAnchor:GetLocation():ToTable()
 	tSave.SlotValues = self.SlotValues
@@ -201,6 +260,7 @@ end
 
 function RaidOpsMM:OnRestore(eLevel, tData)	
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
+	self.tItems = tData.tItems
 	self.settings = tData.settings
 	self.SlotValues = tData.SlotValues
 	self.QualityValues = tData.QualityValues
@@ -312,6 +372,8 @@ function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 			elseif tMsg.type == "GimmeUrEquippedItem" then -- From RaidOpsML
 				local forItem = Item.GetDataFromId(tMsg.item)
 				if forItem and forItem:IsEquippable() then self.channel:SendPrivateMessage({[1] = strSender},{type = "MyEquippedItem",item = forItem:GetEquippedItemForItemType():GetItemId()}) end
+			elseif tMsg.type == "EncodedStandings" then
+				self:StandingsFetched(tMsg.strData)
 			end
 		end
 	end
@@ -735,6 +797,346 @@ end
 ---------------------------------------------------------------------------------------------------
 
 
+
+---------------------------------------------------------------------------------------------------
+-- Standings Functions
+---------------------------------------------------------------------------------------------------
+
+function RaidOpsMM:StandingsSetDataProvider( wndHandler, wndControl, strText )
+	self.settings.strSource = strText
+end
+
+function RaidOpsMM:StandingsFetch( wndHandler, wndControl, eMouseButton )
+	if self.channel then self.channel:SendPrivateMessage({[1] = self.settings.strSource},{type = "SendMeThemStandings"}) end
+end
+
+function RaidOpsMM:StandingsFetched(strData)
+	local tData = self:DecodeData(strData)
+	for k,player in pairs (tData) do
+		self.tItems[k] = player
+	end
+	self.settings.lastFetch = os.time()
+	self:RefreshStandings()
+end
+
+function RaidOpsMM:DecodeData(strData)
+	return serpent.load(Base64.Decode(strData))
+end
+
+function RaidOpsMM:string_starts(String,Start)
+	return string.sub(string.lower(String),1,string.len(Start))==string.lower(Start)
+end
+
+function RaidOpsMM:RefreshStandings()
+	if self.wndStandings:FindChild("Controls"):FindChild("Group"):IsChecked() then self:RefreshStandingsAndGroup() return end
+	
+	self.wndStandings:FindChild("Standings"):FindChild("List"):DestroyChildren()
+	if self.tItems["EPGP"] and self.tItems["EPGP"] == 1 then
+		self.wndStandings:FindChild("Standings"):FindChild("Label2"):SetText("EP")
+		self.wndStandings:FindChild("Standings"):FindChild("Label3"):SetText("GP")
+		self.wndStandings:FindChild("Standings"):FindChild("Label4"):SetText("PR")
+		for k,player in pairs(self.tItems) do
+			if k ~= "EPGP" and self:string_starts(k,self.searchString) then
+				if not self.wndStandings:FindChild("Controls"):FindChild("RaidOnly"):IsChecked() or self.wndStandings:FindChild("Controls"):FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(k) then
+					local wnd = Apollo.LoadForm(self.xmlDoc,"ListItem",self.wndStandings:FindChild("Standings"):FindChild("List"),self)
+					wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+					wnd:FindChild("Stat1"):SetText(k)
+					wnd:FindChild("Stat2"):SetText(player.EP)
+					wnd:FindChild("Stat3"):SetText(player.GP)
+					wnd:FindChild("Stat4"):SetText(player.PR)
+				end
+			end
+		end
+	elseif self.tItems["EPGP"] then
+		self.wndStandings:FindChild("Standings"):FindChild("Label2"):SetText("Net")
+		self.wndStandings:FindChild("Standings"):FindChild("Label3"):SetText("Tot")
+		self.wndStandings:FindChild("Standings"):FindChild("Label4"):Show(false,false)
+		for k,player in pairs(self.tItems) do
+			if k ~= "EPGP" and self:string_starts(k,self.searchString) then
+				if not self.wndStandings:FindChild("Controls"):FindChild("RaidOnly"):IsChecked() or self.wndStandings:FindChild("Controls"):FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(k) then
+					local wnd = Apollo.LoadForm(self.xmlDoc,"ListItem",self.wndStandings:FindChild("Standings"):FindChild("List"),self)
+					wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+					wnd:FindChild("Stat1"):SetText(k)
+					wnd:FindChild("Stat2"):SetText(player.net)
+					wnd:FindChild("Stat3"):SetText(player.tot)
+				end
+			end
+		end
+	end
+	
+	self.wndStandings:FindChild("Standings"):FindChild("List"):ArrangeChildrenVert(0,raidOpsMMsortPlayerswithWnds)
+	self:HighlightRow()
+	self:CalculateLastFetch()
+end
+
+function RaidOpsMM:RefreshStandingsAndGroup()
+	local esp = {}
+	local war = {}
+	local spe = {}
+	local med = {}
+	local sta = {}
+	local eng = {}
+	local unknown = {}
+	
+	self.wndStandings:FindChild("Standings"):FindChild("List"):DestroyChildren()
+	
+	for k,player in pairs(self.tItems) do
+		if k ~= "EPGP" then 
+			player.strName = k
+			if player.class ~= nil then
+				if player.class == "Esper" then
+					table.insert(esp,player)
+				elseif player.class == "Engineer" then
+					table.insert(eng,player)
+				elseif player.class == "Medic" then
+					table.insert(med,player)
+				elseif player.class == "Warrior" then
+					table.insert(war,player)
+				elseif player.class == "Stalker" then
+					table.insert(sta,player)
+				elseif player.class == "Spellslinger" then
+					table.insert(spe,player)
+				end
+			else
+				table.insert(unknown,player)
+			end
+		end
+	end
+--[[table.sort(esp,easyDKPSortPlayerbyLabelNotWnd)
+	table.sort(eng,easyDKPSortPlayerbyLabelNotWnd)
+	table.sort(med,easyDKPSortPlayerbyLabelNotWnd)
+	table.sort(war,easyDKPSortPlayerbyLabelNotWnd)
+	table.sort(sta,easyDKPSortPlayerbyLabelNotWnd)
+	table.sort(spe,easyDKPSortPlayerbyLabelNotWnd)
+	table.sort(unknown,easyDKPSortPlayerbyLabelNotWnd)]]
+	local tables = {
+		[1] = esp,
+		[2] = eng,
+		[3] = med,
+		[4] = war,
+		[5] = sta,
+		[6] = spe,
+		[7] = unknown,
+	}
+	
+	if self.tItems["EPGP"] == 1 then self.epgpmode = true else self.epgpmode = false end
+	
+	for k,tab in ipairs(tables) do
+		table.sort(tab,raidOpsMMsortPlayers)
+	end
+	
+	if self.tItems["EPGP"] and self.tItems["EPGP"] == 1 then
+		self.wndStandings:FindChild("Standings"):FindChild("Label2"):SetText("EP")
+		self.wndStandings:FindChild("Standings"):FindChild("Label3"):SetText("GP")
+		self.wndStandings:FindChild("Standings"):FindChild("Label4"):SetText("PR")
+	else
+		self.wndStandings:FindChild("Standings"):FindChild("Label2"):SetText("Net")
+		self.wndStandings:FindChild("Standings"):FindChild("Label3"):SetText("Tot")
+		self.wndStandings:FindChild("Standings"):FindChild("Label4"):Show(false,false)
+	end
+	
+	
+
+	
+	for j,tab in ipairs(tables) do
+		local added = false
+		for k,player in ipairs(tab) do
+			if not self.wndStandings:FindChild("Controls"):FindChild("RaidOnly"):IsChecked() or self.wndStandings:FindChild("Controls"):FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+				if self.tItems["EPGP"] and self.tItems["EPGP"] == 1 then
+					if self:string_starts(player.strName,self.searchString) then
+						local wnd = Apollo.LoadForm(self.xmlDoc,"ListItem",self.wndStandings:FindChild("Standings"):FindChild("List"),self)
+						wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+						wnd:FindChild("Stat1"):SetText(player.strName)
+						wnd:FindChild("Stat2"):SetText(player.EP)
+						wnd:FindChild("Stat3"):SetText(player.GP)
+						wnd:FindChild("Stat4"):SetText(player.PR)
+						if k == 1 or #tab == 1 or not added then wnd:FindChild("NewClass"):Show(true) end
+						added = true
+						
+					end
+				elseif self.tItems["EPGP"] then
+					if self:string_starts(player.strName,self.searchString) then
+						local wnd = Apollo.LoadForm(self.xmlDoc,"ListItem",self.wndStandings:FindChild("Standings"):FindChild("List"),self)
+						wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+						wnd:FindChild("Stat1"):SetText(player.strName)
+						wnd:FindChild("Stat2"):SetText(player.net)
+						wnd:FindChild("Stat3"):SetText(player.tot)
+						if k == 1 or #tab == 1 or not added then wnd:FindChild("NewClass"):Show(true) end
+						added = true
+					end
+				end
+			end
+		end	
+	end
+	
+	self.wndStandings:FindChild("Standings"):FindChild("List"):ArrangeChildrenVert(0)
+	self:HighlightRow()
+	self:CalculateLastFetch()
+end
+
+function RaidOpsMM:IsPlayerInRaid(strPlayer)
+	local raid = self:Bid2GetTargetsTable()
+	table.insert(raid,GameLib.GetPlayerUnit():GetName())
+	for k,player in ipairs(raid) do
+		if strPlayer == player then return true end
+	end
+	return false
+end
+
+function RaidOpsMM:CalculateLastFetch()
+	local wndFetchDays = self.wndStandings:FindChild("Controls"):FindChild("FetchDaysSince")
+	local wndFetchDate = self.wndStandings:FindChild("Controls"):FindChild("FetchDate")
+	
+	if self.settings.lastFetch == 0 then 
+		wndFetchDays:SetText("--") 
+		wndFetchDate:SetText("--")
+		return
+	end
+	local diff = os.time() - self.settings.lastFetch
+	local tDate = os.date("*t",diff)
+	wndFetchDays:SetText("Last update : " .. tDate.day - 1 .. " days ago.") 
+	wndFetchDate:SetText(os.date("%x",self.settings.lastFetch).."  " .. os.date("%X",self.settings.lastFetch))
+
+end
+
+function RaidOpsMM:LabelSwapSortIndicator(wnd)
+	if wnd:GetData() == "asc" then 
+		wnd:FindChild("SortIndicator"):SetSprite("CRB_PlayerPathSprites:sprPP_SciSpawnArrowDown")
+		wnd:SetData("desc")
+		self.settings.SortOrder = "desc"
+	else
+		wnd:FindChild("SortIndicator"):SetSprite("CRB_PlayerPathSprites:sprPP_SciSpawnArrowUp")
+		wnd:SetData("asc")
+		self.settings.SortOrder = "asc"
+	end
+end
+
+function raidOpsMMsortPlayerswithWnds(a,b)
+	local DKPInstance = Apollo.GetAddon("RaidOpsMM")
+	if DKPInstance.SortedLabel then
+		local label = "Stat"..DKPInstance.SortedLabel
+		if a:FindChild(label) and b:FindChild(label) then
+			if DKPInstance.settings.SortOrder == "asc" then
+				if label ~= "Stat1" then
+					return tonumber(a:FindChild(label):GetText()) > tonumber(b:FindChild(label):GetText())
+				else
+					return a:FindChild(label):GetText() > b:FindChild(label):GetText()
+				end
+			else
+				if label ~= "Stat1" then
+					return tonumber(a:FindChild(label):GetText()) < tonumber(b:FindChild(label):GetText())
+				else
+					return a:FindChild(label):GetText() < b:FindChild(label):GetText()
+				end
+			end
+		end
+	end
+end
+
+function raidOpsMMsortPlayers(a,b)
+	local DKPInstance = Apollo.GetAddon("RaidOpsMM")
+	if DKPInstance.SortedLabel then
+		local label = "Stat"..DKPInstance.SortedLabel
+		if DKPInstance.settings.SortOrder == "asc" then
+			if label == "Stat1" then return a.strName > b.strName end
+			if DKPInstance.epgpmode then
+				if label == "Stat2" then return a.EP > b.EP end
+				if label == "Stat3" then return a.GP > b.GP end
+				if label == "Stat4" then return tonumber(a.PR) > tonumber(b.PR) end
+			else
+				if label == "Stat2" then return a.net > b.net end
+				if label == "Stat3" then return a.tot > b.tot end
+			end
+		else
+			if label == "Stat1" then return a.strName < b.strName end
+			if DKPInstance.epgpmode then
+				if label == "Stat2" then return a.EP < b.EP end
+				if label == "Stat3" then return a.GP < b.GP end
+				if label == "Stat4" then return tonumber(a.PR) < tonumber(b.PR) end
+			else
+				if label == "Stat2" then return a.net < b.net end
+				if label == "Stat3" then return a.tot < b.tot end
+			end
+		end
+	end
+end
+
+function RaidOpsMM:LabelSort(wndHandler,wndControl,eMouseButton)
+	if eMouseButton ~= GameLib.CodeEnumInputMouse.Right and string.find(wndControl:GetName(),"Label") then 
+		self.SortedLabel = string.sub(wndControl:GetName(),6)
+		self:LabelSwapSortIndicator(wndControl)
+		if not self.wndStandings:FindChild("Controls"):FindChild("Group"):IsChecked() then
+			self.wndStandings:FindChild("Standings"):FindChild("List"):ArrangeChildrenVert(0,raidOpsMMsortPlayerswithWnds)
+			self:HighlightRow()
+		else
+			self:RefreshStandings()
+		end
+	else
+		self.SortedLabel = nil
+		self:RefreshStandings()
+	end
+	
+	self:HideSortIndicators()
+end
+
+function RaidOpsMM:HideSortIndicators()
+	self.wndStandings:FindChild("Standings"):FindChild("Label1"):FindChild("SortIndicator"):Show(false)
+	self.wndStandings:FindChild("Standings"):FindChild("Label2"):FindChild("SortIndicator"):Show(false)
+	self.wndStandings:FindChild("Standings"):FindChild("Label3"):FindChild("SortIndicator"):Show(false)
+	self.wndStandings:FindChild("Standings"):FindChild("Label4"):FindChild("SortIndicator"):Show(false)
+	
+	if self.SortedLabel then self.wndStandings:FindChild("Standings"):FindChild("Label"..self.SortedLabel):FindChild("SortIndicator"):Show(true) end
+end
+
+function RaidOpsMM:StandingsShow()
+	self.wndStandings:Show(true,false)
+	self:RefreshStandings()
+end	
+
+function RaidOpsMM:HighlightRow()
+	for k,child in ipairs(self.wndStandings:FindChild("Standings"):FindChild("List"):GetChildren()) do
+		for j=1,4 do
+			child:FindChild("Stat"..j):SetTextColor("white")
+		end
+		if self.SortedLabel then child:FindChild("Stat"..self.SortedLabel):SetTextColor("ChannelAdvice") end
+	end
+
+end
+
+---------------------------------------------------------------------------------------------------
+-- StandingsMain Functions
+---------------------------------------------------------------------------------------------------
+
+function RaidOpsMM:Search( wndHandler, wndControl, strText )
+	self.searchString = strText 
+	self:RefreshStandings()
+end
+
+function RaidOpsMM:StandingsClose( wndHandler, wndControl, eMouseButton )
+	self.wndStandings:Show(false,false)
+end
+
+---------------------------------------------------------------------------------------------------
+-- ListItem Functions
+---------------------------------------------------------------------------------------------------
+local selectedItems = {}
+function RaidOpsMM:SelectItem( wndHandler, wndControl)
+	table.insert(selectedItems,wndControl:FindChild("Stat1"):GetText())
+end
+
+function RaidOpsMM:DeselectItem( wndHandler, wndControl, eMouseButton )
+	for k,item in ipairs(selectedItems) do
+		if item == wndControl:FindChild("Stat1"):GetText() then table.remove(selectedItems,k) return end
+	end
+end
+
+function RaidOpsMM:RemoveSelected()
+	for k,item in ipairs(selectedItems) do
+		self.tItems[item] = nil 
+	end
+	self:RefreshStandings()
+	selectedItems = {}
+end
 
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMM Instance

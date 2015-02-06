@@ -298,21 +298,20 @@ end
 function DKP:OnTimer()
 	if self.tItems["settings"].collect_new == 1 then
 		for k=1,GroupLib.GetMemberCount(),1 do
-		local unit_member = GroupLib.GetGroupMember(k)
-			if unit_member ~= nil then
+			if self.tItems["settings"].CheckAffiliation == 1 then
+				local member = GroupLib.GetUnitForGroupMember(k)
+					if member ~= nil and member:GetGuildName() ~= nil  then
+						if self:GetPlayerByIDByName(member:GetName()) == -1 and member:GetGuildName() ~= nil and self.tItems["settings"].guildname ~= nil   and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname)  then
+							self:OnUnitCreated(member)
+							self:RegisterPlayerClass(self:GetPlayerByIDByName(member:GetName()),member:GetClassId())
+						end				
+					end		
+			else
+				local unit_member = GroupLib.GetGroupMember(k)
+				if unit_member ~= nil and self:GetPlayerByIDByName(unit_member.strCharacterName) == -1 then
 					self:OnUnitCreated(unit_member.strCharacterName,true)
 					self:RegisterPlayerClass(self:GetPlayerByIDByName(unit_member.strCharacterName),unit_member.strClassName)
-			end
-		if self.tItems["settings"].CheckAffiliation == 1 then
-			local member = GroupLib.GetUnitForGroupMember(k)
-				if member ~= nil and member:GetGuildName() ~= nil  then
-					if self:GetPlayerByIDByName(member:GetName()) == -1 and member:GetGuildName() ~= nil and self.tItems["settings"].guildname ~= nil   and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname)  then
-						self:OnUnitCreated(member)
-						self:RegisterPlayerClass(self:GetPlayerByIDByName(member:GetName()),member:GetClassId())
-					end
-					
 				end
-			
 			end
 		end
 	end
@@ -1732,9 +1731,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
-				self:UpdateItem(player,k,addedEs)
+				self:UpdateItem(player,k,addedEn)
 				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
+				addedEn = true
 			end
 		end
 	end	
@@ -1746,9 +1745,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
-				self:UpdateItem(player,k,addedEs)
+				self:UpdateItem(player,k,addedM)
 				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
+				addedM = true
 			end
 		end
 	end	
@@ -1760,9 +1759,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
-				self:UpdateItem(player,k,addedEs)
+				self:UpdateItem(player,k,addedW)
 				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
+				addedW = true
 			end
 		end
 	end	
@@ -1774,9 +1773,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
-				self:UpdateItem(player,k,addedEs)
+				self:UpdateItem(player,k,addedSt)
 				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
+				addedSt = true
 			end
 		end
 	end	
@@ -1788,9 +1787,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
-				self:UpdateItem(player,k,addedEs)
+				self:UpdateItem(player,k,addedS)
 				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
+				addedS = true
 			end
 		end
 	end
@@ -1802,9 +1801,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
-				self:UpdateItem(player,k,addedEs)
+				self:UpdateItem(player,k,addedU)
 				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
+				addedU = true
 			end
 		end
 	end
@@ -3231,6 +3230,112 @@ function DKP:StandbyListItemDeselected( wndHandler, wndControl, eMouseButton )
 		end
 	end
 end
+
+-----------------------------------------------------------------------------------------------
+-- Data Sharing
+-----------------------------------------------------------------------------------------------
+
+function DKP:DSInit()
+	self.wndDS = Apollo.LoadForm(self.xmlDoc,"DataSharing",nil,self)
+	self.wndDS:Show(false,true)
+	
+	if self.tItems["settings"].DS == nil then self.tItems["settings"].DS = {} end
+	if self.tItems["settings"].DS.enable == nil then self.tItems["settings"].DS.enable = true end
+	if self.tItems["settings"].DS.raidMembersOnly == nil then self.tItems["settings"].DS.raidMembersOnly = false end
+	if self.tItems["settings"].DS.aboutRaidMembers == nil then self.tItems["settings"].DS.aboutRaidMembers = false end
+	if self.tItems["settings"].DS.logs == nil then self.tItems["settings"].DS.logs = true end
+	if self.tItems["settings"].DS.tLogs == nil then self.tItems["settings"].DS.tLogs = {} end
+	
+	if self.tItems["settings"].DS.enable then self.wndDS:FindChild("AllowShare"):SetCheck(true) end
+	if self.tItems["settings"].DS.raidMembersOnly then self.wndDS:FindChild("ShareMembers"):SetCheck(true) end
+	if self.tItems["settings"].DS.aboutRaidMembers then self.wndDS:FindChild("ShareAboutMembers"):SetCheck(true) end
+	if self.tItems["settings"].DS.logs then self.wndDS:FindChild("Logs"):SetCheck(true) end
+	
+	self.wndDS:FindChild("Channel"):SetText(self.tItems["settings"]["Bid2"].strChannel)
+	
+end
+
+--- wnd logic
+
+function DKP:DSShow()
+	self.wndDS:Show(true,false)
+end
+
+function DKP:DSClose()
+	self.wndDS:Show(false,true)
+end
+
+--- controls logic
+
+function DKP:DSAboutMembersEnable()
+	self.tItems["settings"].DS.aboutRaidMembers = true
+end
+
+function DKP:DSAboutMembersDisable()
+	self.tItems["settings"].DS.aboutRaidMembers = false
+end
+
+function DKP:DSOnlyMembersEnable()
+	self.tItems["settings"].DS.raidMembersOnly = true
+end
+
+function DKP:DSOnlyMembersDisable()
+	self.tItems["settings"].DS.raidMembersOnly = false
+end
+
+function DKP:DSEnable()
+	self.tItems["settings"].DS.enable = true
+end
+
+function DKP:DSDisable()
+	self.tItems["settings"].DS.enable = false
+end
+
+function DKP:DSLogsEnable()
+	self.tItems["settings"].DS.logs = true
+end
+
+function DKP:DSLogsDisable()
+	self.tItems["settings"].DS.logs = false
+end
+
+function DKP:DSAddLog(strRequester,state)
+	table.insert(self.tItems["settings"].DS.tLogs,1,{strPlayer = strRequester,strState = state})
+	if #self.tItems["settings"].DS.tLogs > 30 then table.remove(selt.tItems["settings"].DS.tLogs,30) end
+end
+
+--- Data preparation
+
+function DKP:DSGetEncodedStandings(strRequester)
+	
+	if not self:IsPlayerInRaid(strRequester) and self.tItems["settings"].DS.raidMembersOnly then 
+		self:DSAddLog(strRequester,"Fail")
+		return "Only Raid Members can fetch data" 
+	end
+	
+	
+	local tStandings = {}
+	tStandings.EPGP = self.tItems["EPGP"].Enable
+	for k,player in ipairs(self.tItems) do
+		if self.tItems["settings"].DS.aboutRaidMembers and self:IsPlayerInRaid(player.strName) or not self.tItems["settings"].DS.aboutRaidMembers then
+			tStandings[player.strName] = {}
+			tStandings[player.strName].class = player.class
+			if self.tItems["EPGP"].Enable == 1 then
+				tStandings[player.strName].EP = player.EP
+				tStandings[player.strName].GP = player.GP
+				tStandings[player.strName].PR = self:EPGPGetPRByName(player.strName)
+			else
+				tStandings[player.strName].net = player.net
+				tStandings[player.strName].tot = player.tot
+			end
+		end
+	end
+	
+	self:DSAddLog(strRequester,"Succes")
+	
+	return Base64.Encode(serpent.dump(tStandings))
+end
+
 
 -----------------------------------------------------------------------------------------------
 -- DKP Instance
