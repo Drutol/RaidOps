@@ -3259,6 +3259,7 @@ end
 
 function DKP:DSShow()
 	self.wndDS:Show(true,false)
+	self:DSPopulateLogs()
 end
 
 function DKP:DSClose()
@@ -3302,17 +3303,19 @@ end
 function DKP:DSAddLog(strRequester,state)
 	table.insert(self.tItems["settings"].DS.tLogs,1,{strPlayer = strRequester,strState = state})
 	if #self.tItems["settings"].DS.tLogs > 30 then table.remove(selt.tItems["settings"].DS.tLogs,30) end
+	self:DSPopulateLogs()
 end
 
 --- Data preparation
 
 function DKP:DSGetEncodedStandings(strRequester)
 	
-	if not self:IsPlayerInRaid(strRequester) and self.tItems["settings"].DS.raidMembersOnly then 
+	if self.tItems["settings"].DS.raidMembersOnly and not self:IsPlayerInRaid(strRequester) then 
 		self:DSAddLog(strRequester,"Fail")
 		return "Only Raid Members can fetch data" 
 	end
 	
+	Print(strRequester)
 	
 	local tStandings = {}
 	tStandings.EPGP = self.tItems["EPGP"].Enable
@@ -3334,6 +3337,16 @@ function DKP:DSGetEncodedStandings(strRequester)
 	self:DSAddLog(strRequester,"Succes")
 	
 	return Base64.Encode(serpent.dump(tStandings))
+end
+
+function DKP:DSPopulateLogs()
+	local strLogs = ""
+	for k,entry in ipairs(self.tItems["settings"].DS.tLogs) do
+		if entry.strPlayer then
+			strLogs = strLogs .. entry.strPlayer .. " :\n " .. entry.strState .. "\n"
+		end
+	end
+	self.wndDS:FindChild("LogsBox"):SetText(strLogs)
 end
 
 

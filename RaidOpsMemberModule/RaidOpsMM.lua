@@ -97,7 +97,7 @@ function RaidOpsMM:OnDocLoaded()
 		self.wndLootList:Show(false, true)
 		self.wndCost:Show(false, true)
 		self.wndStandings:Show(false, true)
-
+		
 		self.wndLootList:MoveToLocation(self.wndAnchorloc)
 		self.wndAnchor:MoveToLocation(self.wndAnchorloc)
 		if self.settings == nil then
@@ -123,7 +123,7 @@ function RaidOpsMM:OnDocLoaded()
 		self:FillInCostFormula()
 		self:RestoreSettings()
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
-		self.wndLootList:SetAnchorOffsets(l,t,r,self.ResizedWndBottom)
+		if self.ResizedWndBottom then self.wndLootList:SetAnchorOffsets(l,t,r,self.ResizedWndBottom) end
 		--Sizing
 		self.wndLootList:SetSizingMaximum(564,332)
 		self.wndLootList:SetSizingMinimum(564,123)
@@ -174,7 +174,8 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.lastFetch == nil then self.settings.lastFetch = 0 end
 		if self.settings.strSource == nil then self.settings.strSource = "Type something here!" end
 		self.wndStandings:FindChild("Source"):SetText(self.settings.strSource)
-		--self:StandingsFetched("ZG8gbG9jYWwgXz17WyJOZWVyYSBaeW5uIl09e1BSPSIyLjUiLGNsYXNzPSJNZWRpYyIsR1A9NjAxLEVQPTE1MDB9LFsiTG9yZCBCcmFwcGluZ3RvbiJdPXtQUj0iMS4wIixjbGFzcz0iRW5naW5lZXIiLEdQPTYwMSxFUD02MDB9LFsiTWlyYWxpcyB2YW5IZWFsc2luZyJdPXtQUj0iMTYwMC4wIixjbGFzcz0iTWVkaWMiLEdQPTEsRVA9MTYwMH0sRVBHUD0xLFsiTXVnYWJlIFNjcnVic2xhcHBlciJdPXtQUj0iMzAwLjAiLGNsYXNzPSJTcGVsbHNsaW5nZXIiLEdQPTEsRVA9MzAwfSxbIlJ1bmRvIFRyZWVmb2NrZXIiXT17UFI9IjExMDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTExMDB9LFsiQW5oaSBCdWdlYXJlZCJdPXtQUj0iODAwLjAiLGNsYXNzPSJTdGFsa2VyIixHUD0xLEVQPTgwMH0sWyJNZWVrbyBCcmlhcnRob3JuIl09e1BSPSI2MDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTYwMH0sWyJTb2thaWkgU2hpbmRhZ2VtdSJdPXtQUj0iMTQwMC4wIixjbGFzcz0iRW5naW5lZXIiLEdQPTEsRVA9MTQwMH0sWyJzZXJPbiB6ZXJPIl09e1BSPSI4MDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTgwMH0sWyJWZW5vbXVzIEthbWFpIl09e1BSPSIxMDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTEwMH0sWyJEcnV0b2wgV2luZGNoYXNlciJdPXtQUj0iMTAwLjAiLGNsYXNzPSJFc3BlciIsR1A9MSxFUD0xMDB9LFsiT3ggc3RhbGtlciJdPXtQUj0iOTAwLjAiLGNsYXNzPSJTdGFsa2VyIixHUD0xLEVQPTkwMH0sWyJQcmluY2UgVmVnZXRhIl09e1BSPSI4MDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTgwMH0sWyJUYXVubmlzIEJ1YmJsZXMiXT17UFI9IjMwMC4wIixjbGFzcz0iRXNwZXIiLEdQPTEsRVA9MzAwfSxbIkVtYmVyIEJlYXJzIl09e1BSPSI4MDAuMCIsY2xhc3M9IlNwZWxsc2xpbmdlciIsR1A9MSxFUD04MDB9LFsiTWFsbGllIEdhbGVzdGFyIl09e1BSPSIxMDAuMCIsY2xhc3M9IlN0YWxrZXIiLEdQPTEsRVA9MTAwfSxbIlNhdmlvdXIgQW5nZWwiXT17UFI9IjEwMC4wIixjbGFzcz0iU3BlbGxzbGluZ2VyIixHUD0xLEVQPTEwMH0sWyJoYWVkdWx1cyBlbmdpbmVlciJdPXtQUj0iMS4yIixjbGFzcz0iRW5naW5lZXIiLEdQPTEyMDEsRVA9MTQwMH0sWyJBbG9uYSBNYXJvIl09e1BSPSIxMDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTEwMH0sWyJEcmFhZ3Jlb3YgRmFydGJlbmRlciJdPXtQUj0iMTQwMC4wIixjbGFzcz0iTWVkaWMiLEdQPTEsRVA9MTQwMH19O3JldHVybiBfO2VuZA==")
+		if self.group then self.wndStandings:FindChild("Controls"):FindChild("Group"):SetCheck(self.group) end
+		--
 	end
 end
 local delay = 2
@@ -185,6 +186,15 @@ function RaidOpsMM:InitDelay()
 		self.delayTimer:Stop()
 		Apollo.RemoveEventHandler("InitDelay",self)
 	end
+end
+
+function RaidOpsMM:PurgeData()
+	self.tItems = {}
+	self:RefreshStandings()
+end
+
+function RaidOpsMM:LoadExample()
+	self:StandingsFetched("ZG8gbG9jYWwgXz17WyJOZWVyYSBaeW5uIl09e1BSPSIyLjUiLGNsYXNzPSJNZWRpYyIsR1A9NjAxLEVQPTE1MDB9LFsiTG9yZCBCcmFwcGluZ3RvbiJdPXtQUj0iMS4wIixjbGFzcz0iRW5naW5lZXIiLEdQPTYwMSxFUD02MDB9LFsiTWlyYWxpcyB2YW5IZWFsc2luZyJdPXtQUj0iMTYwMC4wIixjbGFzcz0iTWVkaWMiLEdQPTEsRVA9MTYwMH0sRVBHUD0xLFsiTXVnYWJlIFNjcnVic2xhcHBlciJdPXtQUj0iMzAwLjAiLGNsYXNzPSJTcGVsbHNsaW5nZXIiLEdQPTEsRVA9MzAwfSxbIlJ1bmRvIFRyZWVmb2NrZXIiXT17UFI9IjExMDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTExMDB9LFsiQW5oaSBCdWdlYXJlZCJdPXtQUj0iODAwLjAiLGNsYXNzPSJTdGFsa2VyIixHUD0xLEVQPTgwMH0sWyJNZWVrbyBCcmlhcnRob3JuIl09e1BSPSI2MDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTYwMH0sWyJTb2thaWkgU2hpbmRhZ2VtdSJdPXtQUj0iMTQwMC4wIixjbGFzcz0iRW5naW5lZXIiLEdQPTEsRVA9MTQwMH0sWyJzZXJPbiB6ZXJPIl09e1BSPSI4MDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTgwMH0sWyJWZW5vbXVzIEthbWFpIl09e1BSPSIxMDAuMCIsY2xhc3M9IkVzcGVyIixHUD0xLEVQPTEwMH0sWyJEcnV0b2wgV2luZGNoYXNlciJdPXtQUj0iMTAwLjAiLGNsYXNzPSJFc3BlciIsR1A9MSxFUD0xMDB9LFsiT3ggc3RhbGtlciJdPXtQUj0iOTAwLjAiLGNsYXNzPSJTdGFsa2VyIixHUD0xLEVQPTkwMH0sWyJQcmluY2UgVmVnZXRhIl09e1BSPSI4MDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTgwMH0sWyJUYXVubmlzIEJ1YmJsZXMiXT17UFI9IjMwMC4wIixjbGFzcz0iRXNwZXIiLEdQPTEsRVA9MzAwfSxbIkVtYmVyIEJlYXJzIl09e1BSPSI4MDAuMCIsY2xhc3M9IlNwZWxsc2xpbmdlciIsR1A9MSxFUD04MDB9LFsiTWFsbGllIEdhbGVzdGFyIl09e1BSPSIxMDAuMCIsY2xhc3M9IlN0YWxrZXIiLEdQPTEsRVA9MTAwfSxbIlNhdmlvdXIgQW5nZWwiXT17UFI9IjEwMC4wIixjbGFzcz0iU3BlbGxzbGluZ2VyIixHUD0xLEVQPTEwMH0sWyJoYWVkdWx1cyBlbmdpbmVlciJdPXtQUj0iMS4yIixjbGFzcz0iRW5naW5lZXIiLEdQPTEyMDEsRVA9MTQwMH0sWyJBbG9uYSBNYXJvIl09e1BSPSIxMDAuMCIsY2xhc3M9Ik1lZGljIixHUD0xLEVQPTEwMH0sWyJEcmFhZ3Jlb3YgRmFydGJlbmRlciJdPXtQUj0iMTQwMC4wIixjbGFzcz0iTWVkaWMiLEdQPTEsRVA9MTQwMH19O3JldHVybiBfO2VuZA==")
 end
 
 -----------------------------------------------------------------------------------------------
@@ -253,6 +263,7 @@ function RaidOpsMM:OnSave(eLevel)
 	tSave.QualityValues = self.QualityValues
 	tSave.CustomModifier = self.CustomModifier
 	tSave.MyChoices = self.MyChoices
+	tSave.Group = self.wndStandings:FindChild("Controls"):FindChild("Group"):IsChecked()
 	local l,t,r,b =  self.wndLootList:GetAnchorOffsets()
 	tSave.ResizedWndBottom = b
 	return tSave
@@ -268,6 +279,7 @@ function RaidOpsMM:OnRestore(eLevel, tData)
 	self.wndAnchorloc  = WindowLocation.new(tData.loc)
 	self.ResizedWndBottom = tData.ResizedWndBottom
 	self.MyChoices = tData.MyChoices
+	self.group = tData.Group
 end
 
 function RaidOpsMM:GetSlotSpriteByQuality(ID)
@@ -812,15 +824,21 @@ end
 
 function RaidOpsMM:StandingsFetched(strData)
 	local tData = self:DecodeData(strData)
-	for k,player in pairs (tData) do
-		self.tItems[k] = player
+	if tData then
+		for k,player in pairs (tData) do
+			self.tItems[k] = player
+		end
+		self.settings.lastFetch = os.time()
+		self:RefreshStandings()
 	end
-	self.settings.lastFetch = os.time()
-	self:RefreshStandings()
 end
 
 function RaidOpsMM:DecodeData(strData)
-	return serpent.load(Base64.Decode(strData))
+	if strData ~= "Only Raid Members can fetch data" then
+		return serpent.load(Base64.Decode(strData))
+	else
+		Print(strData)
+	end
 end
 
 function RaidOpsMM:string_starts(String,Start)
@@ -1013,7 +1031,7 @@ end
 
 function raidOpsMMsortPlayerswithWnds(a,b)
 	local DKPInstance = Apollo.GetAddon("RaidOpsMM")
-	if DKPInstance.SortedLabel then
+	if DKPInstance and DKPInstance.SortedLabel then
 		local label = "Stat"..DKPInstance.SortedLabel
 		if a:FindChild(label) and b:FindChild(label) then
 			if DKPInstance.settings.SortOrder == "asc" then
