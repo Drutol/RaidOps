@@ -1081,6 +1081,12 @@ function DKP:GetPlayerByIDByName(strName)
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then return i end
 	end
+	
+	for j,alt in pairs(self.tItems["alts"]) do
+		if string.lower(strName) == string.lower(j) then return self.tItems["alts"][j] end
+	end
+
+	
 	return -1
 end
 

@@ -248,14 +248,6 @@ function DKP:OnUnitCreated(unit,isStr)
 	end
 	if self.tItems["settings"].lowercase == 1 then strName = string.lower(strName) end
 	local existingID
-
-	local altName = nil
-	if self.tItems["alts"] ~= nil then
-		if self.tItems["alts"][strName] ~= nil then
-			altName = strName
-			strName = self.tItems[self.tItems["alts"][strName]].strName	
-		end
-	end
 	
 	local isNew=true
 	if self.tItems == nil then isNew = true end
@@ -290,10 +282,11 @@ function DKP:OnUnitCreated(unit,isStr)
 		newPlayer.strName = strName
 		newPlayer.net = self.tItems["settings"].default_dkp
 		newPlayer.tot = self.tItems["settings"].default_dkp
-		newPlayer.listed = 0
 		newPlayer.Hrs = 0
 		newPlayer.EP = self.tItems["EPGP"].MinEP
 		newPlayer.GP = self.tItems["EPGP"].BaseGP
+		newPlayer.alts = {}
+		newPlayer.logs = {}
 		if self.tItems["settings"].TradeEnable == 1 then
 			newPlayer.TradeCap = self.tItems["settings"].TradeCap
 		end
@@ -530,7 +523,6 @@ function DKP:OnSave(eLevel)
 					tSave[k].strName = self.tItems[k].strName
 					tSave[k].net = self.tItems[k].net
 					tSave[k].tot = self.tItems[k].tot
-					tSave[k].listed = 0
 					tSave[k].Hrs = self.tItems[k].Hrs
 					tSave[k].TradeCap = self.tItems[k].TradeCap
 					tSave[k].EP = self.tItems[k].EP
@@ -761,6 +753,7 @@ function DKP:Add100DKP()
 			for i=1,GroupLib.GetMemberCount() do
 				local player = GroupLib.GetGroupMember(i)
 				local ID = self:GetPlayerByIDByName(player.strCharacterName)
+				
 				if ID ~= -1 then
 					self.tItems[ID].net = self.tItems[ID].net + tonumber(self.tItems["settings"].dkp)
 					self.tItems[ID].tot = self.tItems[ID].tot + tonumber(self.tItems["settings"].dkp)
@@ -1311,6 +1304,7 @@ end
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 	for k,wnd in ipairs(selectedMembers) do 
 		if wnd:GetData() then
+			for k,alt in ipairs(self.tItems[self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())].alts) do self.tItems["alts"][string.lower(alt)] = nil end
 			table.remove(self.tItems,self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()))
 		end
 	end
@@ -1378,9 +1372,7 @@ function DKP:RefreshMainItemList()
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
 				
-				if self.tItems["alts"][player.strName] then
-					player.alt = self.tItems[self.tItems["alts"][player.strName]].strName
-				end
+				-- Cheking for alt
 				
 				self:UpdateItem(player)
 				if not self.MassEdit then
@@ -1412,16 +1404,42 @@ function DKP:RefreshMainItemList()
 end
 
 function DKP:IsPlayerInRaid(strPlayer)
+	--Print(strPlayer)
 	local raid = self:Bid2GetTargetsTable()
+	table.insert(raid,"Alt Test")
+	for k,player in ipairs(raid) do
+		for j,alt in pairs(self.tItems["alts"]) do
+			if string.lower(j) == string.lower(player) then
+				raid[k] = self.tItems[alt].strName
+				break
+			end
+		end
+	end
 	table.insert(raid,GameLib.GetPlayerUnit():GetName())
 	for k,player in ipairs(raid) do
-		if strPlayer == player then return true end
+		if string.lower(strPlayer) == string.lower(player) then return true end
 	end
 	return false
 end
 
 function DKP:UpdateItem(playerItem,k,bAddedClass)
 	if playerItem.wnd == nil then return end
+	-- Alt check
+	playerItem.alt = nil
+	if self.wndMain:FindChild("RaidOnly"):IsChecked() then
+		local raid = self:Bid2GetTargetsTable()
+		table.insert(raid,"Alt Test")
+		for j,alt in ipairs(playerItem.alts) do
+			for i,raider in ipairs(raid) do
+				if string.lower(alt) == string.lower(raider) then 
+					playerItem.alt = alt 
+					break
+				end
+			end
+			if playerItem.alt then break end
+		end
+	end
+	
 	if k and k == 1 or  bAddedClass == false then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
 	for i=1,5 do
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
@@ -1463,6 +1481,10 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
 	end
 	if playerItem.class then playerItem.wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[playerItem.class]) else playerItem.wnd:FindChild("ClassIcon"):Show(false,false) end
+	if playerItem.alt then
+		playerItem.wnd:FindChild("Alt"):SetTooltip("Playing as : " .. playerItem.alt)
+		playerItem.wnd:FindChild("Alt"):Show(true,false)
+	end
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -2861,8 +2883,8 @@ function DKP:StandbyListRemove( wndHandler, wndControl, eMouseButton,strText )
 			self.tItems["Standby"][string.lower(item)] = nil
 		end
 	else
-		for k,item in ipairs(selectedStandby) do
-			self.tItems["Standby"][string.lower(strText)] = nil
+		for k,item in pairs(self.tItems["Standby"]) do
+			if string.lower(k) == string.lower(strText) then self.tItems["Standby"][k] = nil end
 		end
 	end
 	if self.wndStandby:IsShown() then self:StandbyListPopulate() end
@@ -3036,6 +3058,7 @@ function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 		self.wndContext:Show(true,false)
 		local ID = self:GetPlayerByIDByName(wndControl:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 		self.wndContext:SetData(ID) -- PlayerID
+		self.wndContext:ToFront()
 		if self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
 		wndControl:FindChild("OnContext"):Show(true,false)
 	end
@@ -3063,6 +3086,7 @@ end
 
 function DKP:ConRemoveFinal(wndHandler,wndControl)
 	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
+	for k,alt in ipairs(self.tItems[self.wndContext:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
 	table.remove(self.tItems,self.wndContext:GetData())
 	self.wndContext:Close()
 	wndControl:Show(false,false)
@@ -3096,6 +3120,9 @@ function DKP:AltsShow()
 	
 	self.wndAlts:Show(true,false)
 	self.wndAlts:SetData(self.wndContext:GetData())
+	
+	if self.tItems[self.wndAlts:GetData()].alts == nil then self.tItems[self.wndAlts:GetData()].alts = {} end
+	
 	self.wndAlts:FindChild("Player"):SetText(self.tItems[self.wndAlts:GetData()].strName)
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
 	self:AltsPopulate()
@@ -3113,6 +3140,7 @@ end
 
 function DKP:AltsRemove(wndHandler,wndControl)
 	table.remove(self.tItems[self.wndAlts:GetData()].alts,wndControl:GetParent():GetData())
+	self.tItems["alts"][string.lower(wndControl:GetParent():FindChild("AltName"):GetText())] = nil
 	self:AltsPopulate()
 end
 
@@ -3120,13 +3148,22 @@ function DKP:AltsAdd()
 	local strAlt = self.wndAlts:FindChild("NewAltBox"):GetText()
 	if string.lower(strAlt) == string.lower(self.tItems[self.wndAlts:GetData()].strName) then return end
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
-	if self:GetPlayerByIDByName(strAlt) == -1 then -- just add
-		table.insert(self.tItems[self.wndAlts:GetData()].alts,strAlt)
-		self.wndAlts:FindChild("NewAltBox"):SetText("")
-		self.wndAlts:FindChild("FoundBox"):Show(false,false)
-		self:AltsPopulate()
-	else -- further input required
+	local ID 
+	for k,player in ipairs(self.tItems) do if string.lower(player.strName) == string.lower(strAlt) then ID = k break end end
+	if ID == nil then -- just add
+		if self.tItems["alts"][strAlt] == nil then
+			table.insert(self.tItems[self.wndAlts:GetData()].alts,strAlt)
+			self.tItems["alts"][strAlt] = self.wndAlts:GetData()
+			self.wndAlts:FindChild("NewAltBox"):SetText("")
+			self.wndAlts:FindChild("FoundBox"):Show(false,false)
+			self:AltsPopulate()
+		else
+			Print("Alt already registred") 
+		end
+	elseif self.tItems["alts"][strAlt] == nil then -- further input required
 		self.wndAlts:FindChild("FoundBox"):Show(true,false)
+	else
+		Print("Alt already registred") 
 	end
 end
 
@@ -3139,7 +3176,12 @@ function DKP:AltsAddMerge()
 	self.tItems[self.wndAlts:GetData()].GP =  self.tItems[self.wndAlts:GetData()].GP + mergedPlayer.GP
 	self.tItems[self.wndAlts:GetData()].Hrs =  self.tItems[self.wndAlts:GetData()].Hrs + mergedPlayer.Hrs
 	
+	local recipent = self.tItems[self.wndAlts:GetData()].strName
+	
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
+	
+	for k,player in ipairs(self.tItems) do if player.strName == recipent then self.wndAlts:SetData(k) end end
+	
 	table.insert(self.tItems[self.wndAlts:GetData()].alts,self.wndAlts:FindChild("NewAltBox"):GetText())
 	
 	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
@@ -3147,10 +3189,16 @@ function DKP:AltsAddMerge()
 	
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self:AltsPopulate()
 end
 
 function DKP:AltsAddConvert()
+	local recipent = self.tItems[self.wndAlts:GetData()].strName
+	
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
+	
+	for k,player in ipairs(self.tItems) do if player.strName == recipent then self.wndAlts:SetData(k) end end
+	
 	table.insert(self.tItems[self.wndAlts:GetData()].alts,self.wndAlts:FindChild("NewAltBox"):GetText())
 	
 	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
@@ -3158,6 +3206,7 @@ function DKP:AltsAddConvert()
 	
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self:AltsPopulate()
 end
 
 function DKP:AltsInit()
@@ -3190,6 +3239,8 @@ function DKP:LogsShow()
 	self.wndLogs:ToFront()
 	
 	self.wndLogs:SetData(self.wndContext:GetData())
+	
+	if self.tItems[self.wndLogs:GetData()].logs == nil then self.tItems[self.wndLogs:GetData()].logs = {} end
 	
 	self.wndLogs:FindChild("Player"):SetText(self.tItems[self.wndLogs:GetData()].strName)
 	self:LogsPopulate()
