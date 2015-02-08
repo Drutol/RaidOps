@@ -96,7 +96,6 @@ function DKP:OnDocLoaded()
 
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
 		self.wndMain = Apollo.LoadForm(self.xmlDoc, "DKPMain", nil, self)
-		self.wndDetail = Apollo.LoadForm(self.xmlDoc, "MemberDetails" , nil , self)
 		self.wndSettings = Apollo.LoadForm(self.xmlDoc, "Settings" , nil , self)
 		self.wndExport = Apollo.LoadForm(self.xmlDoc, "Export" , nil , self)
 		self.wndPopUp = Apollo.LoadForm(self.xmlDoc, "MasterLootPopUp" , nil ,self)
@@ -114,7 +113,6 @@ function DKP:OnDocLoaded()
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
 		self.wndMain:Show(false, true)
-		self.wndDetail:Show(false , true)
 		self.wndSettings:Show(false , true)
 		self.wndExport:Show(false , true)
 		self.wndPopUp:Show(false, true)
@@ -133,7 +131,6 @@ function DKP:OnDocLoaded()
 		--Apollo.RegisterEventHandler("LootedItem", "OnLootedItem", self)
 
 		
-		Apollo.RegisterEventHandler("Group_Remove","ForceRefresh", self)	
 		self.timer = ApolloTimer.Create(10, true, "OnTimer", self)
 
 
@@ -187,10 +184,22 @@ function DKP:OnDocLoaded()
 		self:TimeAwardRestore()
 		self:EPGPInit()
 		self:RaidOpsInit()
+		self:ConInit()
+		self:AltsInit()
+		self:LogsInit()
 		
 		self:CloseBigPOPUP()
 
+		-- Alts cleanup onetime
 		
+		if self.tItems.newUpdateAltCleanup == nil then
+			for k,player in ipairs(self.tItems) do
+				player.alts = {}
+				player.logs = {}
+			end
+			self.tItems["alts"] = {}
+			self.tItems.newUpdateAltCleanup = "DONE"
+		end
 		
 		
 		-- Inits
@@ -374,7 +383,7 @@ function DKP:SetDKP(cycling)
 				if wndTot ~= nil then
 					wndTot:SetText(tostring(currentTot))
 				end
-				self:DetailAddLog(comment,modifierTot,ID)
+				self:DetailAddLog(comment,"{DKP}",modifierTot,ID)
 				-- if cycling ~= true then
 					-- self:ResetCommentBoxFull()
 					-- self:ResetDKPInputBoxFull()
@@ -388,16 +397,16 @@ function DKP:SetDKP(cycling)
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
 						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
 							self:EPGPSet(strName,value,value)
-							self:DetailAddLog(comment.. " {EP}",self.tItems[ID].EP - modEP,ID)
-							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
+							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
+							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPSet(strName,value,nil)
-							self:DetailAddLog(comment.. " {EP}",self.tItems[ID].EP - modEP,ID)
+							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
 						end
 					else 
 						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
 							self:EPGPSet(strName,nil,value)
-							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
+							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPSet(strName,nil,nil)
 							Print("Nothing added , check EP or GP in the controls box")
@@ -527,27 +536,8 @@ function DKP:OnSave(eLevel)
 					tSave[k].EP = self.tItems[k].EP
 					tSave[k].GP = self.tItems[k].GP
 					tSave[k].class = self.tItems[k].class
-					if self.tItems[k].alts ~= nil then
-						tSave[k].alts = {}
-						local skip_counter = 0 
-						for j=1,table.getn(self.tItems[k].alts) do
-							if self.tItems[k].alts[j].strName ~= -1 then
-								tSave[k].alts[j - skip_counter] = {}
-								tSave[k].alts[j - skip_counter].strName = self.tItems[k].alts[j].strName
-								tSave[k].alts[j - skip_counter].altsTablePos = self.tItems[k].alts[j].altsTablePos
-							else
-								skip_counter = skip_counter + 1
-							end
-						end
-					end
-					if self.tItems[k].logs ~= nil then
-						tSave[k].logs = {}
-						for j=1,table.getn(self.tItems[k].logs) do
-							tSave[k].logs[j] = {}
-							tSave[k].logs[j].comment = self.tItems[k].logs[j].comment
-							tSave[k].logs[j].modifier = self.tItems[k].logs[j].modifier
-						end
-					end
+					tSave[k].alts = self.tItems[k].alts
+					tSave[k].logs = self.tItems[k].logs
 				end
 			end
 			if self.tItems["alts"] ~= nil then
@@ -569,6 +559,7 @@ function DKP:OnSave(eLevel)
 			tSave["MyChoices"] = self.MyChoices
 			tSave["MyVotes"] = self.MyVotes
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
+			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
 			end
@@ -634,26 +625,24 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Tot"))):SetText(self.tItems[ID].tot)
 					end
 					
-					comment = comment .. "{DKP}"
-					self:DetailAddLog(comment,modifier,ID)
+					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
-					comment = comment .. "{EPGP}"	
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
 						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
 							self:EPGPAdd(strName,value,value)
-							self:DetailAddLog(comment.. " {EP}",self.tItems[ID].EP - modEP,ID)
-							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
+							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
+							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPAdd(strName,value,nil)
-							self:DetailAddLog(comment.. " {EP}",self.tItems[ID].EP - modEP,ID)
+							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
 						end
 					else 
 						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
 							self:EPGPAdd(strName,nil,value)
-							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
+							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPAdd(strName,nil,nil)
 							Print(self.tItems["EPGP"].Enable)
@@ -717,20 +706,19 @@ function DKP:SubtractDKP(cycling)
 				else
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
-					comment = comment .. "{EPGP}"	
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
 						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
 							self:EPGPSubtract(strName,value,value)
-							self:DetailAddLog(comment.. " {EP}",self.tItems[ID].EP - modEP,ID)
-							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
+							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
+							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPSubtract(strName,value,nil)
-							self:DetailAddLog(comment.. " {EP}",self.tItems[ID].EP - modEP,ID)
+							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
 						end
 					else 
 						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
 							self:EPGPSubtract(strName,nil,value)
-							self:DetailAddLog(comment.. " {GP}",self.tItems[ID].GP - modGP,ID)
+							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPSubtract(strName,nil,nil)
 							Print("Nothing added , check EP or GP in the controls box")
@@ -777,7 +765,7 @@ function DKP:Add100DKP()
 					self.tItems[ID].net = self.tItems[ID].net + tonumber(self.tItems["settings"].dkp)
 					self.tItems[ID].tot = self.tItems[ID].tot + tonumber(self.tItems["settings"].dkp)
 					
-					self:DetailAddLog(comment,tostring(self.tItems["settings"].dkp),ID)
+					self:DetailAddLog(comment,"{DKP}",tostring(self.tItems["settings"].dkp),ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,self.tItems["settings"].dkp)
 				end
 			end
@@ -1389,6 +1377,11 @@ function DKP:RefreshMainItemList()
 				else
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 				end
+				
+				if self.tItems["alts"][player.strName] then
+					player.alt = self.tItems[self.tItems["alts"][player.strName]].strName
+				end
+				
 				self:UpdateItem(player)
 				if not self.MassEdit then
 					if player.strName == selectedPlayer then
@@ -1470,11 +1463,6 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
 	end
 	if playerItem.class then playerItem.wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[playerItem.class]) else playerItem.wnd:FindChild("ClassIcon"):Show(false,false) end
-	if playerItem.alt ~=nil then
-		playerItem.wnd:FindChild("AltNote"):SetTooltip("Playing as : " .. i.alt)
-	else
-		playerItem.wnd:FindChild("AltNote"):Show(false,false)
-	end
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1990,7 +1978,7 @@ function DKP:Decay( wndHandler, wndControl, eMouseButton )
 			if self.tItems[i] ~= nil and self.tItems["Standby"][string.lower(self.tItems[i].strName)] == nil  then
 				if tonumber(self.tItems[i].net) > 0 and math.abs(tonumber(self.tItems[i].net)) >= tonumber(self.tItems["settings"].DecayTreshold) then
 					local modifier = self.tItems[i].net
-					self:DetailAddLog("Decay",math.floor(self.tItems[i].net * ((100 -self.tItems["settings"].DecayVal) / 100)) - modifier ,i)
+					self:DetailAddLog("Decay","--",math.floor(self.tItems[i].net * ((100 -self.tItems["settings"].DecayVal) / 100)) - modifier ,i)
 					self.tItems[i].net = math.floor(self.tItems[i].net * ((100 -self.tItems["settings"].DecayVal) / 100))
 				elseif tonumber(self.tItems[i].net) < 0 and tonumber(self.tItems[i].net) >= tonumber(self.tItems["settings"].DecayTreshold) then
 					local val = math.abs(tonumber(self.tItems[i].net))
@@ -1998,7 +1986,7 @@ function DKP:Decay( wndHandler, wndControl, eMouseButton )
 					val = math.floor(val * ((100  + self.tItems["settings"].DecayVal) / 100))
 					modifier = val - modifier
 					self.tItems[i].net = val * -1
-					self:DetailAddLog("Decay",modifier,i)
+					self:DetailAddLog("Decay","--",modifier,i)
 				end
 			end
 		end
@@ -2166,325 +2154,8 @@ end
 -- MemberDetails Functions
 ---------------------------------------------------------------------------------------------------
 function DKP:OnDetailsClose()
-	for i=1,table.getn(self.tAlts) do
-		self.tAlts[i]:Destroy()
-	end
-		self.tAlts = nil
-		self.tAlts = {}
-	for i=1,table.getn(self.tLogs) do
-		self.tLogs[i]:Destroy()
-	end
-		self.tLogs = nil
-		self.tLogs = {}
-	self.wndDetail:Close()
+	self.wndContext:Close()
 end
-
-function DKP:DetailShow(strToFind)
-	self.wndDetail:Show(true,false)
-	self.wndDetail:ToFront()
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil then
-			if string.lower(self.tItems[i].strName) == string.lower(strToFind) then
-				detailedEntryID = i
-				break
-			end
-		end
-	end
-	if detailedEntryID == nil or detailedEntryID == 0 then
-		return
-	end
-	local wndTitle = self.wndDetail:FindChild("Title")
-	wndTitle:SetText("Detailed View : " .. self.tItems[detailedEntryID].strName)
-	self.detailItemList = self.wndDetail:FindChild("DetailsList")
-	self.wndDetail:FindChild("ButtonOfDOOM"):Show(false,false)
-	self.wndDetail:FindChild("BoxAltNameInput"):Show(false,false)
-	self.wndDetail:FindChild("ButtonAddAlt"):Show(false,false)
-	self.wndDetail:FindChild("ButtonDeleteAlt"):Show(false,false)
-	self:DetailShowLogs()
-	self.wndDetail:FindChild("ButtonShowAlts"):SetCheck(true)
-	self.wndDetail:FindChild("ButtonShowLogs"):SetCheck(false)
-	self.wndDetail:FindChild("BoxEditName"):SetText(self.tItems[detailedEntryID].strName)
-	if self.tItems["Standby"][string.lower(self.tItems[detailedEntryID].strName)] ~= nil then self.wndDetail:FindChild("Standby"):SetCheck(true) end
-end
-
-function DKP:DetailDeleteEntryStart( wndHandler, wndControl, eMouseButton )
-	local DoomButton = self.wndDetail:FindChild("ButtonOfDOOM")
-	if not DoomButton:IsShown() then 
-		DoomButton:Show(true,false)
-	else
-		DoomButton:Show(false,false)
-	end
-	
-end
-
-function DKP:DetailShowLogs( wndHandler, wndControl, eMouseButton )
-	self.wndDetail:FindChild("BoxAltNameInput"):Show(false,false)
-	self.wndDetail:FindChild("ButtonAddAlt"):Show(false,false)
-	self.wndDetail:FindChild("ButtonDeleteAlt"):Show(false,false)
-	for i=1,table.getn(self.tLogs) do
-		self.tLogs[i]:Destroy()
-	end
-		self.tLogs = nil
-		self.tLogs = {}
-	for i=1,table.getn(self.tAlts) do
-		self.tAlts[i]:Destroy()
-	end
-		self.tAlts = nil
-		self.tAlts = {}
-	if self.tItems[detailedEntryID].logs == nil then
-		local wnd = Apollo.LoadForm(self.xmlDoc, "LogItem", self.detailItemList, self)
-		wnd:SetText("NO RECORDS")
-		if self.tLogs == nil then
-			self.tLogs[1] = wnd
-		else
-			self.tLogs[table.getn(self.tLogs)+1] = wnd
-		end
-	else
-		for i=1,table.getn(self.tItems[detailedEntryID].logs) do
-			local wnd = Apollo.LoadForm(self.xmlDoc, "LogItem", self.detailItemList, self)
-			local comment = self.tItems[detailedEntryID].logs[i].comment
-			local modifier = self.tItems[detailedEntryID].logs[i].modifier
-			wnd:FindChild("Comment"):SetText(comment)
-			wnd:FindChild("Modifier"):SetText(modifier)
-			if self.tLogs == nil then
-				self.tLogs[1] = wnd
-			else
-				self.tLogs[table.getn(self.tLogs)+1] = wnd
-			end
-		end
-	end
-	self.detailItemList:ArrangeChildrenVert()
-end
-
-function DKP:DetailShowAlts( wndHandler, wndControl, eMouseButton )
-	self.wndDetail:FindChild("BoxAltNameInput"):Show(true,false)
-	self.wndDetail:FindChild("ButtonAddAlt"):Show(true,false)
-	self.wndDetail:FindChild("ButtonDeleteAlt"):Show(true,false)
-	for i=1,table.getn(self.tAlts) do
-		self.tAlts[i]:Destroy()
-	end
-		self.tAlts = nil
-		self.tAlts = {}
-	for i=1,table.getn(self.tLogs) do
-		self.tLogs[i]:Destroy()
-	end
-		self.tLogs = nil
-		self.tLogs = {}
-	if self.tItems[detailedEntryID].alts == nil then
-		local wnd = Apollo.LoadForm(self.xmlDoc, "AltItem", self.detailItemList, self)
-		wnd:SetText("NO RECORDS")
-		if self.tAlts == nil then
-			self.tAlts[1] = wnd
-		else
-			self.tAlts[table.getn(self.tAlts)+1] = wnd
-		end
-	else
-		for i=1,table.getn(self.tItems[detailedEntryID].alts) do
-			if self.tItems[detailedEntryID].alts[i].strName ~= -1 then
-				local wnd = Apollo.LoadForm(self.xmlDoc, "AltItem", self.detailItemList, self)
-				wnd:SetText(self.tItems[detailedEntryID].alts[i].strName)
-				if self.tAlts == nil then
-					self.tAlts[1] = wnd
-				else
-					self.tAlts[table.getn(self.tAlts)+1] = wnd
-				end
-			end
-		end
-	end
-	self.detailItemList:ArrangeChildrenVert()
-end
-
-function DKP:DetailConvertEntryToAlt( wndHandler, wndControl, eMouseButton )
-	local DoomButton = self.wndDetail:FindChild("ButtonConvertToAltConf")
-	if not DoomButton:IsShown() then 
-		DoomButton:Show(true,false)
-	else
-		DoomButton:Show(false,false)
-	end	
-
-end
-
-function DKP:DetailAddAltByName(wndHandler, wndControl, eMouseButton,name,holder_ID )
-	local wndNameInputBox = self.wndDetail:FindChild("BoxAltNameInput")
-	local strName = wndNameInputBox:GetText()	
-
-	if self.tItems["settings"].lowercase == 1 then strName = string.lower(strName) end
-	
-	if strName ~= "Input Name" then
-		wndNameInputBox:SetText("Input Name")
-		for i=1,table.maxn(self.tItems) do
-			if string.lower(self.tItems[i].strName) == string.lower(strName) then
-				Print("Player already exists in database, convert or delete this entry")
-				return
-			end
-		end
-		
-		if self.tItems[detailedEntryID].alts == nil then
-			self.tItems[detailedEntryID].alts = {}
-			self.tItems[detailedEntryID].alts[1] = {}
-			self.tItems[detailedEntryID].alts[1].strName = strName
-			self.tItems[detailedEntryID].alts[1].altsTablePos = table.getn(self.tItems["alts"])+1
-			self.tItems["alts"][strName] = detailedEntryID 
-		else
-			for i=1,table.getn(self.tItems[detailedEntryID].alts) do
-				if string.lower(self.tItems[detailedEntryID].alts[i].strName) == string.lower(strName) then
-					Print("Alt with the same name already exist, check your spelling")
-					return
-				end
-			end
-			self.tItems[detailedEntryID].alts[table.getn(self.tItems[detailedEntryID].alts)+1] = {}
-			self.tItems[detailedEntryID].alts[table.getn(self.tItems[detailedEntryID].alts)].strName = strName
-			self.tItems[detailedEntryID].alts[table.getn(self.tItems[detailedEntryID].alts)].altsTablePos = table.getn(self.tItems["alts"])+1
-			
-			self.tItems["alts"][strName] = detailedEntryID
-			end
-		end
-		self:DetailShowAlts()
-		
-end
-function DKP:DetailAddAltByNameA(name,holder_ID )
-	local strName = name
-	detailedEntryID = holder_ID
-
-	if strName ~= "Input Name" then
-		for i=1,table.maxn(self.tItems) do
-			if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then
-				Print("Player already exists in database, convert or delete this entry")
-				return
-			end
-		end
-		
-		if self.tItems[detailedEntryID].alts == nil then
-			self.tItems[detailedEntryID].alts = {}
-			self.tItems[detailedEntryID].alts[1] = {}
-			self.tItems[detailedEntryID].alts[1].strName = strName
-			self.tItems[detailedEntryID].alts[1].altsTablePos = table.getn(self.tItems["alts"])+1
-			self.tItems["alts"][strName] = detailedEntryID 
-		else
-			for i=1,table.getn(self.tItems[detailedEntryID].alts) do
-				if string.lower(self.tItems[detailedEntryID].alts[i].strName) == string.lower(strName) then
-					Print("Alt with the same name already exist, check your spelling")
-					return
-				end
-			end
-			self.tItems[detailedEntryID].alts[table.getn(self.tItems[detailedEntryID].alts)+1] = {}
-			self.tItems[detailedEntryID].alts[table.getn(self.tItems[detailedEntryID].alts)].strName = strName
-			self.tItems[detailedEntryID].alts[table.getn(self.tItems[detailedEntryID].alts)].altsTablePos = table.getn(self.tItems["alts"])+1
-			
-			self.tItems["alts"][strName] = detailedEntryID
-			end
-		end
-		if name == nil then
-			self:DetailShowAlts()
-		end
-		
-end
-
-function DKP:DetailDeleteAltByName( wndHandler, wndControl, eMouseButton )
-	local wndNameInputBox = self.wndDetail:FindChild("BoxAltNameInput")
-	local strName = wndNameInputBox:GetText()
-	if strName ~= "Input Name" then
-			wndNameInputBox:SetText("Input Name")
-		if self.tItems["alts"][strName] ~= nil and self.tItems["alts"][strName] ~= -1 then
-			local ID = self.tItems["alts"][strName]
-			local alts_ID = nil
-			for i=1,table.getn(self.tItems[ID].alts) do
-				if string.lower(self.tItems[ID].alts[i].strName) == string.lower(strName) then
-					alts_ID = i
-					break
-				end
-			end
-			if alts_ID ~= nil then
-				self.tItems[ID].alts[alts_ID].strName = -1
-				self.tItems["alts"][strName] = nil
-			else
-				Print("No such an entry , check your spelling")
-			end
-		end
-		self:DetailShowAlts()
-	end
-end
-	
-function DKP:DetailDeleteEntryFinish( wndHandler, wndControl, eMouseButton )
-	table.remove(self.tItems,detailedEntryID)
-	self:OnDetailsClose()
-	self:RefreshMainItemList()
-	self.wndSelectedListItem = nil
-end
-
-function DKP:DetailConvertToAltConfirmed( wndHandler, wndControl, eMouseButton )
-	local holderName = self.wndDetail:FindChild("BoxAltOwnerNameInput"):GetText()
-	local playerExists = 0
-	local holderID
-	if holderName ~= nil then
-		for i=1,table.maxn(self.tItems) do
-			if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(holderName) then
-				playerExists = 1
-				holderID = i
-				break
-			end
-		end
-	end
-	
-	if playerExists == 1 then
-		local saveID = detailedEntryID
-		local name = self.tItems[detailedEntryID].strName
-		self:DetailDeleteEntryFinish()
-		self:DetailAddAltByNameA(name,holderID)
-		detailedEntryID = saveID
-	else
-		Print("No specified player in database")
-	end
-end
-
-function DKP:DetailAddLog(comment,modifier,ID)
-	if self.tItems["settings"].logs == 1 then
-		if self.tItems[ID].logs == nil then
-			self.tItems[ID].logs = {}
-			local i = {}
-			if self.tItems["settings"].forceCheck == 1 and self.ItemDatabase ~= nil and self.ItemDatabase[comment] ~= nil and self.ItemDatabase[comment].ID ~= nil then comment = comment .. "  {" ..self.ItemDatabase[comment].ID .. "}" end
-			i.comment = comment
-			if tonumber(modifier) < 0 then
-				i.modifier = tostring(modifier)
-			elseif tonumber(modifier) > 0 then
-				i.modifier = "+" .. tostring(modifier)
-			end
-			table.insert(self.tItems[ID].logs,1,i)
-		else
-			local i = {}
-			i.comment = comment
-			if tonumber(modifier) < 0 then
-				i.modifier = tostring(modifier)
-			elseif tonumber(modifier) > 0 then
-				i.modifier = "+" .. tostring(modifier)
-			end
-			table.insert(self.tItems[ID].logs,1,i)
-			if table.getn(self.tItems[ID].logs) > 10 then 
-				table.remove(self.tItems[ID].logs)
-			end
-		end
-	end
-end
-
-function DKP:DetailChangeName( wndHandler, wndControl, strText )
-	local found = false
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil and self.tItems[i].strName == strText then 
-			found = true 
-			break
-		end
-	end
-
-	if found == false then
-		self.tItems[detailedEntryID].strName = strText
-		self.tItems[detailedEntryID].wnd:FindChild("PlayerName"):SetText(strText)
-		self.wndDetail:FindChild("Title"):SetText("Detailed View : " .. self.tItems[detailedEntryID].strName)
-	else
-		wndControl:SetText(self.tItems[detailedEntryID].strName)
-	end
-end
-
-
 
 ---------------------------------------------------------------------------------------------------
 -- Settings Functions
@@ -3026,7 +2697,7 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 		end
 		modifier = tostring(tonumber(newDKP) - modifier)
 		self.tItems[CurrentPopUpID].net = newDKP
-		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),modifier,CurrentPopUpID)
+		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),"{DKP}",modifier,CurrentPopUpID)
 	else
 		self:EPGPAdd(self.tItems[CurrentPopUpID].strName,nil,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()))
 		if self:LabelGetColumnNumberForValue("GP") ~= -1 and self.tItems[CurrentPopUpID].wnd ~= nil then
@@ -3039,7 +2710,7 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 				self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText("0")
 			end
 		end	
-		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText() .. "{GP}",tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()),CurrentPopUpID)
+		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),"{GP}",tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()),CurrentPopUpID)
 	end
 	if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false and self.tItems["EPGP"].Enable == 0 then
 		self:RaidAddCostInfo(PopUpItemQueue[1].strItem,PopUpItemQueue[1].strName,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())*-1)
@@ -3179,23 +2850,22 @@ function DKP:StandbyListAdd( wndHandler, wndControl, strText )
 		self.tItems["Standby"][string.lower(strText)].strName = strText
 		local currDate = os.date("*t",os.time())
 		self.tItems["Standby"][string.lower(strText)].strDate = tostring(currDate.day .. "/" .. currDate.month .. "/" .. currDate.year)
-
 	end
 	if self.wndStandby:IsShown() then self:StandbyListPopulate() end
 	if wndControl ~= nil then wndControl:SetText("") end
-	if detailedEntryID ~= 0 and detailedEntryID ~= nil  then
-		if detailedEntryID == self:GetPlayerByIDByName(strText) then self.wndDetail:FindChild("Standby"):SetCheck(true) end
-	end
 end
 
-function DKP:StandbyListRemove( wndHandler, wndControl, eMouseButton )
-	for k,item in ipairs(selectedStandby) do
-		self.tItems["Standby"][string.lower(item)] = nil
+function DKP:StandbyListRemove( wndHandler, wndControl, eMouseButton,strText )
+	if strText == nil then 
+		for k,item in ipairs(selectedStandby) do
+			self.tItems["Standby"][string.lower(item)] = nil
+		end
+	else
+		for k,item in ipairs(selectedStandby) do
+			self.tItems["Standby"][string.lower(strText)] = nil
+		end
 	end
-	self:StandbyListPopulate()
-	if detailedEntryID ~= 0 and detailedEntryID ~= nil then
-		if self.tItems["Standby"][string.lower(self.tItems[detailedEntryID].strName)] == nil then self.wndDetail:FindChild("Standby"):SetCheck(false) end
-	end
+	if self.wndStandby:IsShown() then self:StandbyListPopulate() end
 end
 
 function DKP:StandbyListClose( wndHandler, wndControl, eMouseButton )
@@ -3348,6 +3018,208 @@ function DKP:DSPopulateLogs()
 	end
 	self.wndDS:FindChild("LogsBox"):SetText(strLogs)
 end
+-----------------------------------------------------------------------------------------------
+-- Context Menu
+-----------------------------------------------------------------------------------------------
+
+function DKP:ConInit()
+	self.wndContext = Apollo.LoadForm(self.xmlDoc,"PlayerContext",nil,self)
+	self.wndContext:Show(false,true)
+end
+
+
+function DKP:ConShow(wndHandler,wndControl,eMouseButton)
+	if wndControl ~= wndHandler then return end
+	if eMouseButton == GameLib.CodeEnumInputMouse.Right and self:LabelGetColumnNumberForValue("Name") > 0 then 
+		local tCursor = Apollo.GetMouse()
+		self.wndContext:Move(tCursor.x, tCursor.y, self.wndContext:GetWidth(), self.wndContext:GetHeight())
+		self.wndContext:Show(true,false)
+		local ID = self:GetPlayerByIDByName(wndControl:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+		self.wndContext:SetData(ID) -- PlayerID
+		if self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
+		wndControl:FindChild("OnContext"):Show(true,false)
+	end
+end
+
+function DKP:ConAlts()
+	self:AltsShow()
+end
+
+function DKP:ConLogs()
+	self:LogsShow()
+end
+
+function DKP:ConStandbyEnable()
+	self:StandbyListAdd(nil,nil,self.tItems[self.wndContext:GetData()].strName)
+end
+
+function DKP:ConStandbyDisable()
+	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
+end
+
+function DKP:ConRemove(wndHandler,wndControl)
+	if not wndControl:FindChild("Confirm"):IsShown() then wndControl:FindChild("Confirm"):Show(true,false) else wndControl:FindChild("Confirm"):Show(false,false) end
+end
+
+function DKP:ConRemoveFinal(wndHandler,wndControl)
+	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
+	table.remove(self.tItems,self.wndContext:GetData())
+	self.wndContext:Close()
+	wndControl:Show(false,false)
+	self:RefreshMainItemList()
+end
+
+function DKP:ConRemoveContextIndicator()
+	if self:LabelGetColumnNumberForValue("Name")  > 0 and self.tItems[self.wndContext:GetData()] then
+		local name = self.tItems[self.wndContext:GetData()].strName
+		local label = "Stat"..self:LabelGetColumnNumberForValue("Name")
+		for k,child in ipairs(self.wndItemList:GetChildren()) do
+			if child:FindChild(label):GetText() == name then
+				child:FindChild("OnContext"):Show(false,false)
+				break
+			end
+		end
+	end
+end
+
+-----------------------------------------------------------------------------------------------
+-- Alts
+-----------------------------------------------------------------------------------------------
+
+function DKP:AltsShow()
+	if not self.wndAlts:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndAlts:Move(tCursor.x, tCursor.y, self.wndAlts:GetWidth(), self.wndAlts:GetHeight())
+	end
+	self.wndContext:Close()
+	self.wndAlts:ToFront()
+	
+	self.wndAlts:Show(true,false)
+	self.wndAlts:SetData(self.wndContext:GetData())
+	self.wndAlts:FindChild("Player"):SetText(self.tItems[self.wndAlts:GetData()].strName)
+	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self:AltsPopulate()
+end
+
+function DKP:AltsPopulate()
+	self.wndAlts:FindChild("List"):DestroyChildren()
+	for k,alt in ipairs(self.tItems[self.wndAlts:GetData()].alts) do
+		local wnd = Apollo.LoadForm(self.xmlDoc,"AltBar",self.wndAlts:FindChild("List"),self)
+		wnd:FindChild("AltName"):SetText(alt)
+		wnd:SetData(k)
+	end
+	self.wndAlts:FindChild("List"):ArrangeChildrenVert()
+end
+
+function DKP:AltsRemove(wndHandler,wndControl)
+	table.remove(self.tItems[self.wndAlts:GetData()].alts,wndControl:GetParent():GetData())
+	self:AltsPopulate()
+end
+
+function DKP:AltsAdd()
+	local strAlt = self.wndAlts:FindChild("NewAltBox"):GetText()
+	if string.lower(strAlt) == string.lower(self.tItems[self.wndAlts:GetData()].strName) then return end
+	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	if self:GetPlayerByIDByName(strAlt) == -1 then -- just add
+		table.insert(self.tItems[self.wndAlts:GetData()].alts,strAlt)
+		self.wndAlts:FindChild("NewAltBox"):SetText("")
+		self.wndAlts:FindChild("FoundBox"):Show(false,false)
+		self:AltsPopulate()
+	else -- further input required
+		self.wndAlts:FindChild("FoundBox"):Show(true,false)
+	end
+end
+
+function DKP:AltsAddMerge()
+	local mergedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
+	
+	self.tItems[self.wndAlts:GetData()].net =  self.tItems[self.wndAlts:GetData()].net + mergedPlayer.net
+	self.tItems[self.wndAlts:GetData()].tot =  self.tItems[self.wndAlts:GetData()].tot + mergedPlayer.tot
+	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
+	self.tItems[self.wndAlts:GetData()].GP =  self.tItems[self.wndAlts:GetData()].GP + mergedPlayer.GP
+	self.tItems[self.wndAlts:GetData()].Hrs =  self.tItems[self.wndAlts:GetData()].Hrs + mergedPlayer.Hrs
+	
+	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
+	table.insert(self.tItems[self.wndAlts:GetData()].alts,self.wndAlts:FindChild("NewAltBox"):GetText())
+	
+	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
+	self.wndAlts:FindChild("NewAltBox"):SetText("")
+	
+	self:RefreshMainItemList()
+	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+end
+
+function DKP:AltsAddConvert()
+	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
+	table.insert(self.tItems[self.wndAlts:GetData()].alts,self.wndAlts:FindChild("NewAltBox"):GetText())
+	
+	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
+	self.wndAlts:FindChild("NewAltBox"):SetText("")
+	
+	self:RefreshMainItemList()
+	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+end
+
+function DKP:AltsInit()
+	self.wndAlts = Apollo.LoadForm(self.xmlDoc,"Alts",nil,self)
+	self.wndAlts:Show(false,true)
+	self.wndAlts:FindChild("Art"):SetOpacity(.5)
+end
+
+function DKP:AltsClose()
+	self.wndAlts:Show(false,false)
+end
+
+-----------------------------------------------------------------------------------------------
+-- Logs
+-----------------------------------------------------------------------------------------------
+
+function DKP:LogsInit()
+	self.wndLogs = Apollo.LoadForm(self.xmlDoc,"Logs",nil,self)
+	self.wndLogs:Show(false,true)
+end
+
+function DKP:LogsShow()
+	if not self.wndLogs:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndLogs:Move(tCursor.x - 100, tCursor.y - 100, self.wndLogs:GetWidth(), self.wndLogs:GetHeight())
+	end
+	
+	self.wndContext:Close()
+	self.wndLogs:Show(true,false)
+	self.wndLogs:ToFront()
+	
+	self.wndLogs:SetData(self.wndContext:GetData())
+	
+	self.wndLogs:FindChild("Player"):SetText(self.tItems[self.wndLogs:GetData()].strName)
+	self:LogsPopulate()
+	
+	
+end
+
+function DKP:LogsPopulate()
+	local grid = self.wndLogs:FindChild("Grid")
+	grid:DeleteAll()
+	for k,entry in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
+		grid:AddRow(k..".")
+		grid:SetCellData(k,1,entry.strComment)
+		grid:SetCellData(k,3,entry.strType)
+		grid:SetCellData(k,2,entry.strModifier)
+		grid:SetCellData(k,4,entry.strTimestamp)
+	end
+end
+
+function DKP:DetailAddLog(strComment,strType,strModifier,ID)
+	table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = os.date("%x",os.time()) .. "  " .. os.date("%X",os.time())})
+	if self.wndLogs:GetData() == ID then self:LogsPopulate() end
+	if #self.tItems[ID].logs > 20 then table.remove(self.tItems[ID].logs,20) end
+end
+
+function DKP:LogsClose()
+	self.wndLogs:Show(false,false)
+end
+
+
 
 
 -----------------------------------------------------------------------------------------------
