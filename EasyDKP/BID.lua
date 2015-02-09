@@ -1869,6 +1869,8 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self:UpdatePlayerTileBar(strSender,item)
 		elseif tMsg.type =="SendMeThemStandings" then
 			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedStandings" , strData = self:DSGetEncodedStandings(strSender)})
+		elseif tMsg.type =="SendMeThemStandings" then
+			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedLogs" , strData = self:DSGetEncodedLogs(strSender)})
 		end
 	end
 end

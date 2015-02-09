@@ -90,6 +90,7 @@ function RaidOpsMM:OnDocLoaded()
 		self.wndLootList = Apollo.LoadForm(self.xmlDoc,"LootList",nil,self)
 		self.wndCost = Apollo.LoadForm(self.xmlDoc,"ItemCostFormula",nil,self)
 		self.wndStandings = Apollo.LoadForm(self.xmlDoc,"StandingsMain",nil,self)
+		self.wndLogs = Apollo.LoadForm(self.xmlDoc,"Logs",nil,self)
 
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)	
 		self.wndSettings:Show(false, true)
@@ -97,6 +98,7 @@ function RaidOpsMM:OnDocLoaded()
 		self.wndLootList:Show(false, true)
 		self.wndCost:Show(false, true)
 		self.wndStandings:Show(false, true)
+		self.wndLogs:Show(false,true)
 		
 		self.wndLootList:MoveToLocation(self.wndAnchorloc)
 		self.wndAnchor:MoveToLocation(self.wndAnchorloc)
@@ -146,36 +148,16 @@ function RaidOpsMM:OnDocLoaded()
 		self.wndStandings:FindChild("Standings"):FindChild("Label3"):FindChild("SortIndicator"):Show(false)
 		self.wndStandings:FindChild("Standings"):FindChild("Label4"):FindChild("SortIndicator"):Show(false)
 
-		--[[self.tItems["EPGP"] = 1
-		self.tItems["Lol1"] = {}
-		self.tItems["Lol1"].net = 500
-		self.tItems["Lol1"].EP = 70
-		self.tItems["Lol1"].GP = 67		
-		self.tItems["Lol1"].PR = 200		
-		self.tItems["Lol1"].tot = 1000		
-		self.tItems["Lol1"].class = "Medic"		
-		
-		self.tItems["Lol2"] = {}
-		self.tItems["Lol2"].EP = 159
-		self.tItems["Lol2"].GP = 47
-		self.tItems["Lol2"].PR = 20
-		self.tItems["Lol2"].net = 300
-		self.tItems["Lol2"].tot = 1200
-		self.tItems["Lol2"].class = "Esper"		
-		
-		self.tItems["Lol3"] = {}
-		self.tItems["Lol3"].EP = 578
-		self.tItems["Lol3"].GP = 35
-		self.tItems["Lol3"].PR = 123
-		self.tItems["Lol3"].net = 456
-		self.tItems["Lol3"].tot = 2000
-		self.tItems["Lol3"].class = "Esper"]]
 		
 		if self.settings.lastFetch == nil then self.settings.lastFetch = 0 end
 		if self.settings.strSource == nil then self.settings.strSource = "Type something here!" end
 		self.wndStandings:FindChild("Source"):SetText(self.settings.strSource)
 		if self.group then self.wndStandings:FindChild("Controls"):FindChild("Group"):SetCheck(self.group) end
+		
+		--self:LogsFetched("ZG8gbG9jYWwgXz17e3N0ck1vZGlmaWVyPS0xMjAsc3RyQ29tbWVudD0idGVzdDYiLHN0clR5cGU9IntFUH0iLHN0clRpbWVzdGFtcD0iMi85LzIwMTUgIDEwOjA3OjE4IEFNIn0se3N0ck1vZGlmaWVyPS0xMDAsc3RyQ29tbWVudD0idGVzdDYiLHN0clR5cGU9IntHUH0iLHN0clRpbWVzdGFtcD0iMi85LzIwMTUgIDEwOjA3OjA4IEFNIn0se3N0ck1vZGlmaWVyPTEwMCxzdHJDb21tZW50PSJ0ZXN0NiIsc3RyVHlwZT0ie0dQfSIsc3RyVGltZXN0YW1wPSIyLzkvMjAxNSAgMTA6MDY6NTggQU0ifSx7c3RyTW9kaWZpZXI9MTAwLHN0ckNvbW1lbnQ9InRlc3QyIixzdHJUeXBlPSJ7R1B9IixzdHJUaW1lc3RhbXA9IjIvOS8yMDE1ICAxMDowNjo1NSBBTSJ9LHtzdHJNb2RpZmllcj0xMDAsc3RyQ29tbWVudD0idGVzdDEiLHN0clR5cGU9IntFUH0iLHN0clRpbWVzdGFtcD0iMi85LzIwMTUgIDEwOjA2OjUxIEFNIn19O3JldHVybiBfO2VuZA==")
+		
 		--
+		if self.tLogs == nil then self.tLogs = {} end
 	end
 end
 local delay = 2
@@ -264,6 +246,7 @@ function RaidOpsMM:OnSave(eLevel)
 	tSave.CustomModifier = self.CustomModifier
 	tSave.MyChoices = self.MyChoices
 	tSave.Group = self.wndStandings:FindChild("Controls"):FindChild("Group"):IsChecked()
+	tSave.tLogs = self.tLogs
 	local l,t,r,b =  self.wndLootList:GetAnchorOffsets()
 	tSave.ResizedWndBottom = b
 	return tSave
@@ -280,6 +263,7 @@ function RaidOpsMM:OnRestore(eLevel, tData)
 	self.ResizedWndBottom = tData.ResizedWndBottom
 	self.MyChoices = tData.MyChoices
 	self.group = tData.Group
+	self.tLogs = tData.tLogs
 end
 
 function RaidOpsMM:GetSlotSpriteByQuality(ID)
@@ -385,7 +369,9 @@ function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 				local forItem = Item.GetDataFromId(tMsg.item)
 				if forItem and forItem:IsEquippable() then self.channel:SendPrivateMessage({[1] = strSender},{type = "MyEquippedItem",item = forItem:GetEquippedItemForItemType():GetItemId()}) end
 			elseif tMsg.type == "EncodedStandings" then
-				self:StandingsFetched(tMsg.strData)
+				self:StandingsFetched(tMsg.strData)			
+			elseif tMsg.type == "EncodedLogs" then
+				self:LogsFetched(tMsg.strData)
 			end
 		end
 	end
@@ -820,6 +806,45 @@ end
 
 function RaidOpsMM:StandingsFetch( wndHandler, wndControl, eMouseButton )
 	if self.channel then self.channel:SendPrivateMessage({[1] = self.settings.strSource},{type = "SendMeThemStandings"}) end
+end
+
+function RaidOpsMM:LogsFetch()
+	if self.channel then self.channel:SendPrivateMessage({[1] = self.settings.strSource},{type = "SendMeThemLogs"}) end
+end
+
+function RaidOpsMM:LogsShow()
+	if not self.wndLogs:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndLogs:Move(tCursor.x - 100, tCursor.y - 100, self.wndLogs:GetWidth(), self.wndLogs:GetHeight())
+	end
+	
+	self.wndLogs:Show(true,false)
+	self.wndLogs:ToFront()
+	
+	self:LogsPopulate()
+end
+
+function RaidOpsMM:LogsFetched(strData)
+	local tData = self:DecodeData(strData)
+	if tData then
+		self.tLogs = tData
+	end
+end
+
+function RaidOpsMM:LogsPopulate()
+	local grid = self.wndLogs:FindChild("Grid")
+	grid:DeleteAll()
+	for k,entry in ipairs(self.tLogs) do
+		grid:AddRow(k..".")
+		grid:SetCellData(k,1,entry.strComment)
+		grid:SetCellData(k,3,entry.strType)
+		grid:SetCellData(k,2,entry.strModifier)
+		grid:SetCellData(k,4,entry.strTimestamp)
+	end
+end
+
+function RaidOpsMM:LogsClose()
+	self.wndLogs:Show(false,false)
 end
 
 function RaidOpsMM:StandingsFetched(strData)

@@ -181,6 +181,7 @@ function DKP:OnDocLoaded()
 		self.wndLabelOptions:Show(false,true)
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
+		self:DSInit()
 		self:TimeAwardRestore()
 		self:EPGPInit()
 		self:RaidOpsInit()
@@ -1406,7 +1407,6 @@ end
 function DKP:IsPlayerInRaid(strPlayer)
 	--Print(strPlayer)
 	local raid = self:Bid2GetTargetsTable()
-	table.insert(raid,"Alt Test")
 	for k,player in ipairs(raid) do
 		for j,alt in pairs(self.tItems["alts"]) do
 			if string.lower(j) == string.lower(player) then
@@ -1428,7 +1428,6 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	playerItem.alt = nil
 	if self.wndMain:FindChild("RaidOnly"):IsChecked() then
 		local raid = self:Bid2GetTargetsTable()
-		table.insert(raid,"Alt Test")
 		for j,alt in ipairs(playerItem.alts) do
 			for i,raider in ipairs(raid) do
 				if string.lower(alt) == string.lower(raider) then 
@@ -2937,11 +2936,13 @@ function DKP:DSInit()
 	if self.tItems["settings"].DS.aboutRaidMembers == nil then self.tItems["settings"].DS.aboutRaidMembers = false end
 	if self.tItems["settings"].DS.logs == nil then self.tItems["settings"].DS.logs = true end
 	if self.tItems["settings"].DS.tLogs == nil then self.tItems["settings"].DS.tLogs = {} end
+	if self.tItems["settings"].DS.shareLogs == nil then self.tItems["settings"].DS.shareLogs = true end
 	
 	if self.tItems["settings"].DS.enable then self.wndDS:FindChild("AllowShare"):SetCheck(true) end
 	if self.tItems["settings"].DS.raidMembersOnly then self.wndDS:FindChild("ShareMembers"):SetCheck(true) end
 	if self.tItems["settings"].DS.aboutRaidMembers then self.wndDS:FindChild("ShareAboutMembers"):SetCheck(true) end
 	if self.tItems["settings"].DS.logs then self.wndDS:FindChild("Logs"):SetCheck(true) end
+	if self.tItems["settings"].DS.shareLogs then self.wndDS:FindChild("AllowLogs"):SetCheck(true) end
 	
 	self.wndDS:FindChild("Channel"):SetText(self.tItems["settings"]["Bid2"].strChannel)
 	
@@ -2992,9 +2993,17 @@ function DKP:DSLogsDisable()
 	self.tItems["settings"].DS.logs = false
 end
 
+function DKP:DSLogsShareEnable()
+	self.tItems["settings"].DS.shareLogs = true
+end
+
+function DKP:DSLogsShareDisable()
+	self.tItems["settings"].DS.shareLogs = false
+end
+
 function DKP:DSAddLog(strRequester,state)
 	table.insert(self.tItems["settings"].DS.tLogs,1,{strPlayer = strRequester,strState = state})
-	if #self.tItems["settings"].DS.tLogs > 30 then table.remove(selt.tItems["settings"].DS.tLogs,30) end
+	if #self.tItems["settings"].DS.tLogs > 30 then table.remove(self.tItems["settings"].DS.tLogs,30) end
 	self:DSPopulateLogs()
 end
 
@@ -3003,11 +3012,9 @@ end
 function DKP:DSGetEncodedStandings(strRequester)
 	
 	if self.tItems["settings"].DS.raidMembersOnly and not self:IsPlayerInRaid(strRequester) then 
-		self:DSAddLog(strRequester,"Fail")
+		if self.tItem["settings"].DS.logs then self:DSAddLog(strRequester,"Fail") end
 		return "Only Raid Members can fetch data" 
 	end
-	
-	Print(strRequester)
 	
 	local tStandings = {}
 	tStandings.EPGP = self.tItems["EPGP"].Enable
@@ -3025,10 +3032,22 @@ function DKP:DSGetEncodedStandings(strRequester)
 			end
 		end
 	end
-	
-	self:DSAddLog(strRequester,"Succes")
+	if self.tItem["settings"].DS.logs then
+		self:DSAddLog(strRequester,"Succes")
+	end
 	
 	return Base64.Encode(serpent.dump(tStandings))
+end
+
+function DKP:DSGetEncodedLogs(strRequester)
+	if self.tItems["settings"].DS.shareLogs then
+		local ID = self:GetPlayerByIDByName(strRequester)
+		
+		if ID ~= -1 then
+			if self.tItems["settings"].DS.logs then self:DSAddLog(strRequester,"Logs") end
+			return Base64.Encode(serpent.dump(self.tItems[ID].logs))
+		end
+	end
 end
 
 function DKP:DSPopulateLogs()
@@ -3244,7 +3263,6 @@ function DKP:LogsShow()
 	
 	self.wndLogs:FindChild("Player"):SetText(self.tItems[self.wndLogs:GetData()].strName)
 	self:LogsPopulate()
-	
 	
 end
 
