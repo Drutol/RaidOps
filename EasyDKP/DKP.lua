@@ -181,7 +181,6 @@ function DKP:OnDocLoaded()
 		self.wndLabelOptions:Show(false,true)
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
-		self:DSInit()
 		self:TimeAwardRestore()
 		self:EPGPInit()
 		self:RaidOpsInit()
@@ -206,8 +205,6 @@ function DKP:OnDocLoaded()
 		-- Inits
 		self.SortedLabel = nil
 		self:LabelUpdateList() --<<<< With Show ALL
-		self.wndSettings:FindChild("EditBoxFetchedName"):Enable(false)
-		self.wndSettings:FindChild("ButtonSettingsFetchData"):Enable(false)
 		self:UpdateItemCount()
 		self:RaidInit()
 		self:TradeInit()
@@ -230,7 +227,29 @@ function DKP:CloseBigPOPUP()
 	self.wndMain:FindChild("BIGPOPUP"):Show(false,true)
 end
 
-function DKP:OnUnitCreated(unit,isStr)
+function DKP:ImportFromGuild()
+	Apollo.RegisterEventHandler("GuildRoster","GotRoster", self)
+	local guilds = GuildLib.GetGuilds() or {}
+	for k,guild in ipairs(guilds) do 
+		if guild:GetType() == GuildLib.GuildType_Guild then
+			guild:RequestMembers()
+			break
+		end
+	end
+end
+
+function DKP:GotRoster(guildCurr, tRoster)
+	Apollo.RemoveEventHandler("GuildRoster",self)
+	for k,player in ipairs(tRoster) do
+		if self:GetPlayerByIDByName(player.strName) == -1 then
+			self:OnUnitCreated(player.strName,true,true)
+			self:RegisterPlayerClass(self:GetPlayerByIDByName(player.strName),player.strClass)
+		end
+	end
+	self:RefreshMainItemList()
+end
+
+function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 	local strName
 	if isStr ~=nil then
 		if isStr == false then
@@ -293,7 +312,7 @@ function DKP:OnUnitCreated(unit,isStr)
 		end
 		table.insert(self.tItems,newPlayer)
 	end
-	self:RefreshMainItemList()
+	if bForceNoRefresh == nil then self:RefreshMainItemList() end
 end
 
 
@@ -859,58 +878,6 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					ChatSystemLib.Command( strToSend )
 				else
 					local strToSend = "/w " .. senderStr .." You don't have an account yet.You will get one once you join your first raid"
-					ChatSystemLib.Command( strToSend )
-				end
-			elseif strMessage=="!dkpl1" then
-				local ID
-				for i=1,table.maxn(self.tItems) do
-					if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(senderStr) then
-						ID=i
-						break	
-					end
-				end
-				if ID == nil then 
-				   	local strToSend = "/w " .. senderStr .." You don't have an account yet.You will get one once you join your first raid"
-					ChatSystemLib.Command( strToSend )
-					return
-				end
-				if self.tItems[ID].logs == nil then
-					local strToSend = "/w " .. senderStr .. " No logs to show this time"
-					ChatSystemLib.Command( strToSend )
-				elseif table.getn(self.tItems[ID].logs) > 5 then 
-					for j=1,5 do
-						local strToSend = "/w " .. senderStr .. " Log: " .. self.tItems[ID].logs[j].comment .. " Mod: " .. self.tItems[ID].logs[j].modifier
-						ChatSystemLib.Command( strToSend )
-					end
-				elseif table.getn(self.tItems[ID].logs) < 5 then 
-					for j=1,table.getn(self.tItems[ID].logs) do
-						local strToSend = "/w " .. senderStr .. " Log: " .. self.tItems[ID].logs[j].comment .. " Mod: " .. self.tItems[ID].logs[j].modifier
-						ChatSystemLib.Command( strToSend )
-					end
-				end
-			elseif strMessage=="!dkpl2" then
-				local ID
-				for i=1,table.maxn(self.tItems) do
-					if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(senderStr) then
-						ID=i
-						break	
-					end
-				end
-				if ID == nil then 
-				   	local strToSend = "/w " .. senderStr .." You don't have an account yet.You will get one once you join your first raid"
-					ChatSystemLib.Command( strToSend )
-					return
-				end
-				if self.tItems[ID].logs == nil then
-					local strToSend = "/w " .. senderStr .." No logs to show this time"
-					ChatSystemLib.Command( strToSend )
-				elseif table.getn(self.tItems[ID].logs) > 5 then 
-					for j=6,table.getn(self.tItems[ID].logs) do
-						local strToSend = "/w " .. senderStr .. " Log: " .. self.tItems[ID].logs[j].comment .. " Mod: " .. self.tItems[ID].logs[j].modifier
-						ChatSystemLib.Command( strToSend )
-					end
-				else
-					local strToSend = "/w " .. senderStr .." There's no 2'nd page of logs , use !dkpl1 instead"
 					ChatSystemLib.Command( strToSend )
 				end
 			elseif strMessage == "!cap" then
@@ -2317,66 +2284,57 @@ function DKP:SettingsPurgeDatabaseOff()
 end
 
 function DKP:SettingsEnableSync( wndHandler, wndControl, eMouseButton )
-	self.SyncChannel = ICCommLib.JoinChannel( "EasyDKPFetchChannel","OnChannelNameFetchResponse",self)
-	self.wndSettings:FindChild("EditBoxFetchedName"):Enable(true)
-	self.wndSettings:FindChild("ButtonSettingsFetchData"):Enable(true)
+	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel","OnSyncMessage",self)
 end
 
 function DKP:SettingsDisableSync( wndHandler, wndControl, eMouseButton )
-	self.SyncChannel = nil
-	self.PrivateSyncChannel = nil
-	server = nil
-	client = nil
-	self.wndSettings:FindChild("EditBoxFetchedName"):Enable(false)
-	self.wndSettings:FindChild("ButtonSettingsFetchData"):Enable(false)
+	self.sChannel = nil
 end
-function DKP:OnChannelNameFetchResponse(channel, tMsg, strSender)
-	if tMsg.type == "FetchName" then
-		if tMsg.fetchedName == string.lower(GameLib.GetPlayerUnit():GetName()) then
-			local MSG = {}
-			MSG.type = "FetchNameResponse"
-			self.PrivateSyncChannel = ICCommLib.JoinChannel( "EasyDKPSync","OnChannelReadyToExchange"..string.lower(GameLib.GetPlayerUnit():GetName()),self)
-			self.SyncChannel:SendMessage(MSG)
-			server = true
-			client = false
+
+function DKP:OnSyncMessage(channel, tMsg, strSender)
+	if tMsg.type then
+		if tMsg.type == "SendMeData" then
+			self.sChannel:SendPrivateMessage({[1] = strSender},{type = "EncodedData",strData = self:GetEncodedData()})
+		elseif tMsg.type == "EncodedData" then
+			self:ProccesEncodedData(tMsg.strData)
 		end
-	end
-	if tMsg.type == "FetchNameResponse" then
-			self.PrivateSyncChannel = ICCommLib.JoinChannel( "EasyDKPSync","OnChannelReadyToExchange"..string.lower(self.wndSettings:FindChild("EditBoxFetchedName"):GetText()),self)
-			local MSG = {}
-			MSG.type = "ReadyToSync"
-			self.PrivateSyncChannel:SendMessage(MSG)
-			client = true
-			server = false
 	end
 end
 
-function DKP:OnChannelReadyToExchange(channel, tMsg, strSender)
-	if client == true then
-		if tMsg.type == "ReqData" then
-			newImportedDatabaseGlobal = serpent.load(Base64.Decode(tMsg.exportString))
-			self.PrivateSyncChannel = nil
-			if type(newImportedDatabaseGlobal) ~= "table" or newImportedDatabaseGlobal["settings"] == nil then newImportedDatabaseGlobal = nil
-			else ChatSystemLib.Command("/reloadui") end
+function DKP:ProccesEncodedData(strData)
+	local tData = serpent.load(Base64.Decode(strData))
+	
+	if tData then
+		for k,player in ipairs(tData) do
+			if self:GetPlayerByIDByName(player.strName) == -1 then
+				table.insert(self.tItems,player)
+			else
+				self.tItems[self:GetPlayerByIDByName(player.strName)] = player
+			end
 		end
 	end
-	if server == true then
-		if tMsg.type == "ReadyToSync" then
-			local MSG = {}
-			MSG.type = "ReqData"
-			MSG.exportString = Base64.Encode(serpent.dump(self.tItems))
-			self.PrivateSyncChannel:SendMessage(MSG)
-			self.PrivateSyncChannel = nil
-		end
+	Print("Data received and proccessed")
+	
+	self:RefreshMainItemList()
+	
+
+end
+
+function DKP:GetEncodedData()
+	local tData = {}
+	
+	for k,player in ipairs(self.tItems) do
+		table.insert(tData,player)
 	end
+	
+	return Base64.Encode(serpent.dump(tData))
 end
-function DKP:SettingsFetchData( wndHandler, wndControl, eMouseButton )
-	local fetchedNameStr = self.wndSettings:FindChild("EditBoxFetchedName"):GetText()
-	local MSG = {}
-	MSG.type = "FetchName"
-	MSG.fetchedName = string.lower(fetchedNameStr)
-	self.SyncChannel:SendMessage(MSG)
+
+function DKP:SettingsFetchData()
+	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.wndSettings:FindChild("EditBoxFetchedName"):GetText()},{type = "SendMeData"}) end
 end
+
+
 
 function DKP:SettingsCheckFetchedNameSpelling( wndHandler, wndControl, strText )
 	if strText == "" then

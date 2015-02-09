@@ -509,6 +509,7 @@ function RaidOpsMM:ItemOptionSelected( wndHandler, wndControl, eMouseButton )
 			self:RemoveAuction(wndControl:GetParent():GetData())
 			return
 		end
+		Print(tostring(bPass))
 		if not bPass and wndControl:GetName() == "pass" then 
 			wndControl:GetParent():FindChild("GlowyThingy"):Show(false,false)
 			self:ArrangeAuctions()
@@ -521,7 +522,7 @@ function RaidOpsMM:ItemOptionSelected( wndHandler, wndControl, eMouseButton )
 			msg.item = wndControl:GetParent():GetData()
 			local item =  Item.GetDataFromId(wndControl:GetParent():GetData())
 			if item:IsEquippable() then msg.itemCompare = item:GetEquippedItemForItemType():GetItemId() end
-			self.channel:SendPrivateMessage({[1] = self:GetRandomML()},msg)
+			self.channel:SendMessage(msg)
 			if msg.option == "pass" then 
 				if self.settings.bAutoClose then 
 					self:RemoveAuction(wndControl:GetParent():GetData())

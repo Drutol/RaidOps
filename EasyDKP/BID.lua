@@ -175,8 +175,6 @@ function DKP:BidCompleteInit()
 	self.wndBid = Apollo.LoadForm(self.xmlDoc2,"BiddingUI",nil,self)
 	self.wndBid:Show(false,true)
 	
-	self.wndBiddersList = self.wndBid:FindChild("MainFrame"):FindChild("BiddersList")
-	
 	
 	if self.tItems["settings"].BidMin ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):SetText(self.tItems["settings"].BidMin) end
 	if self.tItems["settings"].BidCount ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText(self.tItems["settings"].BidCount) end
@@ -194,7 +192,7 @@ function DKP:BidCompleteInit()
 	
 	
 	self:BidCheckConditions()
-
+	self:DSInit()
 	
 	self.bIsBidding = false
 
@@ -367,14 +365,6 @@ function DKP:InsertLootChildren()
 	end
 end]]
 
-function DKP:BidMasterPlayerSelected(wndHandler,wndControl)
-	self:BidMatchIndicatorsByPlayer(wndControl:FindChild("CharacterName"):GetText())
-end
-
-function DKP:BidMasterPlayerUnSelected(wndHandler,wndControl)
-	self:BidResetIndicators()
-end
-
 function DKP:BidMLSearch(wndHandler,wndControl)
 	if self.wndInsertedSearch:GetText() ~= "Search" then
 		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
@@ -449,7 +439,6 @@ function DKP:BidMasterItemSelected()
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
 		DKPInstance.wndInsertedMasterButton:Enable(true)
-		DKPInstance:BidMatchIndicatorsByItem(DKPInstance.SelectedMasterItem)
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
 	end
 end
@@ -458,7 +447,6 @@ function DKP:BidMasterItemUnSelected(wndHandler,wndControl)
 	self.SelectedMasterItem = nil
 	self.wndInsertedMasterButton:Enable(false)
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
-	self:BidResetIndicators()
 end
 
 function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
@@ -480,6 +468,7 @@ function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 					if self.ItemDatabase[self.SelectedMasterItem] ~= nil then
 						self.CurrentItemChatStr = self.ItemDatabase[self.SelectedMasterItem].strChat
 						self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("ItemIcon"):SetSprite(self.ItemDatabase[self.SelectedMasterItem].sprite)
+						self.CurrentItemID = self.ItemDatabase[self.SelectedMasterItem].ID
 					end
 				end
 			else
@@ -497,7 +486,6 @@ function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 			self:BidCheckConditions()
 		else
 			self.wndBid:Show(true,false)
-			
 		end
 	else
 		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
@@ -754,7 +742,6 @@ function DKP:BidProcessMessageRoll(tData)
 		table.insert(self.CurrentBidSession.Bidders,newBidder)
 		strReturn = "Succes"
 	self:BidUpdateBiddersList()
-	self:BidUpdateStats()
 	return strReturn
 end
 
@@ -910,17 +897,7 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 		end
 	end
 	self:BidUpdateBiddersList()
-	self:BidUpdateStats()
 	return strReturn
-end
-
-function DKP:BidUpdateStats()
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("Stats"):FindChild("Name"):SetText(self.CurrentBidSession.HighestBidEver.name)
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("Stats"):FindChild("Bid"):SetText(self.CurrentBidSession.HighestBidEver.value)
-
-	if self.CurrentBidSession.HighestOffBid.name == "" then return end
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("Stats"):FindChild("Name1"):SetText(self.CurrentBidSession.HighestOffBid.name)
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("Stats"):FindChild("Bid1"):SetText(self.CurrentBidSession.HighestOffBid.value)
 end
 
 function compare_easyDKP_bidders(a,b)
@@ -928,42 +905,21 @@ function compare_easyDKP_bidders(a,b)
 end
 
 function DKP:BidUpdateBiddersList()
-	self.wndBiddersList:DestroyChildren()
+	local grid = self.wndBid:FindChild("MainFrame"):FindChild("Grid")
+	grid:DeleteAll()
 	
-	local tIDsOrder = {}
-	for i=1,#self.CurrentBidSession.Bidders do
-		local k = {}
-		k.name = self.CurrentBidSession.Bidders[i].strName
-		k.value = self.CurrentBidSession.Bidders[i].HighestBid
-		if self.CurrentBidSession.Bidders[i].offspec == true then
-			k.value = k.value - 10000
-		end
-		table.insert(tIDsOrder,k)
-	end
-	table.sort(tIDsOrder,compare_easyDKP_bidders)
-	for i=1,#tIDsOrder do
-		for j=1,#self.CurrentBidSession.Bidders do
-			if tIDsOrder[i].name == self.CurrentBidSession.Bidders[j].strName then
-				tIDsOrder[i] = j
-				break
-			end
+	for k,bidder in ipairs(self.CurrentBidSession.Bidders) do
+		grid:AddRow(k)
+		grid:SetCellData(k,1,bidder.strName)
+		grid:SetCellData(k,2,bidder.HighestBid)
+		if self.mode ~= "modified" then
+			grid:SetCellData(k,3,bidder.offspec and "Offspec" or "")
+		else
+			grid:SetCellData(k,3,"Modifier" .. bidder.mod)
 		end
 	end
 	
-	
-	for i=1,#tIDsOrder do
-		local wnd = Apollo.LoadForm(self.xmlDoc,"BidderItem",self.wndBiddersList,self)
-		wnd:FindChild("Name"):SetText(self.CurrentBidSession.Bidders[tIDsOrder[i]].strName)
-		wnd:FindChild("Bid"):SetText(self.CurrentBidSession.Bidders[tIDsOrder[i]].HighestBid)
-		 if self.CurrentBidSession.Bidders[tIDsOrder[i]].offspec == true then
-			wnd:FindChild("Off"):SetText("Offspec")
-		 end
-		 if self.mode == "modified" then
-			wnd:FindChild("Off"):SetText("Modifier: " .. self.CurrentBidSession.Bidders[tIDsOrder[i]].mod)
-		 end
-	end
-	tIDsOrder = {}
-	self.wndBiddersList:ArrangeChildrenVert()
+	grid:SetSortColumn(2)
 end
 
 function DKP:BidInitCountdown()
@@ -1003,7 +959,6 @@ function DKP:BidPerformCountdown()
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].strName = self.CurrentBidSession.HighestBidEver.name
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].cost = self.CurrentBidSession.HighestBidEver.value
 			self.RegisteredWinnersByName[self.CurrentBidSession.HighestBidEver.name] = self.CurrentBidSession.strItem
-			if Hook.wndMasterLoot:IsShown() == true then self:BidMatchIndicatorsByItem(self.CurrentBidSession.strItem) end
 		elseif self.CurrentBidSession.HighestOffBid.name ~= "" then
 			ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Bidding has ended, and the winner is... (offspec)")
 			if self.tItems["EPGP"].Enable == 1 then
@@ -1015,7 +970,6 @@ function DKP:BidPerformCountdown()
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].strName = self.CurrentBidSession.HighestOffBid.name
 			self.RegistredBidWinners[self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()].cost = self.CurrentBidSession.HighestOffBid.value
 			self.RegisteredWinnersByName[self.CurrentBidSession.HighestBidEver.name] = self.CurrentBidSession.strItem
-			if Hook.wndMasterLoot:IsShown() == true then self:BidMatchIndicatorsByItem(self.CurrentBidSession.strItem) end
 		else
 			ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] No bids were processed")
 		end
@@ -1025,29 +979,13 @@ function DKP:BidPerformCountdown()
 			self:BidCheckConditions()
 			--self:PopUpWindowOpen(self.CurrentBidSession.HighestBidEver.name,self.CurrentBidSession.strItem)
 			self.CurrentBidSession = nil
-			self.wndBiddersList:DestroyChildren()
 	else
 		ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. tostring(self.tItems["settings"].BidCount - self.BidCounter) .. "...")
 	end
 end
 
-function DKP:BidMatchIndicatorsByPlayer(strName)
-	--if self.RegisteredWinnersByName[strName] == nil or self.InsertedIndicators[self.RegisteredWinnersByName[strName]] == nil then return end
-	--self.InsertedIndicators[self.RegisteredWinnersByName[strName]]:Show(true,false)
-	--table.insert(self.ActiveIndicators,self.InsertedIndicators[self.RegisteredWinnersByName[strName]])
-end
-
-function DKP:BidMatchIndicatorsByItem(strItem)
-	--if self.RegistredBidWinners[strItem] == nil or self.InsertedCountersList[self.RegistredBidWinners[strItem].strName] == nil then return end
-	--self.InsertedCountersList[self.RegistredBidWinners[strItem].strName]:FindChild("Indicator"):Show(true,false)
-	--table.insert(self.ActiveIndicators,self.InsertedCountersList[self.RegistredBidWinners[strItem].strName]:FindChild("Indicator"))
-end
-
-function DKP:BidResetIndicators()
-	for i=1,#self.ActiveIndicators do
-		self.ActiveIndicators[i]:Show(false,false)
-	end
-	self.ActiveIndicators = {}
+function DKP:BidUpdateLastWinner()
+	
 end
 
 function DKP:BidClose()
@@ -1803,7 +1741,7 @@ function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
 	self.wndBid2Settings:FindChild("Channel"):FindChild("Value"):SetText(strText)
 	self.wndMLSettings:FindChild("ChannelName"):SetText(strText)
 	self.wndDS:FindChild("Channel"):SetText(strText)
-	self.BidJoinChannel()
+	self:BidJoinChannel()
 end
 
 function DKP:BidJoinChannel()
@@ -1825,8 +1763,7 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 		elseif tMsg.type == "MyVote" then
 			self:Bid2RegisterVote(tMsg.who,tMsg.item,strSender)
 		elseif tMsg.type == "NewAuction" then
-			Print(tMsg.item)
-			self:BidAddNewAuction(tMsg.itemID,false)
+			self:BidAddNewAuction(tMsg.itemID,false,nil,tMsg.pass,tMsg.duration,true)
 		elseif tMsg.type == "GimmeAuctions" then
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive then self.channel:SendPrivateMessage({[1] = strSender},{type = "ActiveAuction" ,item = auction.wnd:GetData(),progress = auction.nTimeLeft,biddersCount = #auction.bidders,votersCount = #auction.votes,duration = self.tItems["settings"]["Bid2"].duration}) end
@@ -1871,6 +1808,8 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedStandings" , strData = self:DSGetEncodedStandings(strSender)})
 		elseif tMsg.type =="SendMeThemStandings" then
 			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedLogs" , strData = self:DSGetEncodedLogs(strSender)})
+		elseif tMsg.type == "WantConfirmation" then
+			self.channel:SendPrivateMessage({[1] = strSender},{type = "Confirmation"})
 		end
 	end
 end
@@ -2118,7 +2057,6 @@ function DKP:Bid2ArrangeResponses(auction)
 		table.sort(passes,easyDKpsortBid2BiddersLootCouncil)
 		table.sort(slights,easyDKpsortBid2BiddersLootCouncil)
 		table.sort(greeds,easyDKpsortBid2BiddersLootCouncil)
-	
 	end
 	
 	auction.wnd:FindChild("Responses"):DestroyChildren()
@@ -2284,7 +2222,7 @@ function DKP:Bid2UpdateProgress()
 
 			auction.nTimeLeft = auction.nTimeLeft + 1
 			auction.wnd:FindChild("TimeLeft"):SetProgress(auction.nTimeLeft,1)
-			auction.wnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - auction.nTimeLeft .. " (s) ")
+			auction.wnd:FindChild("TimeLeft"):FindChild("Time"):SetText(auction.duration - auction.nTimeLeft .. " (s) ")
 			if auction.nTimeLeft >= self.tItems["settings"]["Bid2"].duration then 
 				auction.bActive = false 
 				auction.wnd:FindChild("TimeLeft"):FindChild("Time"):SetText("Finish")
@@ -2303,16 +2241,18 @@ end
 function DKP:Bid2BroadcastMySuperiority()
 	local msg = {}
 	msg.type = "IamML"
-	self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
+	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg) end
 end
 
 
-function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
+function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass,nDuration,bReceived)
 	
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == itemID then return end
 	end
 	
+	if bReceived == nil then bReceived = false end
+	if nDuration == nil then nDuration = self.tItems["settings"]["Bid2"].duration end
 	local item = Item.GetDataFromId(itemID)
 	if item then
 		if progress == nil then progress = 0 end
@@ -2353,7 +2293,11 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		targetWnd:SetData(itemID)
 		targetWnd:SetText(item:GetName())
 		targetWnd:FindChild("TimeLeft"):SetProgress(progress,1000)
-		targetWnd:FindChild("TimeLeft"):SetMax(self.tItems["settings"]["Bid2"].duration)
+		if nDuration then
+			targetWnd:FindChild("TimeLeft"):SetMax(nDuration) 
+		else 
+			targetWnd:FindChild("TimeLeft"):SetMax(self.tItems["settings"]["Bid2"].duration)
+		end
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
 		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
 		if not bMaster then 
@@ -2363,11 +2307,12 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass)
 		end
 		if self.tItems["settings"].bLootCouncil then targetWnd:FindChild("ItemCost"):Show(false,false) end
 		Tooltip.GetItemTooltipForm(self,targetWnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
-		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = false , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {},bPass = bPass})
+		table.insert(self.ActiveAuctions,{wnd = targetWnd , bActive = bReceived , nTimeLeft = progress, bidders = {}, bMaster = bMaster, votes = {},bPass = bPass,duration = nDuration})
 		self:Bid2RestoreMyChoices(self.ActiveAuctions[#self.ActiveAuctions])
 		self:Bid2RestoreMyVotes(self.ActiveAuctions[#self.ActiveAuctions])
 		self:Bid2UpdateMLTooltip()
 		self.wndBid2:Show(true,false)
+		if bReceived and self.Bid2Timer == nil then self:Bid2AuctionTimerStart() end
 	end
 end
 
@@ -2411,7 +2356,6 @@ function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd:GetData() == item:GetItemId() then bPass = auction.bPass break end end
 	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
 	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),string.lower(wndControl:GetName()),wndControl:GetParent():GetParent():GetData(),itemComparee)
-	--if bPass then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , item = wndControl:GetParent():GetParent():GetData(), option = wndControl:GetName(), itemCompare = itemComparee}) end
 	table.insert(self.MyChoices,{item = item:GetItemId(),option = wndControl:GetName()})
 	self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , option = wndControl:GetName(), item = wndControl:GetParent():GetParent():GetData(), itemCompare = itemComparee})
 end
@@ -2585,42 +2529,42 @@ function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 		end
 	end
 	
-	
-	for k,assistant in ipairs(currAuction.votes) do
-		if vote.assistant == strAssistant then 
-			found = true 
-			ofID = k
-			previousWho = vote.who
-			break
-		end
-	end
-	
-	
-	if currAuction and not found then
-		for k,bidder in ipairs(auction.bidders) do
-			if bidder.strName == strName then 
-				bidder.votes = bidder.votes + 1 
-				table.insert(currAuction.voters,{assistant = strAssistant,who = strName})
+	if currAuction then
+		for k,vote in ipairs(currAuction.votes) do
+			if string.lower(vote.assistant) == string.lower(strAssistant) then 
+				found = true 
+				ofID = k
+				previousWho = vote.who
 				break
 			end
 		end
-	elseif currAuction and found and ofID then
-		local tasks = 2
-		for k,bidder in ipairs(auction.bidders) do
-			if bidder.strName == strName then 
-				bidder.votes = bidder.votes + 1 
-				table.insert(currAuction.votes,{assistant = strAssistant,who = strName})
-				tasks = tasks - 1
+		
+		if currAuction and not found then
+			for k,bidder in ipairs(currAuction.bidders) do
+				if bidder.strName == strName then 
+					bidder.votes = bidder.votes + 1 
+					table.insert(currAuction.votes,{assistant = strAssistant,who = strName})
+					break
+				end
 			end
-			if bidder.strName == previousWho then
-				bidder.votes = bidder.votes - 1
-				table.remove(auction.bidders,ofID)
-				tasks = tasks - 1
+		elseif currAuction and found and ofID then
+			local tasks = 2
+			for k,bidder in ipairs(currAuction.bidders) do
+				if bidder.strName == strName then 
+					bidder.votes = bidder.votes + 1 
+					table.insert(currAuction.votes,{assistant = strAssistant,who = strName})
+					tasks = tasks - 1
+				end
+				if bidder.strName == previousWho then
+					bidder.votes = bidder.votes - 1
+					table.remove(currAuction.votes,ofID)
+					tasks = tasks - 1
+				end
+				if tasks == 0 then break end
 			end
-			if tasks == 0 then break end
 		end
+		self:Bid2ArrangeResponses(currAuction)
 	end
-	self:Bid2ArrangeResponses()
 end
 
 function DKP:Bid2AssignItem(wndHandler,wndControl)
@@ -2631,6 +2575,9 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 			bMaster = auction.bMaster
 		end
 	end
+	
+
+	if wndControl:GetText() == "Vote" then bMaster = false end
 	
 	if bMaster then
 		for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
@@ -2681,10 +2628,9 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		end
 	else
 		if self.Bid2SelectedPlayerName and wndControl:GetParent():GetData() then 
-			self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(){type = "MyVote" , who = self.Bid2SelectedPlayerName, item = wndControl:GetParent():GetData()})
-			self:Bid2RegisterVote(self.Bid2SelectedPlayerName,wndHandler:GetData(),GameLib:GetPlayerUnit():GetName())
-			self.Bid2SelectedPlayerTile:FindChild("GlowingThing"):Show(true,false)
-			table.insert(self.MyVotes,{item = item:GetItemId(),who = self.Bid2SelectedPlayerName})
+			self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "MyVote" , who = self.Bid2SelectedPlayerName, item = wndControl:GetParent():GetData()})
+			self:Bid2RegisterVote(self.Bid2SelectedPlayerName,wndControl:GetParent():GetData(),GameLib:GetPlayerUnit():GetName())
+			table.insert(self.MyVotes,{item = wndControl:GetParent():GetData(),who = self.Bid2SelectedPlayerName})
 		end
 	end
 	
@@ -2962,7 +2908,6 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 								if DKPInstance.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. DKPInstance.tItems[ID].net)
 								else wndCounter:SetText("PR : ".. DKPInstance:EPGPGetPRByName(DKPInstance.tItems[ID].strName)) end
 								wndCounter:FindChild("Indicator"):Show(false,true)
-								DKPInstance.InsertedCountersList[strName] = wndCounter
 							end
 						end
 						wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())
@@ -3009,8 +2954,7 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
-	DKPInstance.InsertedIndicators ={}
-	DKPInstance.ActiveIndicators = {}
+
 	
 	for idx, tItem in ipairs (tMasterLootItemList) do
 		local wndCurrentItem
@@ -3024,11 +2968,6 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 		wndCurrentItem:FindChild("ItemIcon"):SetSprite(tItem.itemDrop:GetIcon())
 		
 		wndCurrentItem:SetData(tItem)
-		--[[wndCurrentItem:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
-		wndCurrentItem:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
-		local indi = Apollo.LoadForm(DKPInstance.xmlDoc,"InsertItemIndicator",wndCurrentItem,DKPInstance)
-		indi:Show(false,true)
-		DKPInstance.InsertedIndicators[wndCurrentItem:FindChild("ItemName"):GetText()] = indi]]
 		if luaCaller.tMasterLootSelectedItem ~= nil and (luaCaller.tMasterLootSelectedItem.nLootId == tItem.nLootId) then
 			wndCurrentItem:SetCheck(true)
 			luaCaller:RefreshMasterLootLooterList(tMasterLootItemList)

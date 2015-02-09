@@ -264,9 +264,6 @@ function DKP:EPGPSubtract(strName,EP,GP)
 		end
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP - GP
-			if self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then
-				self.tItems[ID].GP = self.tItems["EPGP"].BaseGP
-			end
 		end
 	end
 
@@ -283,9 +280,6 @@ function DKP:EPGPSet(strName,EP,GP)
 		end
 		if GP ~= nil then
 			self.tItems[ID].GP = GP
-			if self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then
-				self.tItems[ID].GP = self.tItems["EPGP"].BaseGP
-			end
 		end
 	end
 end
@@ -305,9 +299,6 @@ function DKP:EPGPAwardRaid(EP,GP)
 				end
 				if GP ~= nil then
 					self.tItems[ID].GP = self.tItems[ID].GP + GP
-					if self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then
-						self.tItems[ID].GP = self.tItems["EPGP"].BaseGP
-					end
 				end
 			end
 		end
@@ -320,9 +311,6 @@ function DKP:EPGPCheckTresholds()
 		if self.tItems[i] ~= nil then
 			if self.tItems[i].EP < self.tItems["EPGP"].MinEP then
 				 self.tItems[i].EP = self.tItems["EPGP"].MinEP
-			end
-			if self.tItems[i].GP < self.tItems["EPGP"].BaseGP then
-				 self.tItems[i].GP = self.tItems["EPGP"].BaseGP
 			end
 		end
 	end
