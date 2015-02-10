@@ -9,6 +9,8 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
+local knMemberModuleVersion = 1.5
+
 local ktClassToIcon =
 {
 	[GameLib.CodeEnumClass.Medic]       	= "Icon_Windows_UI_CRB_Medic",
@@ -81,13 +83,25 @@ function DKP:OnWait()
 end
 
 function DKP:BidCompleteInit()
+	Apollo.RegisterEventHandler("MasterLootUpdate","BidUpdateItemDatabase", self)
+	if Hook == nil then 
+		self.wndMain:FindChild("CustomAuction"):Show(false)
+		self.wndMain:FindChild("BidCustomStart"):Show(false)
+		self.wndMain:FindChild("LabelAuction"):Show(false)
+		self.wndHub:FindChild("NetworkBidding"):Enable(false)
+		self.wndHub:FindChild("NetworkBidding"):SetTextColor("vdarkgray")
+		Print("RaidOps - Could not find default Master Loot Addon - All Bidding Functionalities are now suspended")
+		self:DSInit()
+		return
+	end
 	bInitialized = true
 	self.wait_timer:Stop()
 	self:InitBid2()
+
 	--Hook.wndLooter:Show(true,false)
 	--Hook.wndMasterLoot:Show(true,false)
 
-	Apollo.RegisterEventHandler("MasterLootUpdate","BidUpdateItemDatabase", self)
+	
 	if self.ItemDatabase == nil then
 		self.ItemDatabase = {}
 	end
@@ -2124,6 +2138,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		msg.cost = self.tItems["settings"].bLootCouncil and nil or string.sub(self:EPGPGetItemCostByID(itemID),36)
 		msg.duration = self.tItems["settings"]["Bid2"].duration
 		msg.pass = self.tItems["settings"]["Bid2"].bRegisterPass
+		msg.ver = knMemberModuleVersion
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
 	end
 end
@@ -2484,7 +2499,6 @@ function DKP:Bid2PopulatePlayerInfo(bidder,container)
 		Tooltip.GetItemTooltipForm(self, container:FindChild("ItemFrameLast"):FindChild("ItemIcon") ,item , {bPrimary = true, bSelling = false})
 	else
 		for k,child in ipairs(container:FindChild("ItemFrameLast"):FindChild("ItemIcon"):GetChildren()) do
-			Print(child:GetName())
 		end
 		container:FindChild("ItemFrameLast"):SetSprite("CRB_Tooltips:sprTooltip_SquareFrame_Orange")
 		container:FindChild("ItemFrameLast"):FindChild("ItemIcon"):SetSprite("IconSprites:Icon_ItemArmorTrinket_Unidentified_Trinket_0009")
@@ -2504,13 +2518,15 @@ function DKP:Bid2HideAuctionVotes(wndHandler,wndControl)
 end
 
 function DKP:Bid2PopulateAuctionVotes(auction)
-	local box = auction.wnd:FindChild("Votes1"):FindChild("votes")
-	local strVoters = ""
+	local grid = auction.wnd:FindChild("Votes1"):FindChild("Grid")
+	
+	grid:DeleteAll()
+	
 	for k,vote in ipairs(auction.votes) do
-		strVoters = strVoters .. vote.assistant .. "    " .. vote.who .. "\n"
+		grid:AddRow(k)
+		grid:SetCellData(k,1,vote.assistant)
+		grid:SetCellData(k,2,vote.who)
 	end
-	if strVoters == "" then strVoters = "No registered votes" end
-	box:SetText(strVoters)
 end
 
 function DKP:Bid2AddTestAuction()
@@ -3120,7 +3136,7 @@ function DKP:SendRequests( wndHandler, wndControl, eMouseButton )
 	self.wndMLResponses:Show(true,false)
 	self.wndMLResponses:ToFront()
 	if self.channel then
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "WantConfirmation"})
+		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "WantConfirmation",ver = knMemberModuleVersion})
 	end
 end
 

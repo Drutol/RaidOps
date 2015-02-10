@@ -10,6 +10,8 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
+local knVersion = 1.5
+ 
 local kUIBody = "ff39b5d4"
 local ktAuctionHeight = 106
 local nItemIDSpacing = 4
@@ -118,6 +120,9 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.bAutoClose == nil then self.settings.bAutoClose = false end
 		if self.settings.tooltips == true then self:EPGPHookToETooltip() end
 		if self.settings.bKeepOnTop == nil then self.settings.bKeepOnTop = true end
+		if self.settings.nReportedVersion == nil then self.settings.nReportedVersion = knVersion end
+		
+		if self.settings.nReportedVersion > knVersion then Print("Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
 		
 		if self.settings.enable then 
 			self:JoinGuildChannel()
@@ -332,6 +337,10 @@ end
 
 function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 	if tMsg then
+		if tMsg.ver then 
+			self.settings.nReportedVersion = tMsg.ver
+			if self.settings.nReportedVersion > knVersion then Print("Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
+		end
 		if tMsg.type then
 			if tMsg.type == "WantConfirmation" then
 				local msg = {}
@@ -509,7 +518,6 @@ function RaidOpsMM:ItemOptionSelected( wndHandler, wndControl, eMouseButton )
 			self:RemoveAuction(wndControl:GetParent():GetData())
 			return
 		end
-		Print(tostring(bPass))
 		if not bPass and wndControl:GetName() == "pass" then 
 			wndControl:GetParent():FindChild("GlowyThingy"):Show(false,false)
 			self:ArrangeAuctions()
@@ -862,8 +870,6 @@ end
 function RaidOpsMM:DecodeData(strData)
 	if strData ~= "Only Raid Members can fetch data" then
 		return serpent.load(Base64.Decode(strData))
-	else
-		Print(strData)
 	end
 end
 

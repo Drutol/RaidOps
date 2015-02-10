@@ -140,7 +140,7 @@ function DKP:OnDocLoaded()
 		setButton:Enable(false)
 		addButton:Enable(false)
 		subtractButton:Enable(false)
-		
+		if self.tItems["alts"] == nil then self.tItems["alts"] = {} end
 		if self.tItems["settings"] == nil then
 			self.tItems["settings"] = {}
 			self.tItems["settings"].whisp = 1
@@ -187,7 +187,7 @@ function DKP:OnDocLoaded()
 		self:ConInit()
 		self:AltsInit()
 		self:LogsInit()
-		
+		self:GIInit()
 		self:CloseBigPOPUP()
 
 		-- Alts cleanup onetime
@@ -217,14 +217,99 @@ function DKP:OnDocLoaded()
 			self.wndMain:FindChild("CustomAuction"):Show(false)
 			self.wndMain:FindChild("BidCustomStart"):Show(false)
 			self.wndMain:FindChild("LabelAuction"):Show(false)
+			self.wndHub:FindChild("NetworkBidding"):Show(false)
+			self:DSInit()
 		end
 		if self.tItems["settings"].RaidTools.show == 1 then self:RaidToolsEnable() end
 		self:SettingsRestore()
+		local lol = self:OnSave()
+	end
+end
+local tGuildRoster
+local uGuild
+local tAcceptedRanks = {}
+function DKP:CloseBigPOPUP()
+	self.wndMain:FindChild("BIGPOPUP"):Show(false,true)
+end
+
+function DKP:GIInit()
+	self.wndGuildImport = Apollo.LoadForm(self.xmlDoc,"GuildImport",nil,self)
+	self.wndGuildImport:Show(false,true)
+end
+
+function DKP:GIShow()
+	if not self.wndGuildImport:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndGuildImport:Move(tCursor.x - 100, tCursor.y - 100, self.wndGuildImport:GetWidth(), self.wndGuildImport:GetHeight())
+	end
+	
+	self.wndGuildImport:Show(true,false)
+	self.wndGuildImport:ToFront()
+	
+	self:GIPopulateRanks()
+end
+
+function DKP:GIClose()
+	self.wndGuildImport:Show(false,false)
+end
+
+function DKP:GIPopulateRanks()
+	if uGuild then
+		local tRanks = uGuild:GetRanks()
+		for k,rank in ipairs(tRanks) do
+			if k > 10 then break end
+			self.wndGuildImport:FindChild(tostring(k)):SetText(rank.strName)
+			self.wndGuildImport:FindChild(tostring(k)):SetData(rank)
+			if rank.strName == "" then self.wndGuildImport:FindChild(tostring(k)):Enable(false) end
+		end
 	end
 end
 
-function DKP:CloseBigPOPUP()
-	self.wndMain:FindChild("BIGPOPUP"):Show(false,true)
+function DKP:GIRankAdded(wndHandler,wndControl)
+	table.insert(tAcceptedRanks,tonumber(wndControl:GetName()))
+	
+	self:GIUpdateCount()
+end
+
+function DKP:GIRankRemoved(wndHandler,wndControl)
+	for k,rank in ipairs(tAcceptedRanks) do
+		if rank == tonumber(wndControl:GetName()) then table.remove(tAcceptedRanks,k) break end
+	end
+	
+	self:GIUpdateCount()
+end
+
+function DKP:GIIsGoodRank(nRank)
+	for k,rank in ipairs(tAcceptedRanks) do
+		if rank == nRank then return true end
+	end
+	
+	return false
+end
+
+function DKP:GIImport()
+	if tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) == nil then return end
+	for k,member in ipairs(tGuildRoster) do
+		if self:GIIsGoodRank(member.nRank) and member.nLevel >= tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) and self:GetPlayerByIDByName(member.strName) == -1 then 
+			self:OnUnitCreated(member.strName,true,true)
+			self:RegisterPlayerClass(self:GetPlayerByIDByName(member.strName),member.strClass)
+		end
+	end
+	self:RefreshMainItemList()
+	self:GIUpdateCount()
+	
+end
+
+function DKP:GIUpdateCount()
+	if tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) == nil then 
+		self.wndGuildImport:FindChild("Count"):SetText("0")
+		return 
+	end
+	local tMembers = {}
+	for k,member in ipairs(tGuildRoster) do
+		if self:GIIsGoodRank(member.nRank) and member.nLevel >= tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) and self:GetPlayerByIDByName(member.strName) == -1 then table.insert(tMembers,member) end
+	end
+	self.wndGuildImport:FindChild("Count"):SetText(#tMembers)
 end
 
 function DKP:ImportFromGuild()
@@ -233,6 +318,7 @@ function DKP:ImportFromGuild()
 	for k,guild in ipairs(guilds) do 
 		if guild:GetType() == GuildLib.GuildType_Guild then
 			guild:RequestMembers()
+			uGuild = guild
 			break
 		end
 	end
@@ -240,13 +326,15 @@ end
 
 function DKP:GotRoster(guildCurr, tRoster)
 	Apollo.RemoveEventHandler("GuildRoster",self)
-	for k,player in ipairs(tRoster) do
+	tGuildRoster = tRoster
+	self:GIPopulateRanks()
+	--[[for k,player in ipairs(tRoster) do
 		if self:GetPlayerByIDByName(player.strName) == -1 then
 			self:OnUnitCreated(player.strName,true,true)
 			self:RegisterPlayerClass(self:GetPlayerByIDByName(player.strName),player.strClass)
 		end
 	end
-	self:RefreshMainItemList()
+	self:RefreshMainItemList()]]
 end
 
 function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
@@ -1271,8 +1359,8 @@ end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 	for k,wnd in ipairs(selectedMembers) do 
-		if wnd:GetData() then
-			for k,alt in ipairs(self.tItems[self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())].alts) do self.tItems["alts"][string.lower(alt)] = nil end
+		if wnd:GetData() and self.tItems[wnd:GetData()] then
+			for k,alt in ipairs(self.tItems[wnd:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
 			table.remove(self.tItems,self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()))
 		end
 	end

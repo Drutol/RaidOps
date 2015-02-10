@@ -179,7 +179,6 @@ function DKP:EPGPChangeUI()
 		labelTypes:FindChild("PR"):Show(true,false)
 		self.wndLabelOptions:FindChild("LabelTypes"):ArrangeChildrenVert()
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(true)
-		self.wndMain:FindChild("Title"):SetText("EasyEPGP")
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(true)
 		if self.tItems["EPGP"].Tooltips == 1 then
 			self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
@@ -208,7 +207,6 @@ function DKP:EPGPChangeUI()
 			self.tItems["settings"].LabelOptions[self:LabelGetColumnNumberForValue("PR")] = "Nil"
 		end
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(false)
-		self.wndMain:FindChild("Title"):SetText("EasyDKP")
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(false)
 		if self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then self:UnhookAll() end
 		self:LabelUpdateList()
