@@ -284,11 +284,13 @@ end
 
 
 function DKP:EPGPAwardRaid(EP,GP)
+	local tMembers = {}
 	for i=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetGroupMember(i)
 		if member ~= nil then
 			local ID = self:GetPlayerByIDByName(member.strCharacterName)
 			if ID ~= -1 then
+				if self.tItems["settings"].bTrackUndo then table.insert(tMembers,self.tItems[ID]) end
 				if EP ~= nil then
 					self.tItems[ID].EP = self.tItems[ID].EP + EP
 					if self.tItems[ID].EP < self.tItems["EPGP"].MinEP then
@@ -301,6 +303,9 @@ function DKP:EPGPAwardRaid(EP,GP)
 			end
 		end
 	end
+	if EP == nil then EP = 0 end
+	if GP == nil then GP = 0 end
+	if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity("Added ".. EP .."/".. GP .. " EP/GP to whole raid."..#tMembers.." members affected.",tMembers) end
 	self:ShowAll()
 end
 

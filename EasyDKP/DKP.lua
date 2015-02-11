@@ -174,6 +174,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].FilterEquippable == nil then self.tItems["settings"].FilterEquippable = false end
 		if self.tItems["settings"].FilterWords == nil then self.tItems["settings"].FilterWords = false end
 		if self.tItems["settings"].networking == nil then self.tItems["settings"].networking = true end
+		if self.tItems["settings"].bTrackUndo == nil then self.tItems["settings"].bTrackUndo = false end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -211,6 +212,7 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("Decay"):Show(false)
 		self:DecayRestore()
 		self:ControlsUpdateQuickAddButtons()
+		self:UndoInit()
 		
 		if self.tItems["settings"].BidEnable == 1 then self:BidBeginInit()
 		else
@@ -225,6 +227,90 @@ function DKP:OnDocLoaded()
 		local lol = self:OnSave()
 	end
 end
+
+---------------
+--Udno
+---------------
+local tUndoActions = {}
+
+function DKP:UndoClose()
+	self.wndActivity:Show(false,false)
+end
+
+function DKP:UndoInit()
+	self.wndActivity = Apollo.LoadForm(self.xmlDoc,"UndoLogs",nil,self)
+	self.wndActivity:Show(false,true)
+end
+
+function DKP:UndoAddActivity(strActivity,tMembers,bRemoval)
+	table.insert(tUndoActions,1,{strAction = strActivity,strData = Base64.Encode(serpent.dump(tMembers)),bRemove = bRemoval})
+	if #tUndoActions > 10 then table.remove(tUndoActions,10) end
+	self:UndoPopulate()
+end
+
+function DKP:Undo()
+	if #tUndoActions > 0 then
+		local tMembersToRevert = serpent.load(Base64.Decode(tUndoActions[1].strData))
+		if tMembersToRevert then
+			for k,revertee in ipairs(tMembersToRevert) do
+				if tUndoActions[1].bRemove == nil then
+					for k,player in ipairs(self.tItems) do
+						if player.strName == revertee.strName then -- modifications 
+							self.tItems[k] = revertee
+							break
+						end
+					end
+				elseif tUndoActions[1].bRemove == true then
+					table.insert(self.tItems,revertee) -- adding player
+				elseif tUndoActions[1].bRemove == false then 
+					for k,player in ipairs(self.tItems) do
+						if player.strName == revertee.strName then table.remove(self.tItems,k) break end
+					end
+				end
+			end
+			table.remove(tUndoActions,1)
+			self:UndoPopulate()
+			self:RefreshMainItemList()
+		end	
+	end
+end
+
+function DKP:UndoPopulate()
+	local grid = self.wndActivity:FindChild("Grid")
+	
+	grid:DeleteAll()
+	
+	for k,activity in ipairs(tUndoActions) do
+		grid:AddRow(k)
+		grid:SetCellData(k,1,k)
+		grid:SetCellData(k,2,activity.strAction)
+	end
+end
+
+function DKP:UndoShowActions()
+	if not self.wndActivity:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndActivity:Move(tCursor.x - 100, tCursor.y - 100, self.wndActivity:GetWidth(), self.wndActivity:GetHeight())
+	end
+	
+	self.wndActivity:Show(true,false)
+	self.wndActivity:ToFront()
+	self:UndoPopulate()
+end
+
+function DKP:UndoTrackEnable()
+	self.tItems["settings"].bTrackUndo = true 
+end
+
+function DKP:UndoTrackDisable()
+	self.tItems["settings"].bTrackUndo = false 
+end
+
+---------------
+--Guild Import
+---------------
+
+
 local tGuildRoster
 local uGuild
 local tAcceptedRanks = {}
@@ -289,12 +375,15 @@ end
 
 function DKP:GIImport()
 	if tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) == nil then return end
+	local tMembers = {}
 	for k,member in ipairs(tGuildRoster) do
 		if self:GIIsGoodRank(member.nRank) and member.nLevel >= tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) and self:GetPlayerByIDByName(member.strName) == -1 then 
 			self:OnUnitCreated(member.strName,true,true)
 			self:RegisterPlayerClass(self:GetPlayerByIDByName(member.strName),member.strClass)
+			table.insert(tMembers,self.tItems[self:GetPlayerByIDByName(member.strName)])
 		end
 	end
+	self:UndoAddActivity("Imported " .. #tMembers .. " player from guild",tMembers,false)
 	self:RefreshMainItemList()
 	self:GIUpdateCount()
 	
@@ -470,6 +559,7 @@ function DKP:SetDKP(cycling)
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			if self.tItems["EPGP"].Enable == 0 then	
+				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity("Set DKP value of "..self.tItems[ID].strName.." to " .. value..".",{[1] = self.tItems[ID]}) end
 				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(value)
 				local ID = self:GetPlayerByIDByName(strName)
 				
@@ -485,47 +575,43 @@ function DKP:SetDKP(cycling)
 					wndTot:SetText(tostring(currentTot))
 				end
 				self:DetailAddLog(comment,"{DKP}",modifierTot,ID)
-				-- if cycling ~= true then
-					-- self:ResetCommentBoxFull()
-					-- self:ResetDKPInputBoxFull()
-					-- self:ResetInputAndComment()
-				-- end
 				self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifierTot)
 			else
-					local ID = self:GetPlayerByIDByName(strName)
-					local modEP = self.tItems[ID].EP
-					local modGP = self.tItems[ID].GP
-					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
-						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
-							self:EPGPSet(strName,value,value)
-							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
-							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
-						else
-							self:EPGPSet(strName,value,nil)
-							self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
-						end
-					else 
-						if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
-							self:EPGPSet(strName,nil,value)
-							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
-						else
-							self:EPGPSet(strName,nil,nil)
-							Print("Nothing added , check EP or GP in the controls box")
-						end
-					end					
-					if self:LabelGetColumnNumberForValue("EP") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(self.tItems[ID].EP)
+				local ID = self:GetPlayerByIDByName(strName)
+				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity("Set EP/GP values of "..self.tItems[ID].strName.." to " .. value..".",{[1] = self.tItems[ID]}) end
+				local modEP = self.tItems[ID].EP
+				local modGP = self.tItems[ID].GP
+				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
+					if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
+						self:EPGPSet(strName,value,value)
+						self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
+						self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
+					else
+						self:EPGPSet(strName,value,nil)
+						self:DetailAddLog(comment,"{EP}",self.tItems[ID].EP - modEP,ID)
 					end
-					if self:LabelGetColumnNumberForValue("GP") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[ID].GP)
+				else 
+					if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() == true then
+						self:EPGPSet(strName,nil,value)
+						self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
+					else
+						self:EPGPSet(strName,nil,nil)
+						Print("Nothing added , check EP or GP in the controls box")
 					end
-					if self:LabelGetColumnNumberForValue("PR") ~= -1 then
-						if self.tItems[ID].GP ~= 0 then 
-							self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText(string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/self.tItems[ID].GP))
-						else
-							self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText("0")
-						end
-					end	
+				end					
+				if self:LabelGetColumnNumberForValue("EP") ~= -1 then
+					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(self.tItems[ID].EP)
+				end
+				if self:LabelGetColumnNumberForValue("GP") ~= -1 then
+					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[ID].GP)
+				end
+				if self:LabelGetColumnNumberForValue("PR") ~= -1 then
+					if self.tItems[ID].GP ~= 0 then 
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText(string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/self.tItems[ID].GP))
+					else
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText("0")
+					end
+				end	
 			end
 		else
 			Print("Name Label is Required")
@@ -714,7 +800,8 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 			local ID = self:GetPlayerByIDByName(strName)
 			if ID ~= -1  then
 				if self.tItems["EPGP"].Enable == 0 then
-				          local modifier = self.tItems[ID].net
+				         	if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity("Modified(add) DKP value of "..self.tItems[ID].strName.." by " .. value..".",{[1] = self.tItems[ID]}) end
+   				          local modifier = self.tItems[ID].net
 					self.tItems[ID].net = self.tItems[ID].net + value
 					self.tItems[ID].tot = self.tItems[ID].tot + value
 					modifier = self.tItems[ID].net - modifier
@@ -728,6 +815,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity("Modified(add) EP/GP values of "..self.tItems[ID].strName.." by " .. value..".",{[1] = self.tItems[ID]}) end
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
@@ -762,7 +850,11 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 							self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText("0")
 						end
 					end	
+				
+					
 				end
+				
+				
 				
 				-- if cycling ~= true then
 					-- self:ResetCommentBoxFull()
@@ -794,6 +886,7 @@ function DKP:SubtractDKP(cycling)
 			local ID = self:GetPlayerByIDByName(strName)
 			if ID ~= -1 then
 				if self.tItems["EPGP"].Enable == 0 then
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity("Modified(subtract) DKP value of "..self.tItems[ID].strName.." by " .. value..".",{[1] = self.tItems[ID]}) end
 					local modifier = self.tItems[ID].net
 					self.tItems[ID].net = self.tItems[ID].net - value
 					modifier = self.tItems[ID].net - modifier
@@ -801,9 +894,10 @@ function DKP:SubtractDKP(cycling)
 						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(self.tItems[ID].net)
 					end
 					
-					self:DetailAddLog(comment,modifier,ID)
+					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity("Modified(subtract) EP/GP values of "..self.tItems[ID].strName.." by " .. value..".",{[1] = self.tItems[ID]}) end
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
@@ -858,11 +952,13 @@ end
 function DKP:Add100DKP()
 		if self.tItems["EPGP"].Enable == 0 then
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			local tMembers = {}
 			for i=1,GroupLib.GetMemberCount() do
 				local player = GroupLib.GetGroupMember(i)
 				local ID = self:GetPlayerByIDByName(player.strCharacterName)
 				
 				if ID ~= -1 then
+					if self.tItems["settings"].bTrackUndo then table.insert(tMembers,self.tItems[ID]) end 
 					self.tItems[ID].net = self.tItems[ID].net + tonumber(self.tItems["settings"].dkp)
 					self.tItems[ID].tot = self.tItems[ID].tot + tonumber(self.tItems["settings"].dkp)
 					
@@ -870,15 +966,11 @@ function DKP:Add100DKP()
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,self.tItems["settings"].dkp)
 				end
 			end
+			self:ShowAll()
+			if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity("Added "..self.tItems["settings"].dkp .. " DKP to whole raid."..#tMembers.." members affected.",tMembers) end
 		else
 			self:EPGPAwardRaid(self.tItems["settings"].dkp,self.tItems["settings"].dkp)
 		end
-				
-		self:ShowAll()
-		
-		-- self:ResetInputAndComment()
-		-- self:ResetCommentBoxFull()
-		-- self:ResetDKPInputBoxFull()
 		self:EnableActionButtons()
 end
 
@@ -1104,6 +1196,7 @@ function DKP:ControlsAddPlayerByName( wndHandler, wndControl, eMouseButton )
 	if strName ~= "Input New Entry Name" then
 		self:OnUnitCreated(strName,true)
 		self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):SetText("Input New Entry Name")
+		self:UndoAddActivity("Added player " .. strName,{[1] = self.tItems[self:GetPlayerByIDByName(strName)]},false)
 	end
 end
 
@@ -1358,6 +1451,14 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
+	local tMembers = {}
+	for k,wnd in ipairs(selectedMembers) do
+		if wnd:GetData() and self.tItems[wnd:GetData()] then
+			table.insert(tMembers,self.tItems[wnd:GetData()])
+		end
+	end
+	self:UndoAddActivity("Removed " .. #tMembers .. " players",tMembers,true)
+	
 	for k,wnd in ipairs(selectedMembers) do 
 		if wnd:GetData() and self.tItems[wnd:GetData()] then
 			for k,alt in ipairs(self.tItems[wnd:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
@@ -1369,19 +1470,29 @@ end
 
 function DKP:MassEditModify(what) -- "Add" "Sub" "Set" 
 	--we're gonna just change self.wndSelectedListItem and call the specific function
+	local tMembers = {}
+	local currencyType = self.tItems["EPGP"].Enable == 1 and " EP/GP" or " DKP"
+	for k,wnd in ipairs(selectedMembers) do
+		local player = self.tItems[wnd:GetData()]
+		table.insert(tMembers,player)
+	end
 	if what == "Add" then
+		if tMembers then self:UndoAddActivity("Add " .. self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText() .. currencyType .. " to " .. #tMembers .. " members.",tMembers) end 
 		for i,wnd in ipairs(selectedMembers) do
-			--Print(wnd:FindChild("Stat1"):GetText())
 			self.wndSelectedListItem = wnd
 			self:AddDKP(true) -- information to function not to cause stack overflow
-		end
+		end	
 	elseif what == "Sub" then
+		if tMembers then self:UndoAddActivity("Subtract " .. self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText() .. currencyType .. " from " .. #tMembers .. " members.",tMembers) end 
 		for i,wnd in ipairs(selectedMembers) do
+			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
 			self.wndSelectedListItem = wnd
 			self:SubtractDKP(true) 
 		end
 	elseif what == "Set" then
+		if tMembers then self:UndoAddActivity("Set values to " .. self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText() .. currencyType .. " of " .. #tMembers .. " members.",tMembers) end
 		for i,wnd in ipairs(selectedMembers) do
+			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
 			self.wndSelectedListItem = wnd
 			self:SetDKP(true) 
 		end
@@ -1724,7 +1835,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 			end
 		elseif self.wndSelectedListItem then
-			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
+			if self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")) ~= nil then
+				selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
+			end
 		end
 	end
 	
@@ -2349,6 +2462,9 @@ function DKP:SettingsRestore()
 	
 	--Affiliation
 	if self.tItems["settings"].CheckAffiliation == 1 then self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetCheck(true) end
+
+	if self.tItems["settings"].bTrackUndo then self.wndSettings:FindChild("TrackUndo"):SetCheck(true) end
+	
 end
 
 function DKP:SettingsEnablePlayerCollection( wndHandler, wndControl, eMouseButton )
@@ -3058,7 +3174,7 @@ end
 function DKP:DSGetEncodedStandings(strRequester)
 	
 	if self.tItems["settings"].DS.raidMembersOnly and not self:IsPlayerInRaid(strRequester) then 
-		if self.tItem["settings"].DS.logs then self:DSAddLog(strRequester,"Fail") end
+		if self.tItems["settings"].DS.logs then self:DSAddLog(strRequester,"Fail") end
 		return "Only Raid Members can fetch data" 
 	end
 	
@@ -3078,7 +3194,7 @@ function DKP:DSGetEncodedStandings(strRequester)
 			end
 		end
 	end
-	if self.tItem["settings"].DS.logs then
+	if self.tItems["settings"].DS.logs then
 		self:DSAddLog(strRequester,"Succes")
 	end
 	
@@ -3124,7 +3240,7 @@ function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 		local ID = self:GetPlayerByIDByName(wndControl:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 		self.wndContext:SetData(ID) -- PlayerID
 		self.wndContext:ToFront()
-		if self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
+		if self.tItems["Standby"] and self.tItems[ID] and self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
 		wndControl:FindChild("OnContext"):Show(true,false)
 	end
 end
@@ -3151,9 +3267,11 @@ end
 
 function DKP:ConRemoveFinal(wndHandler,wndControl)
 	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
+	self:UndoAddActivity("Removed player " .. self.tItems[self.wndContext:GetData()].strName,{[1] = self.tItems[self.wndContext:GetData()]},true)
 	for k,alt in ipairs(self.tItems[self.wndContext:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
 	table.remove(self.tItems,self.wndContext:GetData())
 	self.wndContext:Close()
+	self.wndSelectedListItem = nil
 	wndControl:Show(false,false)
 	self:RefreshMainItemList()
 end
@@ -3325,9 +3443,11 @@ function DKP:LogsPopulate()
 end
 
 function DKP:DetailAddLog(strComment,strType,strModifier,ID)
-	table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = os.date("%x",os.time()) .. "  " .. os.date("%X",os.time())})
-	if self.wndLogs:GetData() == ID then self:LogsPopulate() end
-	if #self.tItems[ID].logs > 20 then table.remove(self.tItems[ID].logs,20) end
+	if self.tItems["settings"].logs then
+		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = os.date("%x",os.time()) .. "  " .. os.date("%X",os.time())})
+		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
+		if #self.tItems[ID].logs > 20 then table.remove(self.tItems[ID].logs,20) end
+	end
 end
 
 function DKP:LogsClose()
