@@ -43,6 +43,18 @@ local ktStringToIcon =
 	["Engineer"]    	= "Icon_Windows_UI_CRB_Engineer",
 	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
+
+local umplauteConversions = {
+	["ä"] = "ae",
+	["ö"] = "oe",
+	["ü"] = "ue",
+	["ß"] = "ss",
+	["Ü"] = "Ue",
+	["Ö"] = "Oe",
+	["Ä"] = "Ae",
+	["Ú"] = "U",
+	["ú"] = "u",
+ }
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -110,6 +122,10 @@ function DKP:OnDocLoaded()
 				self.wndMainLoc = nil
 			end
 		end
+		if self.tItems.wndPopUpLoc ~= nil and self.tItems.wndPopUpLoc.nOffsets[1] ~= 0 then 
+			self.wndPopUp:MoveToLocation(WindowLocation.new(self.tItems.wndPopUpLoc))
+			self.tItems.wndPopUpLoc = nil
+		end
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
 		self.wndMain:Show(false, true)
@@ -169,14 +185,16 @@ function DKP:OnDocLoaded()
 		end
 		if self.tItems["settings"].LabelSortOrder == nil then self.tItems["settings"].LabelSortOrder = "asc" end
 		if self.tItems["settings"].Precision == nil then self.tItems["settings"].Precision = 1 end
+		if self.tItems["settings"].PrecisionEPGP == nil then self.tItems["settings"].PrecisionEPGP = 1 end
 		if self.tItems["settings"].CheckAffiliation == nil then self.tItems["settings"].CheckAffiliation = 0 end
 		if self.tItems["settings"].GroupByClass == nil then  self.tItems["settings"].GroupByClass = false end
 		if self.tItems["settings"].FilterEquippable == nil then self.tItems["settings"].FilterEquippable = false end
 		if self.tItems["settings"].FilterWords == nil then self.tItems["settings"].FilterWords = false end
 		if self.tItems["settings"].networking == nil then self.tItems["settings"].networking = true end
 		if self.tItems["settings"].bTrackUndo == nil then self.tItems["settings"].bTrackUndo = false end
+		if self.tItems["settings"].nPopUpGPRed == nil then self.tItems["settings"].nPopUpGPRed = 25 end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
-
+		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
 		self.wndTimeAward = self.wndMain:FindChild("TimeAward")
 		self.wndLabelOptions:Show(false,true)
@@ -191,6 +209,7 @@ function DKP:OnDocLoaded()
 		self:GIInit()
 		self:CloseBigPOPUP()
 
+		
 		-- Alts cleanup onetime
 		
 		if self.tItems.newUpdateAltCleanup == nil then
@@ -224,7 +243,13 @@ function DKP:OnDocLoaded()
 		end
 		if self.tItems["settings"].RaidTools.show == 1 then self:RaidToolsEnable() end
 		self:SettingsRestore()
-		local lol = self:OnSave()
+		
+		if self:GetPlayerByIDByName("Guild Bank") == -1 then
+			self:OnUnitCreated("Guild Bank",true)
+		end
+		
+		self.tSelectedItems = {}
+		self.bAwardingOnePlayer = false
 	end
 end
 
@@ -390,15 +415,17 @@ function DKP:GIImport()
 end
 
 function DKP:GIUpdateCount()
-	if tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) == nil then 
-		self.wndGuildImport:FindChild("Count"):SetText("0")
-		return 
+	if tGuildRoster then
+		if tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) == nil then 
+			self.wndGuildImport:FindChild("Count"):SetText("0")
+			return 
+		end
+		local tMembers = {}
+		for k,member in ipairs(tGuildRoster) do
+			if self:GIIsGoodRank(member.nRank) and member.nLevel >= tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) and self:GetPlayerByIDByName(member.strName) == -1 then table.insert(tMembers,member) end
+		end
+		self.wndGuildImport:FindChild("Count"):SetText(#tMembers)
 	end
-	local tMembers = {}
-	for k,member in ipairs(tGuildRoster) do
-		if self:GIIsGoodRank(member.nRank) and member.nLevel >= tonumber(self.wndGuildImport:FindChild("MinLevel"):GetText()) and self:GetPlayerByIDByName(member.strName) == -1 then table.insert(tMembers,member) end
-	end
-	self.wndGuildImport:FindChild("Count"):SetText(#tMembers)
 end
 
 function DKP:ImportFromGuild()
@@ -426,6 +453,19 @@ function DKP:GotRoster(guildCurr, tRoster)
 	self:RefreshMainItemList()]]
 end
 
+function DKP:FixOddCharacterInNames()
+	for k,player in ipairs(self.tItems) do
+		strNewName = ""
+		for uchar in string.gfind(player.strName, "([%z\1-\127\194-\244][\128-\191]*)") do
+			if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+			strNewName = strNewName .. uchar
+		end
+		
+		player.strName = strNewName
+	end
+	self:RefreshMainItemList()
+end
+
 function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 	local strName
 	if isStr ~=nil then
@@ -445,6 +485,15 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 	end
 	if self.tItems["settings"].lowercase == 1 then strName = string.lower(strName) end
 	local existingID
+	
+	-- we don't like umlauts so we gonna get rid of them :)
+	strNewName = ""
+	for uchar in string.gfind(strName, "([%z\1-\127\194-\244][\128-\191]*)") do
+		if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+		strNewName = strNewName .. uchar
+	end
+	
+	strName = strNewName
 	
 	local isNew=true
 	if self.tItems == nil then isNew = true end
@@ -600,10 +649,10 @@ function DKP:SetDKP(cycling)
 					end
 				end					
 				if self:LabelGetColumnNumberForValue("EP") ~= -1 then
-					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(self.tItems[ID].EP)
+					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].EP))
 				end
 				if self:LabelGetColumnNumberForValue("GP") ~= -1 then
-					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[ID].GP)
+					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP))
 				end
 				if self:LabelGetColumnNumberForValue("PR") ~= -1 then
 					if self.tItems[ID].GP ~= 0 then 
@@ -745,7 +794,9 @@ function DKP:OnSave(eLevel)
 			tSave["MyChoices"] = self.MyChoices
 			tSave["MyVotes"] = self.MyVotes
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
+			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
+			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
 			end
@@ -833,15 +884,14 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 							self:DetailAddLog(comment,"{GP}",self.tItems[ID].GP - modGP,ID)
 						else
 							self:EPGPAdd(strName,nil,nil)
-							Print(self.tItems["EPGP"].Enable)
 							Print("Nothing added , check EP or GP in the controls box")
 						end
 					end					
 					if self:LabelGetColumnNumberForValue("EP") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(self.tItems[ID].EP)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].EP))
 					end
 					if self:LabelGetColumnNumberForValue("GP") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[ID].GP)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP))
 					end
 					if self:LabelGetColumnNumberForValue("PR") ~= -1 then
 						if self.tItems[ID].GP ~= 0 then 
@@ -919,10 +969,10 @@ function DKP:SubtractDKP(cycling)
 						end
 					end
 					if self:LabelGetColumnNumberForValue("EP") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(self.tItems[ID].EP)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("EP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].EP))
 					end
 					if self:LabelGetColumnNumberForValue("GP") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[ID].GP)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP))
 					end
 					if self:LabelGetColumnNumberForValue("PR") ~= -1 then
 						if self.tItems[ID].GP ~= 0 then 
@@ -1334,7 +1384,7 @@ end
 function DKP:TimeAwardAward()
 	local raidMembers =  {}
 	for i=1,GroupLib.GetMemberCount() do
-	local unit_member = GroupLib.GetGroupMember(i)
+		local unit_member = GroupLib.GetGroupMember(i)
 		table.insert(raidMembers,unit_member.strCharacterName)
 	end
 
@@ -1465,6 +1515,7 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 			table.remove(self.tItems,self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()))
 		end
 	end
+	self:RaidQueueClear()
 	self:RefreshMainItemList()
 end
 
@@ -1531,49 +1582,59 @@ function DKP:RefreshMainItemList()
 	self.wndItemList:DestroyChildren()
 	local nameLabel = self:LabelGetColumnNumberForValue("Name")
 	for k,player in ipairs(self.tItems) do
-		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-				end
-				
-				-- Cheking for alt
-				
-				self:UpdateItem(player)
-				if not self.MassEdit then
-					if player.strName == selectedPlayer then
-						self.wndSelectedListItem = player.wnd
-						player.wnd:SetCheck(true)	
+		if player.strName ~= "Guild Bank" then
+			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
+				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 					end
-				else
-					local found = false
 					
-					for k,prevPlayer in ipairs(selectedPlayer) do
-						if prevPlayer == player.strName then
-							found = true
-							break
+					-- Cheking for alt
+					
+					self:UpdateItem(player)
+					if not self.MassEdit then
+						if player.strName == selectedPlayer then
+							self.wndSelectedListItem = player.wnd
+							player.wnd:SetCheck(true)	
 						end
+					else
+						local found = false
+						
+						for k,prevPlayer in ipairs(selectedPlayer) do
+							if prevPlayer == player.strName then
+								found = true
+								break
+							end
+						end
+						if found then
+							table.insert(selectedMembers,player.wnd)
+							player.wnd:SetCheck(true)
+						end
+						
 					end
-					if found then
-						table.insert(selectedMembers,player.wnd)
-						player.wnd:SetCheck(true)
-					end
-					
+					player.wnd:SetData(k)
 				end
-				player.wnd:SetData(k)
 			end
 		end
 	end
+	self:RaidQueueShow()
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
 	self:UpdateItemCount()
 end
 
 function DKP:IsPlayerInRaid(strPlayer)
-	--Print(strPlayer)
+
 	local raid = self:Bid2GetTargetsTable()
 	for k,player in ipairs(raid) do
+		local strNewPlayer = ""
+		for uchar in string.gfind(player, "([%z\1-\127\194-\244][\128-\191]*)") do
+			if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+			strNewPlayer = strNewPlayer .. uchar
+		end
+		player = strNewPlayer
+		
 		for j,alt in pairs(self.tItems["alts"]) do
 			if string.lower(j) == string.lower(player) then
 				raid[k] = self.tItems[alt].strName
@@ -1636,9 +1697,9 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 					playerItem.wnd:FindChild("Stat"..tostring(i)):SetText("0")
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "EP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.EP)
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.EP))
 			elseif self.tItems["settings"].LabelOptions[i] == "GP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.GP)
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP))
 			elseif self.tItems["settings"].LabelOptions[i] == "PR" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(self:EPGPGetPRByName(playerItem.strName))
 			end
@@ -1852,22 +1913,24 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	local unknown = {}
 	
 	for k,player in ipairs(self.tItems) do
-		if player.class ~= nil then
-			if player.class == "Esper" then
-				table.insert(esp,player)
-			elseif player.class == "Engineer" then
-				table.insert(eng,player)
-			elseif player.class == "Medic" then
-				table.insert(med,player)
-			elseif player.class == "Warrior" then
-				table.insert(war,player)
-			elseif player.class == "Stalker" then
-				table.insert(sta,player)
-			elseif player.class == "Spellslinger" then
-				table.insert(spe,player)
+		if player.strName ~= "Guild Bank" then
+			if player.class ~= nil then
+				if player.class == "Esper" then
+					table.insert(esp,player)
+				elseif player.class == "Engineer" then
+					table.insert(eng,player)
+				elseif player.class == "Medic" then
+					table.insert(med,player)
+				elseif player.class == "Warrior" then
+					table.insert(war,player)
+				elseif player.class == "Stalker" then
+					table.insert(sta,player)
+				elseif player.class == "Spellslinger" then
+					table.insert(spe,player)
+				end
+			else
+				table.insert(unknown,player)
 			end
-		else
-			table.insert(unknown,player)
 		end
 	end
 	table.sort(esp,easyDKPSortPlayerbyLabelNotWnd)
@@ -1888,7 +1951,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	
 	for k,player in ipairs(esp) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1902,7 +1965,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	end	
 	for k,player in ipairs(eng) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1916,7 +1979,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	end	
 	for k,player in ipairs(med) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1930,7 +1993,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	end	
 	for k,player in ipairs(war) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1944,7 +2007,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	end	
 	for k,player in ipairs(sta) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1958,7 +2021,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	end	
 	for k,player in ipairs(spe) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1972,7 +2035,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	end
 	for k,player in ipairs(unknown) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) then
+			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 				if not self.MassEdit then
 					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 				else
@@ -1987,7 +2050,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	if self:LabelGetColumnNumberForValue("Name") > 0 then
 		for k,child in ipairs(self.wndItemList:GetChildren()) do
 			if not self.MassEdit then
-				if self.tItems[child:GetData()].strName == selectedPlayer then
+				if self.tItems[child:GetData()] and self.tItems[child:GetData()].strName == selectedPlayer then
 					self.wndSelectedListItem = child
 					child:SetCheck(true)	
 				end
@@ -2007,8 +2070,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			end
 		end
 	end
-	
-	
+	self:RaidQueueShow()
 	self.wndItemList:ArrangeChildrenVert()
 	self:UpdateItemCount()
 end
@@ -2449,8 +2511,9 @@ function DKP:SettingsRestore()
 	if self.tItems["removed"] ~= nil then removed = self.tItems["removed"] end
 	
 	--GroupByClass
-	
 	self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):SetCheck(self.tItems["settings"].GroupByClass)
+	-- PopUp reduction
+	self.wndSettings:FindChild("PopUPGPRed"):FindChild("EditBox"):SetText(self.tItems["settings"].nPopUpGPRed)
 	
 	--Networking
 	self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(self.tItems["settings"].networking)
@@ -2459,6 +2522,7 @@ function DKP:SettingsRestore()
 	
 	--Slider
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
+	self.wndSettings:FindChild("PrecisionEPGP"):SetValue(self.tItems["settings"].PrecisionEPGP)
 	
 	--Affiliation
 	if self.tItems["settings"].CheckAffiliation == 1 then self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetCheck(true) end
@@ -2555,6 +2619,19 @@ function DKP:SettingsEnableForceGuildCheckDisable( wndHandler, wndControl, eMous
 	self.tItems["settings"].forceCheck = 0
 end
 
+function DKP:SettingsPopUpGPReductionValueChanged(wndHandler,wndControl,strText)
+	if tonumber(strText) then
+		local value = tonumber(strText)
+		if value >= 0 and value <= 100 then 
+			self.tItems["settings"].nPopUpGPRed = value
+		else
+			wndControl:SetText(self.tItems["settings"].nPopUpGPRed) 
+		end
+	else
+		wndControl:SetText(self.tItems["settings"].nPopUpGPRed) 
+	end
+end
+
 function DKP:SettingsEnableForceLowerCaseEnable( wndHandler, wndControl, eMouseButton )
 	for i=1 , table.maxn(self.tItems) do 
 		if self.tItems[i] ~= nil then
@@ -2646,6 +2723,12 @@ end
 function DKP:SettingsSetPrecision( wndHandler, wndControl, fNewValue, fOldValue )
 	if math.floor(fNewValue) ~= self.tItems["settings"].Precision then
 		self.tItems["settings"].Precision = math.floor(fNewValue)
+		self:ShowAll()
+	end
+end
+function DKP:SettingsSetPrecisionEPGP( wndHandler, wndControl, fNewValue, fOldValue )
+	if math.floor(fNewValue) ~= self.tItems["settings"].PrecisionEPGP then
+		self.tItems["settings"].PrecisionEPGP = math.floor(fNewValue)
 		self:ShowAll()
 	end
 end
@@ -2906,10 +2989,30 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 	self:PopUpUpdateQueueLength()
 end
 
+function DKP:PopUpAwardGuildBank()
+	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:DetailAddLog(PopUpItemQueue[1].strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) end
+	self:PopUpWindowClose()
+	self:PopUpUpdateQueueLength()
+end
+
 function DKP:PopUpCheckDKPSpelling( wndHandler, wndControl, strText )
 	if strText == "" then
 		wndControl:SetText("X")
 	end
+end
+
+function DKP:PopUpModifyGPValue(wndHandler,wndControl)
+	local value = tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())
+	if wndControl:IsChecked() then 
+		if value then
+			value = (value*self.tItems["settings"].nPopUpGPRed)/100
+		end
+	else
+		if value and self.tItems["settings"].nPopUpGPRed ~= 0 then
+			value = (100*value)/self.tItems["settings"].nPopUpGPRed
+		end
+	end
+	self.wndPopUp:FindChild("EditBoxDKP"):SetText(value)
 end
 
 function DKP:PopUpWindowClose( wndHandler, wndControl )
@@ -2930,8 +3033,10 @@ function DKP:PopUpWindowClose( wndHandler, wndControl )
 		if self.tItems["EPGP"].Enable == 1 then
 			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
 			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
+			self.wndPopUp:FindChild("GPOffspec"):Show(true)
 		else
 			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
+			self.wndPopUp:FindChild("GPOffspec"):Show(false)
 		end
 		CurrentPopUpID = PopUpItemQueue[1].ID
 		if self.RegistredBidWinners[string.sub(PopUpItemQueue[1].strItem,2)] ~= nil then
@@ -2974,8 +3079,10 @@ function DKP:PopUpWindowOpen(strName,strItem)
 			if self.tItems["EPGP"].Enable == 1 then
 				self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
 				self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
+				self.wndPopUp:FindChild("GPOffspec"):Show(true)
 			else
 				self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
+				self.wndPopUp:FindChild("GPOffspec"):Show(false)
 			end
 			CurrentPopUpID = ID_popup
 		end
@@ -3169,6 +3276,8 @@ function DKP:DSAddLog(strRequester,state)
 	self:DSPopulateLogs()
 end
 
+
+
 --- Data preparation
 
 function DKP:DSGetEncodedStandings(strRequester)
@@ -3274,6 +3383,7 @@ function DKP:ConRemoveFinal(wndHandler,wndControl)
 	self.wndSelectedListItem = nil
 	wndControl:Show(false,false)
 	self:RefreshMainItemList()
+	self:RaidQueueClear()
 end
 
 function DKP:ConRemoveContextIndicator()
@@ -3411,7 +3521,11 @@ function DKP:LogsInit()
 	self.wndLogs:Show(false,true)
 end
 
-function DKP:LogsShow()
+function DKP:LogsOpenGuildBank()
+	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:LogsShow(self:GetPlayerByIDByName("Guild Bank")) end
+end
+
+function DKP:LogsShow(nOverride)
 	if not self.wndLogs:IsShown() then 
 		local tCursor = Apollo.GetMouse()
 		self.wndLogs:Move(tCursor.x - 100, tCursor.y - 100, self.wndLogs:GetWidth(), self.wndLogs:GetHeight())
@@ -3420,6 +3534,8 @@ function DKP:LogsShow()
 	self.wndContext:Close()
 	self.wndLogs:Show(true,false)
 	self.wndLogs:ToFront()
+	
+	if nOverride then self.wndContext:SetData(nOverride) end
 	
 	self.wndLogs:SetData(self.wndContext:GetData())
 	
@@ -3454,8 +3570,63 @@ function DKP:LogsClose()
 	self.wndLogs:Show(false,false)
 end
 
+-----------------------------------------------------------------------------------------------
+-- RaidQueue
+-----------------------------------------------------------------------------------------------
 
+function DKP:RaidQueueAdd(wndHandler,wndControl)
+	table.insert(self.tItems.tQueuedPlayers,wndControl:GetParent():GetData())
+	self:RaidQueueShowClearButton()
+end
 
+function DKP:RaidQueueRemove(wndHandler,wndControl)
+	for k,player in ipairs(self.tItems.tQueuedPlayers) do
+		if player == wndControl:GetParent():GetData() then table.remove(self.tItems.tQueuedPlayers,k) break end
+	end
+	if not self.wndMain:FindChild("RaidQueue"):IsChecked() then wndControl:Show(false) end
+	if self.wndMain:FindChild("RaidOnly"):IsChecked() then self:RefreshMainItemList() end
+	self:RaidQueueShowClearButton()
+end
+
+function DKP:IsPlayerInQueue(strPlayer,ID)
+	if ID then strPlayer = self.tItems[ID].strName end
+	for k,player in ipairs(self.tItems.tQueuedPlayers) do
+		if self.tItems[player].strName == strPlayer then return true end
+	end
+	return false
+end
+
+function DKP:RaidQueueClear()
+	self.tItems.tQueuedPlayers = {}
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		child:FindChild("Standby"):SetCheck(false)
+	end
+	if self.wndMain:FindChild("RaidOnly"):IsChecked() then self:RefreshMainItemList() end
+	self:RaidQueueShow()
+end
+
+function DKP:RaidQueueShow()
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		if self.wndMain:FindChild("RaidQueue"):IsChecked() then child:FindChild("Standby"):Show(true,false) else child:FindChild("Standby"):Show(false,false) end
+		if self:IsPlayerInQueue(nil,child:GetData()) then 
+			child:FindChild("Standby"):Show(true,false)
+			child:FindChild("Standby"):SetCheck(true) 
+		end
+	end
+	self:RaidQueueShowClearButton()
+end
+
+function DKP:RaidQueueHide()
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		if not self:IsPlayerInQueue(nil,child:GetData()) then
+			child:FindChild("Standby"):Show(false,false)
+		end
+	end
+end
+
+function DKP:RaidQueueShowClearButton()
+	if #self.tItems.tQueuedPlayers > 0 then self.wndMain:FindChild("ClearQueue"):Show(true) else self.wndMain:FindChild("ClearQueue"):Show(false) end
+end
 
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

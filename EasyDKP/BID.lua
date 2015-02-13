@@ -63,6 +63,20 @@ local defaultSlotValues =
 	["Feet"] = 250,
 	["Support"] = 150
 }
+
+local umplauteConversions = {
+	["ä"] = "ae",
+	["ö"] = "oe",
+	["ü"] = "ue",
+	["ß"] = "ss",
+	["Ü"] = "Ue",
+	["Ö"] = "Oe",
+	["Ä"] = "Ae",
+	["Ú"] = "U",
+	["ú"] = "u",
+ }
+ 
+
 local bInitialized = false
 local timeout = 5
 function DKP:BidBeginInit()
@@ -209,8 +223,6 @@ function DKP:BidCompleteInit()
 	self:DSInit()
 	
 	self.bIsBidding = false
-
-
 	
 	--Tests
 	--self:InsertLootChildren()
@@ -348,6 +360,9 @@ function DKP:BidUpdateItemDatabase()
 			else
 				self.ItemDatabase[tCurNewItem.itemDrop:GetName()].slot = tCurNewItem.itemDrop:GetSlot()
 			end
+			if tCurNewItem.itemDrop:GetItemCategoryName() == "Armor Token" then
+				self.ItemDatabase[tCurNewItem.itemDrop:GetName()].slot = "Armor Token"
+			end
 		end
 	end
 end
@@ -454,17 +469,31 @@ function DKP:BidMasterItemSelected()
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
 		DKPInstance.wndInsertedMasterButton:Enable(true)
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
+		--if DKPInstance.tItems["settings"]["ML"].bAllowMulti then table.insert(DKPInstance.tSelectedItems,HookML.tMasterLootSelectedItem.nLootId) end
 	end
 end
 
-function DKP:BidMasterItemUnSelected(wndHandler,wndControl)
-	self.SelectedMasterItem = nil
-	self.wndInsertedMasterButton:Enable(false)
-	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
-end
+--[[function DKP:BidMasterItemDeselected()
+	local HookML = Apollo.GetAddon("MasterLoot")
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
+		if DKPInstance.tItems["settings"]["ML"].bAllowMulti then
+			for k,item in ipairs(DKPInstance.tSelectedItems) do
+				if item == HookML.tMasterLootSelectedItem.itemDrop:GetName() then
+					table.remove(DKPInstance.tSelectedItems,k)
+					break
+				end
+			end
+		end
+	end
+end]]
+
+
 
 function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 	if eMouseButton ~= 1 or eMouseButton == nil then
+		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
+	else		
 		if self.bIsBidding == false then
 			if tCustomData.strItem == nil then
 				if Hook.wndMasterLoot:IsShown() == false then
@@ -501,8 +530,6 @@ function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 		else
 			self.wndBid:Show(true,false)
 		end
-	else
-		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
 	end
 end
 
@@ -1030,6 +1057,14 @@ end
 
 
 function DKP:GetPlayerByIDByName(strName)
+
+	local strPlayer = ""
+	for uchar in string.gfind(strName, "([%z\1-\127\194-\244][\128-\191]*)") do
+		if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+		strPlayer = strPlayer .. uchar
+	end
+	strName = strPlayer
+	
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then return i end
 	end
@@ -2719,11 +2754,39 @@ end
 function DKP:HookToMasterLootDisp()
 	if not self:IsHooked(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList") then
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnAssignDown")
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
 		self:PostHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck","BidMasterItemSelected")
-		self:Hook(Apollo.GetAddon("MasterLoot"),"OnAssignDown","MLRegisterItemWinner")
 	end
 end
+
+function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
+
+	if luaCaller.tMasterLootSelectedItem ~= nil and luaCaller.tMasterLootSelectedLooter ~= nil then
+		local DKPInstance = Apollo.GetAddon("EasyDKP")
+		-- gotta save before it gets wiped out by event
+		local SelectedLooter = luaCaller.tMasterLootSelectedLooter
+		local SelectedItemLootId = luaCaller.tMasterLootSelectedItem.nLootId
+
+		luaCaller.tMasterLootSelectedLooter = nil
+		luaCaller.tMasterLootSelectedItem = nil
+
+		for k,item in ipairs(DKPInstance.tSelectedItems) do
+			GameLib.AssignMasterLoot(item,SelectedLooter)
+			DKPInstance:MLRegisterItemWinner()
+		end
+		DKPInstance.tSelectedItems = {}
+
+	end
+
+end
+
+function DKP:OnLootAssigned(objItem, strLooter)
+	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	if string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then strLooter = DKPInstance.tItems["settings"]["ML"].strGBManager end
+	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), objItem:GetName(), strLooter))
+end
+
 
 function DKP:MLRegisterItemWinner()
 	if Hook.tMasterLootSelectedLooter and Hook.tMasterLootSelectedItem then
@@ -2793,8 +2856,22 @@ function DKP:SendRequestsForCurrItem(itemz)
 	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "GimmeUrEquippedItem",item = itemz}) end
 end
 
-function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
+function DKP:BidAllowMultiSelection()
+	self.tItems["settings"]["ML"].bAllowMulti = true
+	for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
+		child:SetGlobalRadioSel(k)
+	end
+end
 
+function DKP:BidDisAllowMultiSelection()
+	self.tItems["settings"]["ML"].bAllowMulti = false
+	for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
+		child:SetGlobalRadioSel("MasterLootItem")
+	end
+end
+
+
+function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
 	if luaCaller ~= Apollo.GetAddon("MasterLoot") then luaCaller = Apollo.GetAddon("MasterLoot") end
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
@@ -2848,6 +2925,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					end
 				end
 				-- Finally Creating windows
+				local unitGBManager
 				for k,tab in pairs(tables) do
 					for j,unitLooter in ipairs(tab) do
 						local wndCurrentLooter
@@ -2869,8 +2947,6 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 							end
 								
 							wndCurrentLooter:FindChild("CharacterLevel"):SetText(unitLooter:GetBasicStats().nLevel)
-
-							--Print(tostring(DKPInstance.tItems["settings"]["ML"].bShowLastItemTile) .." ".. tostring(DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile)) 
 							
 							if DKPInstance.tItems["settings"]["ML"].bShowLastItemTile then
 								if self.tItems["settings"]["ML"].tWinners[unitLooter:GetName()] then
@@ -2928,6 +3004,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						end
 						wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())
 						
+						if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and string.lower(unitLooter:GetName()) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then unitGBManager = unitLooter end
 						wndCurrentLooter:SetData(unitLooter)
 						
 						
@@ -2937,7 +3014,24 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						end
 					end
 				end
-				-- For for ended
+								-- For for ended
+				-- Guild Bank
+				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and unitGBManager then
+					local wnd
+					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
+						wnd = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					else
+						wnd = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					end
+					
+					wnd:FindChild("CharacterName"):SetText("Guild Bank")
+					wnd:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
+					wnd:FindChild("CharacterLevel"):SetText("")
+					wnd:SetTooltip(unitGBManager:GetName() .. " is behind this.")
+					wnd:SetData(unitGBManager)
+				end
+				
+
 				
 				if not bStillHaveLooter then
 					luaCaller.tMasterLootSelectedLooter = nil
@@ -2953,7 +3047,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						wndCurrentLooter:Enable(false)
 					end
 				end
-				self:BidMLSearch()
+				DKPInstance:BidMLSearch()
 				if not DKPInstance.tItems["settings"]["ML"].bGroup then DKPInstance:BidMLSortPlayers() else 
 					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
 						luaCaller.wndMasterLoot_LooterList:ArrangeChildrenTiles()
@@ -2966,6 +3060,25 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 	end
 end
 
+function DKP:BidAddItem(wndHandler,wndControl)
+	table.insert(self.tSelectedItems,wndControl:GetParent():GetData().nLootId)
+end
+
+function DKP:BidRemoveItem(wndHandler,wndControl)
+	for k,item in ipairs(self.tSelectedItems) do
+		if item == wndControl:GetParent():GetData().nLootId then table.remove(self.tSelectedItems,k) end
+	end
+	
+end
+
+function DKP:OnItemCheck(wndHandler,wndControl,eMouseButton)
+	Hook:OnItemCheck(wndHandler,wndControl,eMouseButton)
+end
+
+function DKP:OnItemMouseButtonUp(wndHandler,wndControl,eMouseButton)
+	Hook:OnItemMouseButtonUp(wndHandler,wndControl,eMouseButton)
+end
+
 function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
@@ -2974,11 +3087,24 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 	
 	for idx, tItem in ipairs (tMasterLootItemList) do
 		local wndCurrentItem
+		
 		if DKPInstance.tItems["settings"]["ML"].bArrItemTiles then
-			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc2,"ItemButtonTile",luaCaller.wndMasterLoot_ItemList, luaCaller)
+			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc2,"ItemButtonTile",luaCaller.wndMasterLoot_ItemList, DKPInstance)
 		else
-			wndCurrentItem = Apollo.LoadForm(luaCaller.xmlDoc, "ItemButton", luaCaller.wndMasterLoot_ItemList, luaCaller)
+			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc2, "ItemButton", luaCaller.wndMasterLoot_ItemList, DKPInstance)
 			wndCurrentItem:FindChild("ItemName"):SetText(tItem.itemDrop:GetName())
+		end
+		wndCurrentItem:FindChild("Multi"):Show(true) 
+		if DKPInstance.tItems["settings"]["ML"].bAllowMulti and DKPInstance.tSelectedItems then
+			
+			for k,item in ipairs(DKPInstance.tSelectedItems) do
+				if tItem.nLootId == item then 
+					wndCurrentItem:FindChild("Multi"):SetCheck(true) 
+					wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonCheck","BidAddItem",DKPInstance)
+					wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonUncheck","BidRemoveItem",DKPInstance)
+					break
+				end
+			end
 		end
 		
 		wndCurrentItem:FindChild("ItemIcon"):SetSprite(tItem.itemDrop:GetIcon())
@@ -3022,11 +3148,12 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = false end	
 	if self.tItems["settings"]["ML"].bShowCurrItemBar == nil then self.tItems["settings"]["ML"].bShowCurrItemBar = true end
 	if self.tItems["settings"]["ML"].bShowCurrItemTile == nil then self.tItems["settings"]["ML"].bShowCurrItemTile = false end
+	if self.tItems["settings"]["ML"].bAllowMulti == nil then self.tItems["settings"]["ML"].bAllowMulti = false end
+	if self.tItems["settings"]["ML"].bShowGuildBank == nil then self.tItems["settings"]["ML"].bShowGuildBank = false end
+	if self.tItems["settings"]["ML"].strGBManager == nil then self.tItems["settings"]["ML"].strGBManager = "" end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
 	
 	if self.tItems["settings"]["ML"].bShowClass then self.wndMLSettings:FindChild("ShowClass"):SetCheck(true) end
-	if self.tItems["settings"]["ML"].bArrTiles then self.wndMLSettings:FindChild("Tiles"):SetCheck(true) else self.wndMLSettings:FindChild("List"):SetCheck(true) end
-	if self.tItems["settings"]["ML"].bShowValues then self.wndMLSettings:FindChild("Values"):SetCheck(true) else self.wndMLSettings:FindChild("Level"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bStandardLayout then self.wndMLSettings:FindChild("Horiz"):SetCheck(true) else self.wndMLSettings:FindChild("Vert"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bArrItemTiles then self.wndMLSettings:FindChild("TilesLoot"):SetCheck(true) else self.wndMLSettings:FindChild("TilesLoot"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bListIndicators then self.wndMLSettings:FindChild("ShowIndicators"):SetCheck(true) end
@@ -3035,7 +3162,10 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowLastItemTile then self.wndMLSettings:FindChild("ShowLastItemTile"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowCurrItemBar then self.wndMLSettings:FindChild("ShowCurrItemBar"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowCurrItemTile then self.wndMLSettings:FindChild("ShowCurrItemTile"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bAllowMulti then self.wndMLSettings:FindChild("AllowMultiItem"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
 	
+	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
 	self.wndMLSettings:FindChild("ChannelName"):SetText(self.tItems["settings"]["Bid2"].strChannel)
 end
 
@@ -3123,6 +3253,20 @@ function DKP:MLSettingsArrangeLootTypeChanged(wndHandler,wndControl)
 	if wndControl:GetName() == "TilesLoot" then self.tItems["settings"]["ML"].bArrItemTiles = true else self.tItems["settings"]["ML"].bArrItemTiles = false end
 	Hook:OnMasterLootUpdate(true)
 end
+
+function DKP:MLShowGuildBank()
+	self.tItems["settings"]["ML"].bShowGuildBank = true
+end
+
+function DKP:MLShowGuildBankNot()
+	self.tItems["settings"]["ML"].bShowGuildBank = false
+end
+
+function DKP:MLSetGBManager(wndHandler,wndControl,strText)
+	self.tItems["settings"]["ML"].strGBManager = strText
+end
+
+
 
 --- ML Responses
 

@@ -29,6 +29,27 @@ local defaultQualityValues =
 	["Orange"] = .1
 }
 
+local DataScapeTokenIds =
+{
+	["Chest"] = 69892,
+	["Legs"] = 69893,
+	["Head"] = 69894,
+	["Shoulders"] = 69895,
+	["Hands"] = 69896,
+	["Feet"] = 69897,
+}
+
+local GeneticTokenIds = 
+{
+	["Chest"] = 69814,
+	["Legs"] = 69815,
+	["Head"] = 69816,
+	["Shoulders"] = 69817,
+	["Hands"] = 69818,
+	["Feet"] = 69819,
+}
+
+
 -- constants from ETooltip
 local kUIBody = "ff39b5d4"
 local nItemIDSpacing = 4
@@ -74,9 +95,24 @@ function DKP:OnLootedItem(item)
 			Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Drutol Windchaser"))
 end
 
-function DKP:EPGPRestore()
-	
-
+function DKP:EPGPGetTokenItemID(strToken)
+	if string.find(strToken,"Calculated") then --DS
+		if string.find(strToken,"Chestplate") then return DataScapeTokenIds["Chest"] 
+		elseif string.find(strToken,"Greaves") then return DataScapeTokenIds["Legs"] 
+		elseif string.find(strToken,"Helm") then return DataScapeTokenIds["Head"] 
+		elseif string.find(strToken,"Pauldron") then return DataScapeTokenIds["Shoulders"] 
+		elseif string.find(strToken,"Glove") then return DataScapeTokenIds["Hands"] 
+		elseif string.find(strToken,"Boot") then return DataScapeTokenIds["Feet"] 
+		end
+	elseif string.find(strToken,"Xenological") then --GA
+		if string.find(strToken,"Chestplate") then return GeneticTokenIds["Chest"] 
+		elseif string.find(strToken,"Greaves") then return GeneticTokenIds["Legs"] 
+		elseif string.find(strToken,"Helm") then return GeneticTokenIds["Head"] 
+		elseif string.find(strToken,"Pauldron") then return GeneticTokenIds["Shoulders"] 
+		elseif string.find(strToken,"Glove") then return GeneticTokenIds["Hands"] 
+		elseif string.find(strToken,"Boot") then return GeneticTokenIds["Feet"] 
+		end
+	end
 end
 
 function DKP:EPGPFillInSettings()
@@ -435,10 +471,10 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and self.tItems["Standby"][string.lower(self.tItems[i].strName)] == nil then
 			if self.wndEPGPSettings:FindChild("DecayEP"):IsChecked() == true then
-				self.tItems[i].EP = math.floor(self.tItems[i].EP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100))
+				self.tItems[i].EP = self.tItems[i].EP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100)
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
-				self.tItems[i].GP = math.floor(self.tItems[i].GP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100))
+				self.tItems[i].GP = self.tItems[i].GP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100)
 			end
 		end
 	end
@@ -522,6 +558,11 @@ end
 
 function DKP:EPGPGetItemCostByID(itemID)
 	local item = Item.GetDataFromId(itemID)
+	if string.find(item:GetName(),"Imprint") then
+		Print(self:EPGPGetTokenItemID(item:GetName()))
+		Print(item:GetName())
+		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
+	end
 	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then
 		local slot 
 		if item:GetSlotName() ~= "" then
