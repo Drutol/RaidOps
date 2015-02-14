@@ -1471,14 +1471,9 @@ function DKP:MassEditDisable( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditSelectRaid( wndHandler, wndControl, eMouseButton )
-	local raidMembers =  {}
-	for i=1,GroupLib.GetMemberCount() do
-		local unit_member = GroupLib.GetGroupMember(i)
-			raidMembers[string.lower(unit_member.strCharacterName)] = 1
-	end
 	local children = self.wndItemList:GetChildren()
 	for k,child in ipairs(children) do
-		if raidMembers[string.lower(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText())] == 1 then
+		if self:IsPlayerInRaid(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()) then
 			child:SetCheck(true)
 			table.insert(selectedMembers,child)
 		end
@@ -1626,15 +1621,19 @@ end
 
 function DKP:IsPlayerInRaid(strPlayer)
 
-	local raid = self:Bid2GetTargetsTable()
-	for k,player in ipairs(raid) do
+	local raidPre = self:Bid2GetTargetsTable()
+	local raid = {}
+	for k,player in ipairs(raidPre) do
 		local strNewPlayer = ""
 		for uchar in string.gfind(player, "([%z\1-\127\194-\244][\128-\191]*)") do
 			if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
 			strNewPlayer = strNewPlayer .. uchar
 		end
-		player = strNewPlayer
-		
+		table.insert(raid,strNewPlayer)
+	end
+	
+	
+	for k,player in ipairs(raid) do
 		for j,alt in pairs(self.tItems["alts"]) do
 			if string.lower(j) == string.lower(player) then
 				raid[k] = self.tItems[alt].strName
@@ -1911,25 +1910,48 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	local sta = {}
 	local eng = {}
 	local unknown = {}
-	
-	for k,player in ipairs(self.tItems) do
-		if player.strName ~= "Guild Bank" then
-			if player.class ~= nil then
-				if player.class == "Esper" then
-					table.insert(esp,player)
-				elseif player.class == "Engineer" then
-					table.insert(eng,player)
-				elseif player.class == "Medic" then
-					table.insert(med,player)
-				elseif player.class == "Warrior" then
-					table.insert(war,player)
-				elseif player.class == "Stalker" then
-					table.insert(sta,player)
-				elseif player.class == "Spellslinger" then
-					table.insert(spe,player)
+	if not self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):FindChild("TokenGroup"):IsChecked() then
+		for k,player in ipairs(self.tItems) do
+			if player.strName ~= "Guild Bank" then
+				if player.class ~= nil then
+					if player.class == "Esper" then
+						table.insert(esp,player)
+					elseif player.class == "Engineer" then
+						table.insert(eng,player)
+					elseif player.class == "Medic" then
+						table.insert(med,player)
+					elseif player.class == "Warrior" then
+						table.insert(war,player)
+					elseif player.class == "Stalker" then
+						table.insert(sta,player)
+					elseif player.class == "Spellslinger" then
+						table.insert(spe,player)
+					end
+				else
+					table.insert(unknown,player)
 				end
-			else
-				table.insert(unknown,player)
+			end
+		end
+	else
+		for k,player in ipairs(self.tItems) do
+			if player.strName ~= "Guild Bank" then
+				if player.class ~= nil then
+					if player.class == "Esper" then
+						table.insert(esp,player)
+					elseif player.class == "Engineer" then
+						table.insert(eng,player)
+					elseif player.class == "Medic" then
+						table.insert(med,player)
+					elseif player.class == "Warrior" then
+						table.insert(eng,player)
+					elseif player.class == "Stalker" then
+						table.insert(med,player)
+					elseif player.class == "Spellslinger" then
+						table.insert(esp,player)
+					end
+				else
+					table.insert(unknown,player)
+				end
 			end
 		end
 	end
@@ -2396,6 +2418,9 @@ end
 
 function DKP:DecayShow( wndHandler, wndControl, eMouseButton )
 	self.wndMain:FindChild("Decay"):Show(true,false)
+	
+	self.wndMain:FindChild("EPGPDecayShow"):SetCheck(false)
+	self.wndMain:FindChild("EPGPDecay"):Show(false)
 end
 
 function DKP:DecayHide( wndHandler, wndControl, eMouseButton )
@@ -2514,6 +2539,8 @@ function DKP:SettingsRestore()
 	self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):SetCheck(self.tItems["settings"].GroupByClass)
 	-- PopUp reduction
 	self.wndSettings:FindChild("PopUPGPRed"):FindChild("EditBox"):SetText(self.tItems["settings"].nPopUpGPRed)
+	-- Undo
+	self.wndSettings:FindChild("TrackUndo"):SetCheck(self.tItems["settings"].bTrackUndo)
 	
 	--Networking
 	self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(self.tItems["settings"].networking)
@@ -3003,13 +3030,24 @@ end
 
 function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 	local value = tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())
-	if wndControl:IsChecked() then 
-		if value then
-			value = (value*self.tItems["settings"].nPopUpGPRed)/100
+	if self.tItems["settings"].nPopUpGPRed > 0 and self.tItems["settings"].nPopUpGPRed < 100 then
+		local nDecrease = 100 - self.tItems["settings"].nPopUpGPRed
+		if wndControl:IsChecked() then 
+			if value and nDecrease ~= 0 then
+				value = (value*nDecrease)/100
+			end
+		else
+			if value and nDecrease ~= 0 then
+				value = (100*value)/nDecrease
+			end
 		end
-	else
-		if value and self.tItems["settings"].nPopUpGPRed ~= 0 then
-			value = (100*value)/self.tItems["settings"].nPopUpGPRed
+	elseif value then
+		if self.tItems["settings"].nPopUpGPRed == 100 then
+			if wndControl:IsChecked() then 
+				value = 0
+			else
+				value = string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36)
+			end
 		end
 	end
 	self.wndPopUp:FindChild("EditBoxDKP"):SetText(value)
@@ -3034,9 +3072,11 @@ function DKP:PopUpWindowClose( wndHandler, wndControl )
 			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
 			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
 			self.wndPopUp:FindChild("GPOffspec"):Show(true)
+			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
 		else
 			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
 			self.wndPopUp:FindChild("GPOffspec"):Show(false)
+			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
 		end
 		CurrentPopUpID = PopUpItemQueue[1].ID
 		if self.RegistredBidWinners[string.sub(PopUpItemQueue[1].strItem,2)] ~= nil then
@@ -3080,9 +3120,11 @@ function DKP:PopUpWindowOpen(strName,strItem)
 				self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
 				self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
 				self.wndPopUp:FindChild("GPOffspec"):Show(true)
+				self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
 			else
 				self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
 				self.wndPopUp:FindChild("GPOffspec"):Show(false)
+				self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
 			end
 			CurrentPopUpID = ID_popup
 		end
@@ -3111,8 +3153,12 @@ function DKP:PopUpSkip( wndHandler, wndControl, eMouseButton )
 		if self.tItems["EPGP"].Enable == 1 then
 			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
 			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
+			self.wndPopUp:FindChild("GPOffspec"):Show(true)
+			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
 		else
 			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
+			self.wndPopUp:FindChild("GPOffspec"):Show(false)
+			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
 		end
 		self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
 		self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
@@ -3339,6 +3385,20 @@ function DKP:ConInit()
 	self.wndContext:Show(false,true)
 end
 
+function DKP:ConChangeClass(wndHandler,wndControl)
+	local strCurrClass = wndControl:GetText()
+	if strCurrClass == "Esper" then strCurrClass = "Medic" 
+	elseif strCurrClass == "Medic" then strCurrClass = "Warrior" 
+	elseif strCurrClass == "Warrior" then strCurrClass = "Stalker" 
+	elseif strCurrClass == "Stalker" then strCurrClass = "Engineer" 
+	elseif strCurrClass == "Engineer" then strCurrClass = "Spellslinger" 
+	elseif strCurrClass == "Spellslinger" then strCurrClass = "Esper" 
+	end
+	wndControl:SetText(strCurrClass)
+	self.tItems[self.wndContext:GetData()].class = strCurrClass
+	self.wndContext:FindChild("Class"):FindChild("ClassIcon"):SetSprite(ktStringToIcon[strCurrClass])
+	
+end
 
 function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 	if wndControl ~= wndHandler then return end
@@ -3351,6 +3411,10 @@ function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 		self.wndContext:ToFront()
 		if self.tItems["Standby"] and self.tItems[ID] and self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
 		wndControl:FindChild("OnContext"):Show(true,false)
+		self.wndContext:FindChild("Class"):SetText(self.tItems[ID].class or "Set Class") 
+		if self.tItems[ID].class then
+			self.wndContext:FindChild("Class"):FindChild("ClassIcon"):SetSprite(ktStringToIcon[self.tItems[ID].class])
+		end
 	end
 end
 

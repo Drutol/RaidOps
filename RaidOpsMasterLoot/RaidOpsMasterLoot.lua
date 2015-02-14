@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------------------------
 -- Client Lua Script for RaidOpsMasterLoot
--- Copyright (c) NCsoft. All rights reserved
+-- Copyright (c) Piotr Szymczak 2014 dogier140@poczta.fm . All rights reserved
 -----------------------------------------------------------------------------------------------
  
 require "Window"
@@ -122,6 +122,7 @@ function RaidOpsMasterLoot:CompleteInit()
 	self.wndResponses = Apollo.LoadForm(self.xmlDoc,"Responses",nil,self)
 	self.wndResponses:Show(false,true)
 	Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
+	self.tSelectedItems = {}
 	self:HookToMasterLootDisp()
 	self:MLSettingsRestore()
 	Apollo.RegisterSlashCommand("ropsml", "MLSettingsShow", self)
@@ -159,7 +160,6 @@ function RaidOpsMasterLoot:CompleteInit()
 	Hook:OnMasterLootUpdate(true)
 	if self.tItems["settings"]["ML"].strChannel == nil then self.tItems["settings"]["ML"].strChannel = "your guild's channel" end
 	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
-	self.wndMLSettings:FindChild("EditBox"):SetText(self.tItems["settings"]["ML"].strChannel)
 end
 
 function RaidOpsMasterLoot:ReArr()
@@ -234,6 +234,9 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = false end	
 	if self.tItems["settings"]["ML"].bShowCurrItemBar == nil then self.tItems["settings"]["ML"].bShowCurrItemBar = true end
 	if self.tItems["settings"]["ML"].bShowCurrItemTile == nil then self.tItems["settings"]["ML"].bShowCurrItemTile = false end
+	if self.tItems["settings"]["ML"].bAllowMulti == nil then self.tItems["settings"]["ML"].bAllowMulti = false end
+	if self.tItems["settings"]["ML"].bShowGuildBank == nil then self.tItems["settings"]["ML"].bShowGuildBank = false end
+	if self.tItems["settings"]["ML"].strGBManager == nil then self.tItems["settings"]["ML"].strGBManager = "" end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
 	
 	if self.tItems["settings"]["ML"].bArrTiles then self.wndMLSettings:FindChild("Tiles"):SetCheck(true) else self.wndMLSettings:FindChild("List"):SetCheck(true) end
@@ -245,6 +248,12 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowLastItemTile then self.wndMLSettings:FindChild("ShowLastItemTile"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowCurrItemBar then self.wndMLSettings:FindChild("ShowCurrItemBar"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowCurrItemTile then self.wndMLSettings:FindChild("ShowCurrItemTile"):SetCheck(true) end
+	
+	if self.tItems["settings"]["ML"].bAllowMulti then self.wndMLSettings:FindChild("AllowMultiItem"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
+	
+	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
+	self.wndMLSettings:FindChild("ChannelName"):SetText(self.tItems["settings"]["ML"].strChannel)
 
 end
 
@@ -308,10 +317,42 @@ end
 function RaidOpsMasterLoot:HookToMasterLootDisp()
 	if not self:IsHooked(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList") then
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnAssignDown")
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
 		self:PostHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck","BidMasterItemSelected")
-		self:Hook(Apollo.GetAddon("MasterLoot"),"OnAssignDown","MLRegisterItemWinner")
+		self:Hook(Apollo.GetAddon("MasterLoot"),"OnCharacterCheck","BidCharacterChecked")
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnLootAssigned")
 	end
+end
+
+function RaidOpsMasterLoot:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
+
+	if luaCaller.tMasterLootSelectedItem ~= nil and luaCaller.tMasterLootSelectedLooter ~= nil then
+		local DKPInstance = Apollo.GetAddon("RaidOpsMasterLoot")
+		-- gotta save before it gets wiped out by event
+		local SelectedLooter = luaCaller.tMasterLootSelectedLooter
+		local SelectedItemLootId = luaCaller.tMasterLootSelectedItem.nLootId
+
+		luaCaller.tMasterLootSelectedLooter = nil
+		luaCaller.tMasterLootSelectedItem = nil
+		if #DKPInstance.tSelectedItems > 1 then
+			for k,item in ipairs(DKPInstance.tSelectedItems) do
+				GameLib.AssignMasterLoot(item,SelectedLooter)
+				DKPInstance:MLRegisterItemWinner()
+			end
+			DKPInstance.tSelectedItems = {}
+		else
+			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
+		end
+
+	end
+
+end
+
+function RaidOpsMasterLoot:OnLootAssigned(luaCaller,objItem, strLooter)
+	local DKPInstance = Apollo.GetAddon("RaidOpsMasterLoot")
+	if DKPInstance.bIsSelectedGuildBank and string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then strLooter = "Guild Bank" end
+	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), objItem:GetName(), strLooter))
 end
 
 function RaidOpsMasterLoot:EPGPGetSlotSpriteByQualityRectangle(ID)
@@ -414,6 +455,7 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
 					end
 				end
+				local unitGBManager
 				--Creating windows
 				for k,tab in pairs(tables) do
 					for j,unitLooter in ipairs(tab) do
@@ -476,6 +518,8 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 						end
 						wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())
 						
+						if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and string.lower(unitLooter:GetName()) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then unitGBManager = unitLooter end
+						
 						wndCurrentLooter:SetData(unitLooter)
 						
 						
@@ -484,6 +528,21 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 							bStillHaveLooter = true
 						end
 					end
+				end
+				-- Guild Bank
+				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and unitGBManager then
+					local wnd
+					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
+						wnd = Apollo.LoadForm(DKPInstance.xmlDoc, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					else
+						wnd = Apollo.LoadForm(DKPInstance.xmlDoc, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					end
+					
+					wnd:FindChild("CharacterName"):SetText("Guild Bank")
+					wnd:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
+					wnd:FindChild("CharacterLevel"):SetText("")
+					wnd:SetTooltip(unitGBManager:GetName() .. " is behind this.")
+					wnd:SetData(unitGBManager)
 				end
 
 				if not bStillHaveLooter then
@@ -511,20 +570,55 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 	end
 end
 
+function RaidOpsMasterLoot:BidAddItem(wndHandler,wndControl)
+	table.insert(self.tSelectedItems,wndControl:GetParent():GetData().nLootId)
+end
+
+function RaidOpsMasterLoot:BidRemoveItem(wndHandler,wndControl)
+	for k,item in ipairs(self.tSelectedItems) do
+		if item == wndControl:GetParent():GetData().nLootId then table.remove(self.tSelectedItems,k) end
+	end
+	
+end
+
+function RaidOpsMasterLoot:OnItemCheck(wndHandler,wndControl,eMouseButton)
+	Hook:OnItemCheck(wndHandler,wndControl,eMouseButton)
+end
+
+function RaidOpsMasterLoot:OnItemMouseButtonUp(wndHandler,wndControl,eMouseButton)
+	Hook:OnItemMouseButtonUp(wndHandler,wndControl,eMouseButton)
+end
+
+function RaidOpsMasterLoot:BidCharacterChecked(wndHandler,wndControl)
+	if wndControl:FindChild("CharacterName"):GetText() == "Guild Bank" then self.bIsSelectedGuildBank = true else self.bIsSelectedGuildBank = false end
+end
+
 function RaidOpsMasterLoot:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
 	local DKPInstance = Apollo.GetAddon("RaidOpsMasterLoot")
-	DKPInstance.InsertedIndicators ={}
-	DKPInstance.ActiveIndicators = {}
+
 	
 	for idx, tItem in ipairs (tMasterLootItemList) do
 		local wndCurrentItem
+		
 		if DKPInstance.tItems["settings"]["ML"].bArrItemTiles then
-			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc,"ItemButtonTile",luaCaller.wndMasterLoot_ItemList, luaCaller)
+			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc,"ItemButtonTile",luaCaller.wndMasterLoot_ItemList, DKPInstance)
 		else
-			wndCurrentItem = Apollo.LoadForm(luaCaller.xmlDoc, "ItemButton", luaCaller.wndMasterLoot_ItemList, luaCaller)
+			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc, "ItemButton", luaCaller.wndMasterLoot_ItemList, DKPInstance)
 			wndCurrentItem:FindChild("ItemName"):SetText(tItem.itemDrop:GetName())
+		end
+		
+		if DKPInstance.tItems["settings"]["ML"].bAllowMulti and DKPInstance.tSelectedItems then
+			wndCurrentItem:FindChild("Multi"):Show(true) 
+			wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonCheck","BidAddItem",DKPInstance)
+			wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonUncheck","BidRemoveItem",DKPInstance)
+			for k,item in ipairs(DKPInstance.tSelectedItems) do
+				if tItem.nLootId == item then 
+					wndCurrentItem:FindChild("Multi"):SetCheck(true) 
+					break
+				end
+			end
 		end
 		
 		wndCurrentItem:FindChild("ItemIcon"):SetSprite(tItem.itemDrop:GetIcon())
@@ -541,7 +635,6 @@ function RaidOpsMasterLoot:RefreshMasterLootItemList(luaCaller,tMasterLootItemLi
 	else
 		luaCaller.wndMasterLoot_ItemList:ArrangeChildrenVert(0)
 	end
-
 end
 ---------------------------------------------------------------------------------------------------
 -- MLSettings Functions
@@ -593,6 +686,29 @@ function RaidOpsMasterLoot:SetChannelAndReconnect( wndHandler, wndControl, strTe
 	self.channel = nil
 	self.tItems["settings"]["ML"].strChannel = strText
 	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
+end
+
+function RaidOpsMasterLoot:MLShowGuildBank()
+	self.tItems["settings"]["ML"].bShowGuildBank = true
+end
+
+function RaidOpsMasterLoot:MLShowGuildBankNot()
+	self.tItems["settings"]["ML"].bShowGuildBank = false
+end
+
+function RaidOpsMasterLoot:MLSetGBManager(wndHandler,wndControl,strText)
+	self.tItems["settings"]["ML"].strGBManager = strText
+end
+
+function RaidOpsMasterLoot:BidAllowMultiSelection()
+	self.tItems["settings"]["ML"].bAllowMulti = true
+	Hook:OnMasterLootUpdate(true)
+end
+
+function RaidOpsMasterLoot:BidDisAllowMultiSelection()
+	self.tItems["settings"]["ML"].bAllowMulti = false
+	self.tSelectedItems = {}
+	Hook:OnMasterLootUpdate(true)
 end
 
 ---------------------------------------------------------------------------------------------------

@@ -2749,6 +2749,10 @@ function DKP:Bid2IsPlayerOnWhitelist(strName)
 	return false
 end
 
+function DKP:BidCharacterChecked(wndHandler,wndControl)
+	if wndControl:FindChild("CharacterName"):GetText() == "Guild Bank" then self.bIsSelectedGuildBank = true else self.bIsSelectedGuildBank = false end
+end
+
 -------------- Hook to Carbine's ML addon
 
 function DKP:HookToMasterLootDisp()
@@ -2756,7 +2760,9 @@ function DKP:HookToMasterLootDisp()
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnAssignDown")
 		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
+		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnLootAssigned")
 		self:PostHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck","BidMasterItemSelected")
+		self:Hook(Apollo.GetAddon("MasterLoot"),"OnCharacterCheck","BidCharacterChecked")
 	end
 end
 
@@ -2770,20 +2776,23 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 
 		luaCaller.tMasterLootSelectedLooter = nil
 		luaCaller.tMasterLootSelectedItem = nil
-
-		for k,item in ipairs(DKPInstance.tSelectedItems) do
-			GameLib.AssignMasterLoot(item,SelectedLooter)
-			DKPInstance:MLRegisterItemWinner()
+		if #DKPInstance.tSelectedItems > 1 then
+			for k,item in ipairs(DKPInstance.tSelectedItems) do
+				GameLib.AssignMasterLoot(item,SelectedLooter)
+				DKPInstance:MLRegisterItemWinner()
+			end
+			DKPInstance.tSelectedItems = {}
+		else
+			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
-		DKPInstance.tSelectedItems = {}
 
 	end
 
 end
 
-function DKP:OnLootAssigned(objItem, strLooter)
+function DKP:OnLootAssigned(luaCaller,objItem, strLooter)
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
-	if string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then strLooter = DKPInstance.tItems["settings"]["ML"].strGBManager end
+	if DKPInstance.bIsSelectedGuildBank and string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then strLooter = "Guild Bank" end
 	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), objItem:GetName(), strLooter))
 end
 
@@ -2795,6 +2804,8 @@ function DKP:MLRegisterItemWinner()
 end
 
 function sortMasterLootEasyDKPasc(a,b)
+	if a:FindChild("CharacterName"):GetText() == "Guild Bank" then return b end
+	if b:FindChild("CharacterName"):GetText() == "Guild Bank" then return a end
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
 		if DKPInstance.tItems["EPGP"].Enable == 1 then
 			return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) > DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
@@ -2809,6 +2820,8 @@ function sortMasterLootEasyDKPasc(a,b)
 		end
 end
 function sortMasterLootEasyDKPdesc(a,b)
+	if a:FindChild("CharacterName"):GetText() == "Guild Bank" then return a end
+	if b:FindChild("CharacterName"):GetText() == "Guild Bank" then return b end
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
 	if DKPInstance.tItems["EPGP"].Enable == 1 then
 		return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) < DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
@@ -2858,18 +2871,14 @@ end
 
 function DKP:BidAllowMultiSelection()
 	self.tItems["settings"]["ML"].bAllowMulti = true
-	for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
-		child:SetGlobalRadioSel(k)
-	end
+	Hook:OnMasterLootUpdate(true)
 end
 
 function DKP:BidDisAllowMultiSelection()
 	self.tItems["settings"]["ML"].bAllowMulti = false
-	for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
-		child:SetGlobalRadioSel("MasterLootItem")
-	end
+	self.tSelectedItems = {}
+	Hook:OnMasterLootUpdate(true)
 end
-
 
 function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
@@ -3094,14 +3103,14 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 			wndCurrentItem = Apollo.LoadForm(DKPInstance.xmlDoc2, "ItemButton", luaCaller.wndMasterLoot_ItemList, DKPInstance)
 			wndCurrentItem:FindChild("ItemName"):SetText(tItem.itemDrop:GetName())
 		end
-		wndCurrentItem:FindChild("Multi"):Show(true) 
+		
 		if DKPInstance.tItems["settings"]["ML"].bAllowMulti and DKPInstance.tSelectedItems then
-			
+			wndCurrentItem:FindChild("Multi"):Show(true) 
+			wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonCheck","BidAddItem",DKPInstance)
+			wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonUncheck","BidRemoveItem",DKPInstance)
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
 				if tItem.nLootId == item then 
 					wndCurrentItem:FindChild("Multi"):SetCheck(true) 
-					wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonCheck","BidAddItem",DKPInstance)
-					wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonUncheck","BidRemoveItem",DKPInstance)
 					break
 				end
 			end
@@ -3155,7 +3164,8 @@ function DKP:MLSettingsRestore()
 	
 	if self.tItems["settings"]["ML"].bShowClass then self.wndMLSettings:FindChild("ShowClass"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bStandardLayout then self.wndMLSettings:FindChild("Horiz"):SetCheck(true) else self.wndMLSettings:FindChild("Vert"):SetCheck(true) end
-	if self.tItems["settings"]["ML"].bArrItemTiles then self.wndMLSettings:FindChild("TilesLoot"):SetCheck(true) else self.wndMLSettings:FindChild("TilesLoot"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bArrItemTiles then self.wndMLSettings:FindChild("TilesLoot"):SetCheck(true) else self.wndMLSettings:FindChild("ListLoot"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bArrTiles then self.wndMLSettings:FindChild("Tiles"):SetCheck(true) else self.wndMLSettings:FindChild("List"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bListIndicators then self.wndMLSettings:FindChild("ShowIndicators"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bGroup then self.wndMLSettings:FindChild("GroupClass"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowLastItemBar then self.wndMLSettings:FindChild("ShowLastItemBar"):SetCheck(true) end

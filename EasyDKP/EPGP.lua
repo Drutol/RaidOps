@@ -69,6 +69,19 @@ function DKP:EPGPInit()
 		self.tItems["EPGP"].BaseGP = 1
 		self.tItems["EPGP"].MinEP = 100
 	end
+	if self.tItems["EPGP"].bDecayEP == nil then self.tItems["EPGP"].bDecayEP = false end
+	if self.tItems["EPGP"].bDecayGP == nil then self.tItems["EPGP"].bDecayGP = false end
+	if self.tItems["EPGP"].nDecayValue == nil then self.tItems["EPGP"].nDecayValue = 25 end
+	
+	self.wndEPGPSettings:FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
+	
+	self.wndEPGPSettings:FindChild("DecayEP"):SetCheck(self.tItems["EPGP"].bDecayEP)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayEP"):SetCheck(self.tItems["EPGP"].bDecayEP)
+	
+	self.wndEPGPSettings:FindChild("DecayGP"):SetCheck(self.tItems["EPGP"].bDecayGP)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayGP"):SetCheck(self.tItems["EPGP"].bDecayGP)
+	
 	self:EPGPFillInSettings()
 	self:EPGPAddValuesToMembers()
 	self:EPGPChangeUI()
@@ -79,20 +92,20 @@ function DKP:EPGPInit()
 end
 
 function DKP:OnLootedItem(item)
-			self.ItemDatabase[item:GetName()] = {}
-			self.ItemDatabase[item:GetName()].ID = item:GetItemId()
-			self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()
-			self.ItemDatabase[item:GetName()].strChat = item:GetChatLinkString()
-			self.ItemDatabase[item:GetName()].sprite = item:GetIcon()
-			self.ItemDatabase[item:GetName()].strItem = item:GetName()
-			self.ItemDatabase[item:GetName()].Power = item:GetItemPower()
-			if item:GetSlotName() ~= "" then
-				self.ItemDatabase[item:GetName()].slot = item:GetSlotName()
-			else
-				self.ItemDatabase[item:GetName()].slot = item:GetSlot()
-			end
-			--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
-			Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Drutol Windchaser"))
+	self.ItemDatabase[item:GetName()] = {}
+	self.ItemDatabase[item:GetName()].ID = item:GetItemId()
+	self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()
+	self.ItemDatabase[item:GetName()].strChat = item:GetChatLinkString()
+	self.ItemDatabase[item:GetName()].sprite = item:GetIcon()
+	self.ItemDatabase[item:GetName()].strItem = item:GetName()
+	self.ItemDatabase[item:GetName()].Power = item:GetItemPower()
+	if item:GetSlotName() ~= "" then
+		self.ItemDatabase[item:GetName()].slot = item:GetSlotName()
+	else
+		self.ItemDatabase[item:GetName()].slot = item:GetSlot()
+	end
+	--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
+	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Drutol Windchaser"))
 end
 
 function DKP:EPGPGetTokenItemID(strToken)
@@ -113,6 +126,17 @@ function DKP:EPGPGetTokenItemID(strToken)
 		elseif string.find(strToken,"Boot") then return GeneticTokenIds["Feet"] 
 		end
 	end
+end
+
+function DKP:EPGPDecayShow()
+	self.wndMain:FindChild("EPGPDecay"):Show(true,false)
+	
+	self.wndMain:FindChild("Decay"):Show(false,false)
+	self.wndMain:FindChild("DecayShow"):SetCheck(false)
+end
+
+function DKP:EPGPDecayHide()
+	self.wndMain:FindChild("EPGPDecay"):Show(false,false)
 end
 
 function DKP:EPGPFillInSettings()
@@ -188,17 +212,30 @@ function DKP:EPGPGetItemCostByName(strItem)
 	return math.ceil(self.ItemDatabase[strItem].Power/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(self.ItemDatabase[strItem].quality)] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(self.ItemDatabase[strItem].slot)])
 end
 
-function DKP:EPGPEnableEPChange( wndHandler, wndControl, eMouseButton )
+function DKP:EPGPDecayEPEnable( wndHandler, wndControl, eMouseButton )
+	self.tItems["EPGP"].bDecayEP = true
+	self.wndEPGPSettings:FindChild("DecayEP"):SetCheck(true)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayEP"):SetCheck(true)
 end
 
-function DKP:EPGPDisableGPChange( wndHandler, wndControl, eMouseButton )
+function DKP:EPGPDecayEPDisable( wndHandler, wndControl, eMouseButton )
+	self.tItems["EPGP"].bDecayEP = false
+	self.wndEPGPSettings:FindChild("DecayEP"):SetCheck(false)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayEP"):SetCheck(false)
 end
 
-function DKP:EPGPDisableEPChange( wndHandler, wndControl, eMouseButton )
+function DKP:EPGPDecayGPEnable( wndHandler, wndControl, eMouseButton )
+	self.tItems["EPGP"].bDecayGP = true
+	self.wndEPGPSettings:FindChild("DecayGP"):SetCheck(true)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayGP"):SetCheck(true)
 end
 
-function DKP:EPGPEnableGPChange( wndHandler, wndControl, eMouseButton )
+function DKP:EPGPDecayGPDisable( wndHandler, wndControl, eMouseButton )
+	self.tItems["EPGP"].bDecayGP = false
+	self.wndEPGPSettings:FindChild("DecayGP"):SetCheck(false)
+	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayGP"):SetCheck(false)
 end
+
 
 function DKP:EPGPChangeUI()
 	if self.tItems["EPGP"].Enable == 1 then
@@ -468,13 +505,27 @@ function DKP:EPGPDisable( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
+	if self.tItems["settings"].bTrackUndo then
+		local tMembers = {}
+		for k,player in ipairs(self.tItems) do
+			if self.tItems["Standby"][string.lower(player.strName)] == nil then
+				table.insert(tMembers,player)
+			end
+		end
+		local strAffectedFields = ""
+		if self.tItems["EPGP"].bDecayEP then strAffectedFields = strAffectedFields .. "EP " end
+		if self.tItems["EPGP"].bDecayGP then strAffectedFields = strAffectedFields .. "GP " end
+		self:UndoAddActivity("Performed ".. self.tItems["EPGP"].nDecayValue .. " % " .. strAffectedFields .. " Decay on " .. #tMembers .. " players.",tMembers) 
+	end
+	
+	
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and self.tItems["Standby"][string.lower(self.tItems[i].strName)] == nil then
 			if self.wndEPGPSettings:FindChild("DecayEP"):IsChecked() == true then
-				self.tItems[i].EP = self.tItems[i].EP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100)
+				self.tItems[i].EP = self.tItems[i].EP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
-				self.tItems[i].GP = self.tItems[i].GP * ((100 - tonumber(self.wndEPGPSettings:FindChild("DecayValue"):GetText()))/100)
+				self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 			end
 		end
 	end
@@ -486,13 +537,15 @@ function DKP:EPGPCheckDecayValue( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
 		local val = tonumber(strText)
 		if val >= 1 and val <= 100 then
-			
+			self.tItems["EPGP"].nDecayValue = val
+			self.wndEPGPSettings:FindChild("DecayValue"):SetText(val)
+			self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(val)
 		else
-			wndControl:SetText("")
+			wndControl:SetText(self.tItems["EPGP"].nDecayValue)
 		end
 	else
-		wndControl:SetText("")
-	end
+		wndControl:SetText(self.tItems["EPGP"].nDecayValue)
+	end	
 end
 
 function DKP:EPGPClose( wndHandler, wndControl, eMouseButton )
