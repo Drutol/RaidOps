@@ -9,7 +9,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.5
+local knMemberModuleVersion = 1.6
 
 local ktClassToIcon =
 {
@@ -33,10 +33,10 @@ local ktStringToIcon =
 
 local ktOptionToIcon =
 {
-	["need"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_InCombat2",
-	["greed"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_InCombat1",
-	["pass"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_OutOfCombat",
-	["slight"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_InCombat1",
+	["Opt1"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_InCombat2",
+	["Opt2"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_InCombat1",
+	["Opt4"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_OutOfCombat",
+	["Opt3"] = "CM_Engineer:spr_CM_Engineer_BarEdgeGlow_InCombat1",
 }
 local ktClassToString =
 {
@@ -80,8 +80,6 @@ local umplauteConversions = {
 local bInitialized = false
 local timeout = 5
 function DKP:BidBeginInit()
-	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList","InsertLootChildren")
-	--self:PostHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList","InsertLooterChildren")
 	Apollo.RegisterTimerHandler(1, "OnWait", self)
 	self.wait_timer = ApolloTimer.Create(1, true, "OnWait", self)
 end
@@ -104,7 +102,7 @@ function DKP:BidCompleteInit()
 		self.wndMain:FindChild("LabelAuction"):Show(false)
 		self.wndHub:FindChild("NetworkBidding"):Enable(false)
 		self.wndHub:FindChild("NetworkBidding"):SetTextColor("vdarkgray")
-		Print("RaidOps - Could not find default Master Loot Addon - All Bidding Functionalities are now suspended")
+		Print("RaidOps - Could not find default Master Loot Addon - All Bidding/ML Functionalities are now suspended")
 		self:DSInit()
 		return
 	end
@@ -488,12 +486,7 @@ end
 	end
 end]]
 
-
-
-function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
-	if eMouseButton ~= 1 or eMouseButton == nil then
-		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
-	else		
+function DKP:StartChatBidding(tCustomData)
 		if self.bIsBidding == false then
 			if tCustomData.strItem == nil then
 				if Hook.wndMasterLoot:IsShown() == false then
@@ -530,12 +523,15 @@ function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 		else
 			self.wndBid:Show(true,false)
 		end
-	end
+
+end
+
+function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
+	self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
 end
 
 function DKP:BidStartCustom( wndHandler, wndControl, eMouseButton )
-	local over = wndControl:GetParent():FindChild("CustomAuction"):GetText()
-	self:BidSetUpWindow({strItem = over})
+	self:StartChatBidding({strItem = self.wndMain:FindChild("CustomAuction"):GetText()})
 end
 
 function DKP:BidLinkItem()
@@ -719,7 +715,7 @@ function DKP:BidProcessMessageEPGP(tData)
 				self.CurrentBidSession.Bidders[bidID].offspec = true
 				self.CurrentBidSession.Bidders[bidID].HighestBid = tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100)
 				strReturn = "Accepted"
-				if newBidder.HighestBid > self.CurrentBidSession.Bidders[bidID].HighestBid then
+				if self.CurrentBidSession.Bidders[bidID].HighestBid > self.CurrentBidSession.HighestBidEver.value then
 					self.CurrentBidSession.HighestBidEver.value = self.CurrentBidSession.Bidders[bidID].HighestBid
 					self.CurrentBidSession.HighestBidEver.name = self.CurrentBidSession.Bidders[bidID].strName
 				end
@@ -1724,10 +1720,10 @@ function DKP:InitBid2()
 	self.wndBid2:FindChild("Auctions"):FindChild("Assign"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
-	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("need"):Enable(false)
-	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("pass"):Enable(false)
-	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("slight"):Enable(false)
-	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("greed"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt1"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt2"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt3"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt4"):Enable(false)
 	
 	self.tEquippedItems = {}
 	
@@ -1735,10 +1731,8 @@ function DKP:InitBid2()
 		self.tItems["settings"]["Bid2"] = {} 
 		self.tItems["settings"]["Bid2"].strChannel = "InputChannelName"
 		self.tItems["settings"]["Bid2"].duration = 20
-		self.tItems["settings"]["Bid2"].bAllowOffspec = true
 	end
 	if self.tItems["settings"]["Bid2"].assignAction == nil then self.tItems["settings"]["Bid2"].assignAction = "select" end
-	if self.tItems["settings"]["Bid2"].bLootCouncil == nil then self.tItems["settings"]["Bid2"].bLootCouncil = false end
 	if self.tItems["settings"]["Bid2"].bWhitelist == nil then self.tItems["settings"]["Bid2"].bWhitelist = false end
 	if self.tItems["settings"]["Bid2"].tWhitelisted == nil then self.tItems["settings"]["Bid2"].tWhitelisted = {} end
 	if self.tItems["settings"]["Bid2"].bRegisterPass == nil then self.tItems["settings"]["Bid2"].bRegisterPass = false end
@@ -1759,6 +1753,9 @@ function DKP:InitBid2()
 	self.MyVotes = self.tItems["MyVotes"]
 	self.tItems["MyVotes"] = nil
 	if self.MyVotes == nil then self.MyVotes = {} end
+	
+	self:BidCustomLabelRestore()
+	self:BidCustomLabelsUpdate()
 	--Print("[Network Bidding] - Restoring Auctions")
 end
 
@@ -1767,7 +1764,6 @@ function DKP:MLSettingShow()
 end
 
 function DKP:Bid2FetchAuctions(strML)
-	Print("[Network Bidding] - Fetching Auctions from".. strML)
 	if self.channel then self.channel:SendPrivateMessage({[1] = strML},{"GimmeAuctions"}) end -- requesting auctions from the ML
 	timeout = 5
 	Apollo.RegisterTimerHandler(1,"AuctionsTimeout",self)
@@ -1812,7 +1808,7 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 		elseif tMsg.type == "MyVote" then
 			self:Bid2RegisterVote(tMsg.who,tMsg.item,strSender)
 		elseif tMsg.type == "NewAuction" then
-			self:BidAddNewAuction(tMsg.itemID,false,nil,tMsg.pass,tMsg.duration,true)
+			self:BidAddNewAuction(tMsg.itemID,false,nil,tMsg.duration,true,tMsg.tLabels,tMsg.tLabelsState)
 		elseif tMsg.type == "GimmeAuctions" then
 			for k,auction in ipairs(self.ActiveAuctions) do
 				if auction.bActive then self.channel:SendPrivateMessage({[1] = strSender},{type = "ActiveAuction" ,item = auction.wnd:GetData(),progress = auction.nTimeLeft,biddersCount = #auction.bidders,votersCount = #auction.votes,duration = self.tItems["settings"]["Bid2"].duration}) end
@@ -1822,7 +1818,6 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 		elseif tMsg.type == "IamML" then -- searching for one at random and stockpile them in table
 			if self.searchingML then -- waiting for one , else close -> restore from saved ones
 				self.LastML = strSender
-				self.Bid2FetchAuctions(strSender) -- got one -> we are happy and verifying changes
 				self:Bid2CloseTimeout()
 				self.searchingML = false
 			end
@@ -2046,7 +2041,6 @@ function DKP:BidRegisterChoice(strSender,option,item,currItem)
 	if ID == -1 then return end
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == item then
-
 			local found = false
 			local ofID
 			for k,bidder in ipairs(auction.bidders) do
@@ -2056,14 +2050,14 @@ function DKP:BidRegisterChoice(strSender,option,item,currItem)
 				end
 			end
 			if not found then
-				table.insert(auction.bidders,{strName = strSender, option = string.lower(option), currItem = currItem,pr = self:EPGPGetPRByName(strSender) , votes = 0})
+				table.insert(auction.bidders,{strName = strSender, option = option, currItem = currItem,pr = self:EPGPGetPRByName(strSender) , votes = 0})
 				if auction.nRemainingPlayers and auction.nRemainingPlayers > 0 then
 					auction.nRemainingPlayers = auction.nRemainingPlayers - 1
 					wnd:FindChild("LoadingOverlay"):FindChild("Status"):SetText("Fetching Data waiting for: "..auction.nRemainingPlayers.. " Players.")
 					if auction.nRemainingPlayers == 0 then auction.wnd:FindChild("LoadingOverlay"):Show(false,false) end
 				end
 			else -- found
-				auction.bidders[ofID].option = string.lower(option)
+				auction.bidders[ofID].option = option
 			end
 			self:Bid2ArrangeResponses(auction)
 			break
@@ -2086,14 +2080,14 @@ function DKP:Bid2ArrangeResponses(auction)
 	local slights = {}
 	
 	for k,bidder in ipairs(auction.bidders) do
-		if bidder.option == "need" then
+		if bidder.option == "Opt1" then
 			table.insert(needs,bidder)
-		elseif bidder.option == "pass" then
-			table.insert(passes,bidder)
-		elseif bidder.option == "greed" then
-			table.insert(greeds,bidder)
-		elseif bidder.option == "slight" then
+		elseif bidder.option == "Opt2" then
 			table.insert(slights,bidder)
+		elseif bidder.option == "Opt3" then
+			table.insert(greeds,bidder)
+		elseif bidder.option == "Opt4" then
+			table.insert(passes,bidder)
 		end
 	end
 	if not self.tItems["settings"].bLootCouncil then
@@ -2169,10 +2163,11 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		local msg = {}
 		msg.type = "NewAuction"
 		msg.itemID = itemID
-		msg.bAllowOffspec = self.tItems["settings"]["Bid2"].bAllowOffspec 
-		msg.cost = self.tItems["settings"].bLootCouncil and nil or string.sub(self:EPGPGetItemCostByID(itemID),36)
+		msg.cost = string.sub(self:EPGPGetItemCostByID(itemID),36)
 		msg.duration = self.tItems["settings"]["Bid2"].duration
 		msg.pass = self.tItems["settings"]["Bid2"].bRegisterPass
+		msg.tLabels = self.tItems["settings"]["Bid2"].tLabels
+		msg.tLabelsState = self.tItems["settings"]["Bid2"].tLabelsState
 		msg.ver = knMemberModuleVersion
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
 	end
@@ -2250,11 +2245,7 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 		self.wndBid2:FindChild("Auctions"):FindChild("Assign"):Enable(false)
 		self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
 		self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
-		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("need"):Enable(false)
-		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("pass"):Enable(false)
-		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("slight"):Enable(false)
-		self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("greed"):Enable(false)
-		
+		self:BidCustomLabelsUpdate(false)
 	else
 		self.ActiveAuctions[1].wnd:SetName("Auctions")
 	end
@@ -2295,7 +2286,7 @@ function DKP:Bid2BroadcastMySuperiority()
 end
 
 
-function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass,nDuration,bReceived)
+function DKP:BidAddNewAuction(itemID,bMaster,progress,nDuration,bReceived,tLabels,tLabelsState)
 	
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == itemID then return end
@@ -2327,10 +2318,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass,nDuration,bReceived)
 			targetWnd:FindChild("Auctions"):FindChild("Assign"):Enable(true)
 			targetWnd:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(true)
 			targetWnd:FindChild("Auctions"):FindChild("ShowVotes"):Enable(true)
-			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("need"):Enable(true)
-			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("pass"):Enable(true)
-			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("slight"):Enable(true)
-			targetWnd:FindChild("Auctions"):FindChild("Controls"):FindChild("greed"):Enable(true)
+			self:BidCustomLabelsUpdate(true)
 		end
 		if bMaster == nil then 
 				if #Hook.wndMasterLoot_ItemList:GetChildren() == 0 then bMaster = false else bMaster = true end
@@ -2347,6 +2335,14 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,bPass,nDuration,bReceived)
 			targetWnd:FindChild("TimeLeft"):SetMax(nDuration) 
 		else 
 			targetWnd:FindChild("TimeLeft"):SetMax(self.tItems["settings"]["Bid2"].duration)
+		end
+		if tLabels and tLabelsState then 
+			for k,strLabel in ipairs(tLabels) do
+				targetWnd:FindChild("Controls"):FindChild("Opt"..k):SetText(strLabel)
+			end		
+			for k,bLabel in ipairs(tLabelsState) do
+				targetWnd:FindChild("Controls"):FindChild("Opt"..k):Enable(bLabel)
+			end
 		end
 		targetWnd:FindChild("RemoveAuction"):Enable(true)
 		if progress > 0 then targetWnd:FindChild("TimeLeft"):FindChild("Time"):SetText(self.tItems["settings"]["Bid2"].duration - progress .. "(s)") end
@@ -2405,7 +2401,7 @@ function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	local bPass
 	for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd:GetData() == item:GetItemId() then bPass = auction.bPass break end end
 	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
-	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),string.lower(wndControl:GetName()),wndControl:GetParent():GetParent():GetData(),itemComparee)
+	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),wndControl:GetName(),wndControl:GetParent():GetParent():GetData(),itemComparee)
 	table.insert(self.MyChoices,{item = item:GetItemId(),option = wndControl:GetName()})
 	self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , option = wndControl:GetName(), item = wndControl:GetParent():GetParent():GetData(), itemCompare = itemComparee})
 end
@@ -2489,8 +2485,6 @@ function DKP:Bid2RestoreSettings()
 	self.wndBid2Settings:FindChild("Time"):FindChild("Value"):SetText(self.tItems["settings"]["Bid2"].duration)
 	self.wndBid2Settings:FindChild("Channel"):FindChild("Value"):SetText(self.tItems["settings"]["Bid2"].strChannel)
 	self.wndBid2Settings:FindChild("AssignActionSelection"):FindChild(self.tItems["settings"]["Bid2"].assignAction):SetCheck(true)
-	self.wndBid2Settings:FindChild("AllowOffpsec"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bAllowOffspec)
-	self.wndBid2Settings:FindChild("LootCouncilMode"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bLootCouncil)
 	self.wndBid2Settings:FindChild("WhitelistOption"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bWhitelist)
 	self.wndBid2Settings:FindChild("RegisterPass"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bRegisterPass)
 end
@@ -3298,5 +3292,106 @@ function DKP:AddResponse(who)
 	if self.allResponses == nil then self.allResponses = "" end
 	self.allResponses = self.allResponses .. who .. "\n"
 	self.wndMLResponses:FindChild("EditBox"):SetText(self.allResponses)
+end
+
+--- Customizable Labels
+
+function DKP:BidCustomLabel1NameChanged(wndControl,wndHandler,strText)
+	self.tItems["settings"]["Bid2"].tLabels[1] = strText
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel2NameChanged(wndControl,wndHandler,strText)
+	self.tItems["settings"]["Bid2"].tLabels[2] = strText
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel3NameChanged(wndControl,wndHandler,strText)
+	self.tItems["settings"]["Bid2"].tLabels[3] = strText
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabelsUpdate(bFirstOpened)
+	if bFirstOpened == nil then bFirstOpened = false end
+	for k,strLabel in ipairs(self.tItems["settings"]["Bid2"].tLabels) do 
+		self.wndBid2:FindChild("Legend"):FindChild("Label"..k):FindChild("Text"):SetText(strLabel)
+	end
+	if #self.ActiveAuctions > 0 then
+		for k,auction in ipairs(self.ActiveAuctions) do
+			for j,strLabel in ipairs(self.tItems["settings"]["Bid2"].tLabels) do 
+				auction.wnd:FindChild("Controls"):FindChild("Opt"..j):SetText(strLabel)
+			end
+			for j,bLabel in ipairs(self.tItems["settings"]["Bid2"].tLabelsState) do
+				auction.wnd:FindChild("Controls"):FindChild("Opt"..j):Enable(bLabel)
+			end
+		end
+	else
+		for j,strLabel in ipairs(self.tItems["settings"]["Bid2"].tLabels) do 
+			self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt"..j):SetText(strLabel)
+		end
+		for j=1,4 do
+			self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt"..j):Enable(bFirstOpened)
+		end
+	end
+end
+
+function DKP:BidCustomLabel1Enabled(wndControl,wndHandler)
+	self.tItems["settings"]["Bid2"].tLabelsState[1] = true
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel1Disabled(wndControl,wndHandler)
+	self.tItems["settings"]["Bid2"].tLabelsState[1] = false
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel2Enabled(wndControl,wndHandler)
+	self.tItems["settings"]["Bid2"].tLabelsState[2] = true
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel2Disabled(wndControl,wndHandler)
+	self.tItems["settings"]["Bid2"].tLabelsState[2] = false
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel3Enabled(wndControl,wndHandler)
+	self.tItems["settings"]["Bid2"].tLabelsState[3] = true
+	self:BidCustomLabelsUpdate()
+end
+
+function DKP:BidCustomLabel3Disabled(wndControl,wndHandler)
+	self.tItems["settings"]["Bid2"].tLabelsState[3] = false
+	self:BidCustomLabelsUpdate()
+end
+
+
+function DKP:BidCustomLabelRestore(wndControl,wndHandler)
+	if self.tItems["settings"]["Bid2"].tLabels == nil then
+		self.tItems["settings"]["Bid2"].tLabels =
+		{
+			[1] = "Need",
+			[2] = "Slight Upgrade",
+			[3] = "Greed",
+		}
+	end
+	if self.tItems["settings"]["Bid2"].tLabelsState == nil then
+		self.tItems["settings"]["Bid2"].tLabelsState =
+		{
+			[1] = true,
+			[2] = true,
+			[3] = true,
+		}
+	end
+	for k,label in ipairs(self.tItems["settings"]["Bid2"].tLabels) do
+		self.wndBid2Settings:FindChild("CustomLabels"):FindChild("Label"..k):SetText(label)
+	end	
+	for k,labelState in ipairs(self.tItems["settings"]["Bid2"].tLabelsState) do
+		self.wndBid2Settings:FindChild("CustomLabels"):FindChild("EnableLabel"..k):SetCheck(labelState)
+	end
+end
+
+function DKP:lll(wndControl,wndHandler)
+
 end
 

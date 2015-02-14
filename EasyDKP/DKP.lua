@@ -3392,7 +3392,8 @@ function DKP:ConChangeClass(wndHandler,wndControl)
 	elseif strCurrClass == "Warrior" then strCurrClass = "Stalker" 
 	elseif strCurrClass == "Stalker" then strCurrClass = "Engineer" 
 	elseif strCurrClass == "Engineer" then strCurrClass = "Spellslinger" 
-	elseif strCurrClass == "Spellslinger" then strCurrClass = "Esper" 
+	elseif strCurrClass == "Spellslinger" then strCurrClass = "Esper"
+	elseif strCurrClass == "Set Class" then strCurrClass = "Esper"
 	end
 	wndControl:SetText(strCurrClass)
 	self.tItems[self.wndContext:GetData()].class = strCurrClass

@@ -10,7 +10,7 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
-local knVersion = 1.5
+local knVersion = 1.6
  
 local kUIBody = "ff39b5d4"
 local ktAuctionHeight = 106
@@ -358,7 +358,7 @@ function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 				self.CustomModifier = tMsg.CustomModifier or .5
 				self:FillInCostFormula()
 			elseif tMsg.type == "NewAuction" then
-				self:AddAuction(tMsg.itemID,tMsg.cost,tMsg.duration,tMsg.bAllowOffspec,nil,tMsg.pass)
+				self:AddAuction(tMsg.itemID,tMsg.cost,tMsg.duration,nil,tMsg.pass,tMsg.tLabels,tMsg.tLabelsState)
 			elseif tMsg.type == "AuctionPaused" then
 				self:OnAuctionPasused(tMsg.item)
 			elseif tMsg.type == "AuctionResumed" then
@@ -423,7 +423,7 @@ function RaidOpsMM:SetLootListPos()
 	self.wndLootList:MoveToLocation(self.wndAnchor:GetLocation())
 end
 function RaidOpsMM:AddTestAuction( wndHandler, wndControl, eMouseButton )
-	self:AddAuction(math.random(20000,40000),1000,30,true,nil,false)
+	self:AddAuction(math.random(20000,40000),1000,30,nil,false,{[1] = "Test1" , [2] = "Test2" , [3] = "Test3"},{[1] = true , [2] = true , [3] = true})
 end
 
 function RaidOpsMM:EnableKeepOnTop( wndHandler, wndControl, eMouseButton )
@@ -451,7 +451,7 @@ end
 -- Auction Functions
 ---------------------------------------------------------------------------------------------------
 
-function RaidOpsMM:AddAuction(itemID,cost,duration,bOff,progress,pass)
+function RaidOpsMM:AddAuction(itemID,cost,duration,progress,pass,tLabels,tLabelState)
 	if progress == nil then progress = 0 end
 	local item = Item.GetDataFromId(itemID)
 	if item then
@@ -459,10 +459,16 @@ function RaidOpsMM:AddAuction(itemID,cost,duration,bOff,progress,pass)
 		wndAuction:FindChild("Icon"):SetSprite(item:GetIcon())
 		wndAuction:FindChild("Remove"):Enable(false)
 		wndAuction:FindChild("Icon"):FindChild("Frame"):SetSprite(self:GetSlotSpriteByQuality(item:GetItemQuality()))
+		
+		for k,strLabel in ipairs(tLabels) do
+			wndAuction:FindChild("Opt"..k):SetText(strLabel)
+		end		
+		for k,bLabel in ipairs(tLabelState) do
+			wndAuction:FindChild("Opt"..k):Enable(bLabel)
+		end
 		if cost then wndAuction:FindChild("ItemCost"):SetText(cost .. " GP") else wndAuction:FindChild("ItemCost"):Show(false,false) end
 		wndAuction:SetMax(duration)
 		wndAuction:SetProgress(progress,100)
-		if not bOff then wndAuction:FindChild("Greed"):Enable(false) end
 		wndAuction:SetData(itemID)
 		table.insert(self.ActiveAuctions,{wnd = wndAuction , bActive = true , nTimeLeft = progress, nDuration = duration, bPass = pass})
 		if self.Timer == nil then self:AuctionTimerStart() end
@@ -514,11 +520,12 @@ function RaidOpsMM:ItemOptionSelected( wndHandler, wndControl, eMouseButton )
 	if self.channel then
 		local bPass
 		for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd == wndControl:GetParent() then bPass =  auction.bPass end end
-		if not bPass and self.settings.bAutoClose and wndControl:GetName() == "pass" then
+		for k,choice in ipairs(self.MyChoices) do if choice.item == wndControl:GetParent():GetData() and choice.option == "Opt4" then bPass = true break end end
+		if not bPass and self.settings.bAutoClose and wndControl:GetName() == "Opt4" then
 			self:RemoveAuction(wndControl:GetParent():GetData())
 			return
 		end
-		if not bPass and wndControl:GetName() == "pass" then 
+		if not bPass and wndControl:GetName() == "Opt4" then 
 			wndControl:GetParent():FindChild("GlowyThingy"):Show(false,false)
 			self:ArrangeAuctions()
 			table.insert(self.MyChoices,{option = wndControl:GetName(),item = wndControl:GetParent():GetData()})
@@ -531,7 +538,7 @@ function RaidOpsMM:ItemOptionSelected( wndHandler, wndControl, eMouseButton )
 			local item =  Item.GetDataFromId(wndControl:GetParent():GetData())
 			if item:IsEquippable() then msg.itemCompare = item:GetEquippedItemForItemType():GetItemId() end
 			self.channel:SendMessage(msg)
-			if msg.option == "pass" then 
+			if msg.option == "Opt4" then 
 				if self.settings.bAutoClose then 
 					self:RemoveAuction(wndControl:GetParent():GetData())
 					return
@@ -604,10 +611,10 @@ function RaidOpsMM:UpdateProgress()
 			if auction.nTimeLeft >= auction.nDuration then 
 				auction.bActive = false
 				auction.wnd:FindChild("TimeLeft"):SetText("Waiting for results")
-				auction.wnd:FindChild("need"):Enable(false)
-				auction.wnd:FindChild("greed"):Enable(false)
-				auction.wnd:FindChild("pass"):Enable(false)
-				auction.wnd:FindChild("slight"):Enable(false)
+				auction.wnd:FindChild("Opt1"):Enable(false)
+				auction.wnd:FindChild("Opt2"):Enable(false)
+				auction.wnd:FindChild("Opt3"):Enable(false)
+				auction.wnd:FindChild("Opt4"):Enable(false)
 				auction.wnd:FindChild("Remove"):Enable(true)
 				auction.wnd:FindChild("GlowyThingy"):Show(false,false)
 			end
@@ -952,13 +959,6 @@ function RaidOpsMM:RefreshStandingsAndGroup()
 			end
 		end
 	end
---[[table.sort(esp,easyDKPSortPlayerbyLabelNotWnd)
-	table.sort(eng,easyDKPSortPlayerbyLabelNotWnd)
-	table.sort(med,easyDKPSortPlayerbyLabelNotWnd)
-	table.sort(war,easyDKPSortPlayerbyLabelNotWnd)
-	table.sort(sta,easyDKPSortPlayerbyLabelNotWnd)
-	table.sort(spe,easyDKPSortPlayerbyLabelNotWnd)
-	table.sort(unknown,easyDKPSortPlayerbyLabelNotWnd)]]
 	local tables = {
 		[1] = esp,
 		[2] = eng,
