@@ -92,6 +92,8 @@ function DKP:EPGPInit()
 end
 
 function DKP:OnLootedItem(item)
+
+
 	self.ItemDatabase[item:GetName()] = {}
 	self.ItemDatabase[item:GetName()].ID = item:GetItemId()
 	self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()
@@ -612,8 +614,6 @@ end
 function DKP:EPGPGetItemCostByID(itemID)
 	local item = Item.GetDataFromId(itemID)
 	if string.find(item:GetName(),"Imprint") then
-		Print(self:EPGPGetTokenItemID(item:GetName()))
-		Print(item:GetName())
 		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
 	end
 	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then

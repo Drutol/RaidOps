@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------------------------
 -- Client Lua Script for EasyDKP
--- Copyright (c) Piotr Szymczak 2014 	dogier140@poczta.fm.
+-- Copyright (c) Piotr Szymczak 2015 	dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
 
 local Hook = Apollo.GetAddon("MasterLoot")
@@ -102,10 +102,12 @@ function DKP:BidCompleteInit()
 		self.wndMain:FindChild("LabelAuction"):Show(false)
 		self.wndHub:FindChild("NetworkBidding"):Enable(false)
 		self.wndHub:FindChild("NetworkBidding"):SetTextColor("vdarkgray")
-		Print("RaidOps - Could not find default Master Loot Addon - All Bidding/ML Functionalities are now suspended")
+		Print("RaidOps - Could not find default Master Loot Addon - All Bidding/ML Functionalities are now suspended.")
 		self:DSInit()
 		return
 	end
+	
+
 	bInitialized = true
 	self.wait_timer:Stop()
 	self:InitBid2()
@@ -230,7 +232,11 @@ function DKP:BidCompleteInit()
 	--Post Update To generate Labels for Main DKP window
 	if self:LabelGetColumnNumberForValue("Item") ~= - 1 then self:LabelUpdateList() end
 	
+	--local test = Item.GetDataFromId(60420)
+	--Tooltip.GetItemTooltipForm(self,self.wndMain:FindChild("RaidOnly"),test,{bPrimary = true, bSelling = false})
+	
 	--self:BidInsertChildren()
+	
 end
 
 function DKP:BidFillInSlotValues()
@@ -344,6 +350,7 @@ end
 
 function DKP:BidUpdateItemDatabase()
 	local curItemList = GameLib.GetMasterLoot()
+	if self.ItemDatabase == nil then self.ItemDatabase = {} end
 	if curItemList ~= nil then
 		for idxNewItem, tCurNewItem in pairs(curItemList) do
 			self.ItemDatabase[tCurNewItem.itemDrop:GetName()] = {}
@@ -2090,17 +2097,11 @@ function DKP:Bid2ArrangeResponses(auction)
 			table.insert(passes,bidder)
 		end
 	end
-	if not self.tItems["settings"].bLootCouncil then
-		table.sort(needs,easyDKpsortBid2Bidders)
-		table.sort(passes,easyDKpsortBid2Bidders)
-		table.sort(slights,easyDKpsortBid2Bidders)
-		table.sort(greeds,easyDKpsortBid2Bidders)
-	else
-		table.sort(needs,easyDKpsortBid2BiddersLootCouncil)
-		table.sort(passes,easyDKpsortBid2BiddersLootCouncil)
-		table.sort(slights,easyDKpsortBid2BiddersLootCouncil)
-		table.sort(greeds,easyDKpsortBid2BiddersLootCouncil)
-	end
+	
+	table.sort(needs,easyDKpsortBid2Bidders)
+	table.sort(passes,easyDKpsortBid2Bidders)
+	table.sort(slights,easyDKpsortBid2Bidders)
+	table.sort(greeds,easyDKpsortBid2Bidders)
 	
 	auction.wnd:FindChild("Responses"):DestroyChildren()
 	for k,bidder in ipairs(needs) do
