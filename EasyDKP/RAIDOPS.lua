@@ -34,10 +34,10 @@ local ktStringToIcon =
 local wndListedNews = {}
 
 function DKP:RaidOpsInit()
+	self:HubSettingsInit()
 	self:AttendanceInit()
 	self:HubInit()
 	self:LootListInit()
-	self:HubSettingsInit()
 end
 
 function DKP:HubInit()
@@ -343,19 +343,23 @@ function DKP:LootListIconWindowPopulate()
 			for i=1,#self.tItems["Raids"][k].tPlayers do
 				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
 					local item = Item.GetDataFromId(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].ID)
-					if inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] == nil or self.tItems["settings"].HubRemDup == 0 then
-						local wnd = Apollo.LoadForm(self.xmlDoc2,"ItemIcon",icons,self)
-						wnd:FindChild("Icon"):SetSprite(item:GetIcon())
-						wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
-						wnd:FindChild("Recipent"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
-						wnd:SetData({itemData = item , raidData = k , cost = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp, currency = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency})
-						Tooltip.GetItemTooltipForm(self, wnd:FindChild("Icon") , item , {bPrimary = true, bSelling = false})
-						counter = counter + 1
-						if counter >= self.tItems["settings"].HubItemCount then
-							icons:ArrangeChildrenTiles(0)
-							return
+					if item:GetDetailedInfo().tPrimary.nEffectiveLevel >= self.tItems["settings"].HubItemLevelTreshold then
+						if not self.tItems["settings"].HubOnlyEqippable or self.tItems["settings"].HubOnlyEqippable and item:IsEquippable() then
+							if inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] == nil or self.tItems["settings"].HubRemDup == 0 then
+								local wnd = Apollo.LoadForm(self.xmlDoc2,"ItemIcon",icons,self)
+								wnd:FindChild("Frame"):FindChild("Icon"):SetSprite(item:GetIcon())
+								wnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+								wnd:FindChild("Recipent"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
+								wnd:SetData({itemData = item , raidData = k , cost = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp, currency = self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency})
+								Tooltip.GetItemTooltipForm(self, wnd:FindChild("Icon") , item , {bPrimary = true, bSelling = false})
+								counter = counter + 1
+								if counter >= self.tItems["settings"].HubItemCount then
+									icons:ArrangeChildrenTiles(0)
+									return
+								end
+								inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
+							end
 						end
-						inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
 					end
 				end
 			end
@@ -391,6 +395,11 @@ function DKP:LootListGetCountForItem(strItem)
 	return counter
 end
 
+function DKP:LootListRefresh()
+	self:LootListIconWindowPopulate()
+	self:LootListListWindowPopulate()
+end
+
 function DKP:LootListListWindowPopulate()
 	local list = self.wndListList:FindChild("List")
 	list:DestroyChildren()
@@ -401,21 +410,24 @@ function DKP:LootListListWindowPopulate()
 			for i=1,#self.tItems["Raids"][k].tPlayers do
 				for j=1,#self.tItems["Raids"][k].tPlayers[i].tClaimedLoot do
 					local item = Item.GetDataFromId(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].ID)
-					if inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] == nil or self.tItems["settings"].HubRemDup == 0 then
-						local wnd = Apollo.LoadForm(self.xmlDoc2,"ListItem",list,self)
-						
-						wnd:FindChild("Icon"):SetSprite(item:GetIcon())
-						wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
-						wnd:FindChild("Looter"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
-						wnd:FindChild("Date"):SetText(self.tItems["Raids"][k].date.strDate)
-						wnd:FindChild("Cost"):SetText(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp .. " " .. self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency)
-						Tooltip.GetItemTooltipForm(self,wnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
-						counter = counter + 1
-						if counter >= self.tItems["settings"].HubItemCount then
-							list:ArrangeChildrenTiles(0)
-							return
+					if item:GetDetailedInfo().tPrimary.nEffectiveLevel >= self.tItems["settings"].HubItemLevelTreshold then
+						if not self.tItems["settings"].HubOnlyEqippable or self.tItems["settings"].HubOnlyEqippable and item:IsEquippable() then
+							if inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] == nil or self.tItems["settings"].HubRemDup == 0 then
+								local wnd = Apollo.LoadForm(self.xmlDoc2,"ListItem",list,self)
+								wnd:FindChild("Icon"):SetSprite(item:GetIcon())
+								wnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+								wnd:FindChild("Looter"):SetText(self.tItems["Raids"][k].tPlayers[i].name)
+								wnd:FindChild("Date"):SetText(self.tItems["Raids"][k].date.strDate)
+								wnd:FindChild("Cost"):SetText(self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].dkp .. " " .. self.tItems["Raids"][k].tPlayers[i].tClaimedLoot[j].currency)
+								Tooltip.GetItemTooltipForm(self,wnd:FindChild("Icon"),item,{bPrimary = true, bSelling = false})
+								counter = counter + 1
+								if counter >= self.tItems["settings"].HubItemCount then
+									list:ArrangeChildrenTiles(0)
+									return
+								end
+								inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
+							end
 						end
-						inserted[self.tItems["Raids"][k].tPlayers[i].name..item:GetName()] = 1
 					end
 				end
 			end
@@ -454,6 +466,12 @@ function DKP:HubSettingsRestore()
 	if self.tItems["settings"].HubCallRaidBy == "Name" then self.wndHubSettings:FindChild("OptionRaidNaming"):FindChild("Name"):SetCheck(true) end
 	if self.tItems["settings"].HubRemDup == nil then self.tItems["settings"].HubRemDup = 1 end
 	if self.tItems["settings"].HubRemDup == 1 then self.wndHubSettings:FindChild("OptionRemDup"):FindChild("Value"):SetCheck(true) end
+	
+	if self.tItems["settings"].HubOnlyEqippable == nil then self.tItems["settings"].HubOnlyEqippable = false end
+	if self.tItems["settings"].HubItemLevelTreshold == nil then self.tItems["settings"].HubItemLevelTreshold = 60 end
+	
+	self.wndHubSettings:FindChild("OnlyEquip"):FindChild("Value"):SetCheck(self.tItems["settings"].HubOnlyEqippable)
+	self.wndHubSettings:FindChild("iLvlTreshold"):FindChild("Value"):SetText(self.tItems["settings"].HubItemLevelTreshold)
 	
 	self.wndHubSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n /sum - For Raid Summaries \n /rops - For RaidOps windo \n")
 
@@ -495,10 +513,18 @@ function DKP:HubSettingsRemDupDisable()
 	self.tItems["settings"].HubRemDup = 0
 end
 
+function DKP:HubSettingsEquippableOnlyEnable()
+	self.tItems["settings"].HubOnlyEqippable = true
+end
+
+function DKP:HubSettingsEquippableOnlyDisable()
+	self.tItems["settings"].HubOnlyEqippable = false
+end
+
 function DKP:HubSettingsSetNewsCount(wndHandler,wndControl,strText)
 	if tonumber(strText) then
 		local value = tonumber(strText)
-		if value > 0 and value <= 50 then
+		if value > 0 and value <= 10 then
 			self.tItems["settings"].HubNewsCount = value
 		else
 			wndControl:SetText("5")
@@ -513,14 +539,29 @@ end
 function DKP:HubSettingsSetLootCount(wndHandler,wndControl,strText)
 	if tonumber(strText) then
 		local value = tonumber(strText)
-		if value > 0 and value <= 50 then
-			self.tItems["settings"].HubNewsCount = value
+		if value > 0 and value <= 500 then
+			self.tItems["settings"].HubItemCount = value
 		else
 			wndControl:SetText("20")
-			self.tItems["settings"].HubNewsCount = 20
+			self.tItems["settings"].HubItemCount = 20
 		end
 	else
 		wndControl:SetText("20")
-		self.tItems["settings"].HubNewsCount = 20
+		self.tItems["settings"].HubItemCount = 20
+	end
+end
+
+function DKP:HubSettingsSetILvl(wndHandler,wndControl,strText)
+	if tonumber(strText) then
+		local value = tonumber(strText)
+		if value > 0 and value <= 500 then
+			self.tItems["settings"].HubItemLevelTreshold = value
+		else
+			wndControl:SetText("60")
+			self.tItems["settings"].HubItemLevelTreshold = 60
+		end
+	else
+		wndControl:SetText("60")
+		self.tItems["settings"].HubItemLevelTreshold = 60
 	end
 end

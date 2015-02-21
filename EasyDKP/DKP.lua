@@ -3708,11 +3708,49 @@ function DKP:CEInit()
 	self.wndCE = self.wndMain:FindChild("CustomEvents")
 	self.wndCEL = Apollo.LoadForm(self.xmlDoc,"HandledEventsList",nil,self)
 	self.wndCEL:Show(false,true)
+	self.wndCE:Show(false,true)
 	self.wndCE:FindChild("IfBoss"):Show(false,true)
 	self.wndCE:FindChild("IfUnit"):Show(false,true)
+	
+	if self.tItems["settings"].CEEnable == nil then self.tItems["settings"].CEEnable = false end
+	if self.tItems["settings"].CERaidOnly == nil then self.tItems["settings"].CERaidOnly = false end
+	
+	self.wndCE:FindChild("Enable"):SetCheck(self.tItems["settings"].CEEnable)
+	self.wndCE:FindChild("RaidOnly"):SetCheck(self.tItems["settings"].CERaidOnly)
+	
+	if self.tItems["settings"].CEEnable then Apollo.RegisterEventHandler("CombatLogDamage","CEOnUnitDamage", self) end
+	
+	
 	if self.tItems["CE"] == nil then self.tItems["CE"] = {} end
 end
 
+function DKP:CEShow()
+	self.wndCE:Show(true,false)
+	self.wndCE:ToFront()
+	self:CEPopulate()
+end
+
+function DKP:CEHide()
+	self.wndCE:Show(false,false)
+end
+
+function DKP:CEEnable()
+	self.tItems["settings"].CEEnable = true
+	Apollo.RegisterEventHandler("CombatLogDamage","CEOnUnitDamage", self)
+end
+
+function DKP:CEDisable()
+	self.tItems["settings"].CEEnable = false
+	Apollo.RemoveEventHandler("CombatLogDamage",self)
+end
+
+function DKP:CERaidOnlyEnable()
+	self.tItems["settings"].CERaidOnly = true
+end
+
+function DKP:CERaidOnlyDisable()
+	self.tItems["settings"].CERaidOnly = false
+end
 
 -- Dropdowns
 
@@ -3778,6 +3816,54 @@ function DKP:BossItemSelected(wndHandler,wndControl)
 	self:CECollapseBosses()
 end
 
+function DKP:CETriggerEvent(eID)
+	local event = self.tItems["CE"][eID]
+	if event then
+		local raid = self:Bid2GetTargetsTable()
+		local strMob = event.bType or event.strUnit
+		if event.rType == "RMQ" then
+			for k,queued in ipairs(self.tItems.tQueuedPlayers) do
+				if self.tItems[queued] then table.insert(raid,self.tItems[queued].strName) end
+			end
+		end
+		for k,member in ipairs(raid) do
+			local pID = self:GetPlayerByIDByName(member)
+			if pID ~= -1 then
+				if event.EP then
+					self.tItems[pID].EP = self.tItems[pID].EP + event.EP
+					self:DetailAddLog("Award for triggering event : "..eID,"{EP}",event.EP,pID)
+				end
+				if event.GP then
+					self.tItems[pID].GP = self.tItems[pID].GP + event.GP
+					self:DetailAddLog("Award for triggering event : "..eID,"{GP}",event.EP,pID)
+				end
+				if event.DKP then
+					self.tItems[pID].net = self.tItems[pID].net + event.DKP
+					self.tItems[pID].tot = self.tItems[pID].tot + event.DKP
+					self:DetailAddLog("Award for triggering event : "..eID,"{DKP}",event.EP,pID)
+				end
+			end
+		end
+		event.nTriggerCount = event.nTriggerCount + 1
+		if self.tItems["settings"].tCETriggeredEvents == nil then self.tItems["settings"].tCETriggeredEvents = {} end
+		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")",strDate = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
+		if #self.tItems["settings"].tCETriggeredEvents > 20 then table.remove(self.tItems["settings"].tCETriggeredEvents,20) end
+		if self.wndCE:IsShown() then self:CEPopulate() end
+
+	end
+end
+
+function DKP:CEPopulate()
+	local grid = self.wndCE:FindChild("Grid")
+	grid:DeleteAll()
+	if self.tItems["settings"].tCETriggeredEvents == nil then self.tItems["settings"].tCETriggeredEvents = {} end
+	for k,entry in ipairs(self.tItems["settings"].tCETriggeredEvents) do
+		grid:AddRow(k)
+		grid:SetCellData(k,1,entry.strEv)
+		grid:SetCellData(k,2,entry.strDate)
+	end
+end
+
 function DKP:CECreate()
 	if tCreatedEvent.uType and tCreatedEvent.rType then
 		if tCreatedEvent.uType == "Unit" and tCreatedEvent.strUnit or tCreatedEvent.uType == "Boss" and tCreatedEvent.bType then
@@ -3794,7 +3880,7 @@ function DKP:CECreate()
 				tCreatedEvent.DKP = tonumber(self.wndCE:FindChild("ValueDKP"):GetText())
 			end
 			
-			table.insert(self.tItems["CE"],{uType = tCreatedEvent.uType,bType = tCreatedEvent.bType,rType = tCreatedEvent.rType,EP = tCreatedEvent.EP,GP = tCreatedEvent.GP,DKP = tCreatedEvent.DKP,strUnit = tCreatedEvent.strUnit})
+			table.insert(self.tItems["CE"],{uType = tCreatedEvent.uType,bType = tCreatedEvent.bType,rType = tCreatedEvent.rType,EP = tCreatedEvent.EP,GP = tCreatedEvent.GP,DKP = tCreatedEvent.DKP,strUnit = tCreatedEvent.strUnit,nTriggerCount = 0})
 			
 			tCreatedEvent.EP = nil
 			tCreatedEvent.GP = nil
@@ -3837,11 +3923,11 @@ function DKP:CELPopulate()
 		wnd:FindChild("Recipents"):SetText(event.rType == "RM" and "Raid Members" or "Raid Members + Queue")
 		local strAwards = ""
 		if event.EP then strAwards = strAwards .. " EP : " .. event.EP end
-		if event.GP then strAwards = strAwards .. " GP : " .. event.EP end
-		if event.DKP then strAwards = strAwards .. " DKP : " .. event.EP end
+		if event.GP then strAwards = strAwards .. " GP : " .. event.GP end
+		if event.DKP then strAwards = strAwards .. " DKP : " .. event.DKP end
 		if strAwards == "" then strAwards = "None" end
 		wnd:FindChild("Awards"):SetText(strAwards)
-		wnd:FindChild("TriggerCount"):SetText(event.nTriggers or 0)
+		wnd:FindChild("TriggerCount"):SetText(event.nTriggerCount or 0)
 		wnd:FindChild("ID"):SetText(k)
 		wnd:SetData(k)
 	end
@@ -3864,17 +3950,17 @@ local tKilledBossesInSession = {
 
 }
 
-function DKP:RaidOnUnitDestroyed(tArgs)
-	
+function DKP:CEOnUnitDamage(tArgs)
+	if self.tItems["settings"].CERaidOnly and not GroupLib.InRaid() then return end
 	if  tArgs.bTargetKilled== false then return end
 	
 	local tUnits = {}
 	local tBosses = {}
 	
 	for k,event in ipairs(self.tItems["CE"]) do 
-		if event.uType = "Unit" then table.insert(tUnits,{strUnit = event.strUnit,ID = k}) else table.insert(tBosses,{bType = event.bType,ID = k}) end
+		if event.uType == "Unit" then table.insert(tUnits,{strUnit = event.strUnit,ID = k}) else table.insert(tBosses,{bType = event.bType,ID = k}) end
 	end
-	local name = string.lower(tArgs.unitTarget:GetName())
+	local name =tArgs.unitTarget:GetName()
 	
 	
 	-- Counting Council Fights
@@ -3883,10 +3969,23 @@ function DKP:RaidOnUnitDestroyed(tArgs)
 	if name == "Phagetech Protector" then tKilledBossesInSession.tech3 = true end
 	if name == "Phagetech Fabricator" then tKilledBossesInSession.tech4 = true end
 	
+	if name == "Ersoth Curseform" then tKilledBossesInSession.born1 = true end
+	if name == "Fleshmonger Vratorg" then tKilledBossesInSession.born2 = true end
+	if name == "Terax Blightweaver" then tKilledBossesInSession.born3 = true end
+	if name == "Goldox Lifecrusher" then tKilledBossesInSession.born4 = true  end
+	if name == "Noxmind the Insidious" then tKilledBossesInSession.born5 =true end
+		
+	
+	local bornCounter = 0
+	if tKilledBossesInSession.born1 then bornCounter = bornCounter + 1 end 
+	if tKilledBossesInSession.born2 then bornCounter = bornCounter + 1 end 
+	if tKilledBossesInSession.born3 then bornCounter = bornCounter + 1 end 
+	if tKilledBossesInSession.born4 then bornCounter = bornCounter + 1 end 
+	if tKilledBossesInSession.born5 then bornCounter = bornCounter + 1 end 
 	
 	if #tUnits > 0 then
 		for k,unit in ipairs(tUnits) do
-			if string.lower(unit.strUnit) == name do
+			if string.lower(unit.strUnit) == string.lower(name) then
 				self:CETriggerEvent(unit.ID)
 				return
 			end
@@ -3896,63 +3995,30 @@ function DKP:RaidOnUnitDestroyed(tArgs)
 	if #tBosses > 0 then
 		for k,boss in ipairs(tBosses) do
 			if boss.bType ~= "Phageborn Convergence" and boss.bType ~= "Phagetech Prototypes" then
-			
-			
+				if string.lower(boss.bType) == string.lower(name) then
+					self:CETriggerEvent(boss.ID)
+					break
+				end
 			else
-				if boss.bType == "Phageborn Convergence" then
-				
-				else
-				
+				if boss.bType == "Phageborn Convergence" and not tKilledBossesInSession.bornTriggerred then
+					if bornCounter >= 4 then 
+						tKilledBossesInSession.bornTriggerred = true
+						self:CETriggerEvent(boss.ID)
+						break
+					end
+				elseif boss.bType == "Phagetech Prototypes" and not tKilledBossesInSession.techTriggered then
+					if tKilledBossesInSession.tech1 and tKilledBossesInSession.tech2 and tKilledBossesInSession.tech3 and tKilledBossesInSession.tech4 then
+						tKilledBossesInSession.techTriggered = true
+						self:CETriggerEvent(boss.ID)
+						break
+					end
 				end
 			end
 		end
 	end
 	
-		-- GA
-		if name == "Ersoth Curseform" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1  end
-		if name == "Fleshmonger Vratorg" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-		if name == "Terax Blightweaver" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-		if name == "Goldox Lifecrusher" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
-		if name == "Noxmind the Insidious" then self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount +1 end
 		
-		if  self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount >= 4 then
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,"Phageborn Convergence")
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.converCount = 0
-		end
-		
-	
-		
-		if name == "Experiment X-89" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Kuralak the Defiler" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Phage Maw" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Phageborn Convergence" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Dreadphage Ohmna" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Genetic Archives"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		end
-	end
-		-- DS
-	if self.tItems["Raids"][currentRaidID].RaidSure == false or self.tItems["Raids"][currentRaidID].RaidSure == true and self.tItems["Raids"][currentRaidID].Raid == "Datascape"  then
-		
-		if name == "Megalith" or name == "Hydroflux" or name == "Visceralus" or name == "Aileron" or name == "Pyrobane" or name == "Mnemesis" then
+		--[[if name == "Megalith" or name == "Hydroflux" or name == "Visceralus" or name == "Aileron" or name == "Pyrobane" or name == "Mnemesis" then
 			if self.tItems["Raids"][currentRaidID].tMisc.tBossKills.pairs == nil then  self.tItems["Raids"][currentRaidID].tMisc.tBossKills.pairs = {} end
 			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.pairs,name)
 		end
@@ -3969,35 +4035,7 @@ function DKP:RaidOnUnitDestroyed(tArgs)
 			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
 		elseif name == "Mnemesis" then
 			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.elementals + 1
-		end
-		
-		
-		
-		
-		
-		
-		if name == "System Daemons" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Gloomclaw" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Maelstrom Authority" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		elseif name == "Avatus" then
-			self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count = self.tItems["Raids"][currentRaidID].tMisc.tBossKills.count +1
-			table.insert(self.tItems["Raids"][currentRaidID].tMisc.tBossKills.names,name)
-			self.tItems["Raids"][currentRaidID].Raid = "Datascape"
-			self.tItems["Raids"][currentRaidID].RaidSure = true
-		end
-	end
+		end]]
 end
 
 

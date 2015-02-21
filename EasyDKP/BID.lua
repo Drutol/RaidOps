@@ -1768,6 +1768,7 @@ end
 
 function DKP:MLSettingShow()
 	self.wndMLSettings:Show(true,false)
+	self.wndMLSettings:ToFront()
 end
 
 function DKP:Bid2FetchAuctions(strML)
