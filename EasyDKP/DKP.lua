@@ -44,6 +44,16 @@ local ktStringToIcon =
 	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
 
+local ktStringToNewIcon =
+{
+	["Medic"]       	= "BK3:UI_Icon_CharacterCreate_Class_Medic",
+	["Esper"]       	= "BK3:UI_Icon_CharacterCreate_Class_Esper",
+	["Warrior"]     	= "BK3:UI_Icon_CharacterCreate_Class_Warrior",
+	["Stalker"]     	= "BK3:UI_Icon_CharacterCreate_Class_Stalker",
+	["Engineer"]    	= "BK3:UI_Icon_CharacterCreate_Class_Engineer",
+	["Spellslinger"]  	= "BK3:UI_Icon_CharacterCreate_Class_Spellslinger",
+}
+
 local umplauteConversions = {
 	["ä"] = "ae",
 	["ö"] = "oe",
@@ -1475,6 +1485,10 @@ function DKP:MassEditDisable( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditSelectRaid( wndHandler, wndControl, eMouseButton )
+	for k,wnd in ipairs(selectedMembers) do
+		wnd:SetCheck(false)
+	end
+	selectedMembers = {}
 	local children = self.wndItemList:GetChildren()
 	for k,child in ipairs(children) do
 		if self:IsPlayerInRaid(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()) then
@@ -1482,6 +1496,40 @@ function DKP:MassEditSelectRaid( wndHandler, wndControl, eMouseButton )
 			table.insert(selectedMembers,child)
 		end
 	end
+end
+
+function DKP:MassEditInvite()
+	local strRealm = GameLib.GetRealmName()
+	local strMsg = "Raid time!"
+	local invitedIDs = {}
+	for k,wnd in ipairs(selectedMembers) do
+		if wnd:GetData() and self.tItems[wnd:GetData()] then
+			GroupLib.Invite(self.tItems[wnd:GetData()].strName,strRealm,strMessage)
+			table.insert(invitedIDs,wnd:GetData())
+		end
+	end
+	self:InviteOpen(invitedIDs)
+end
+
+function DKP:MassEditInvert()
+	local newSelectedMembers = {}
+	local children = self.wndItemList:GetChildren()
+	for k,wnd in ipairs(selectedMembers) do
+		wnd:SetCheck(false)
+	end
+	for k,child in ipairs(children) do
+		local found = false
+		for j,wnd in ipairs(selectedMembers) do
+			if wnd == child then found = true break end
+		end
+		if not found then table.insert(newSelectedMembers,child) end
+	end
+	selectedMembers = newSelectedMembers
+	newSelectedMembers = nil 
+	for k,wnd in ipairs(selectedMembers) do
+		wnd:SetCheck(true)
+	end
+	
 end
 
 function DKP:MassEditDeselect( wndHandler, wndControl, eMouseButton )
@@ -4038,7 +4086,64 @@ function DKP:CEOnUnitDamage(tArgs)
 		end]]
 end
 
+-----------------------------------------------------------------------------------------------
+-- Invites
+-----------------------------------------------------------------------------------------------
+local tInvited = {}
+function DKP:InvitesInit()
+	self.wndInv = Apollo.LoadForm(self.xmlDoc,"InviteDialog",nil,self)
+	self.wndInv:Show(false,true)
+end
 
+function DKP:InviteOpen(tIDs)
+	for k,ID in ipairs(tIDs) do
+		local found = false
+		for j,inv in ipairs(tInvited) do
+			if inv.ID == ID then found = true break end
+		end
+		if not found then table.insert(tInvited,{ID = ID,status = "P"}) end
+	end
+end
+
+function DKP:InvitePopulate()
+	self.wndInv:FindChild("ListInvited"):DestroyChildren()
+	
+	local nEsper = 0
+	local nEngineer = 0
+	local nWarrior = 0
+	local nMedic = 0
+	local nSpellslinger = 0
+	local nStalker = 0
+	
+	
+	for k,inv in ipairs(tInvited) do
+		if inv.status == "P" then
+			local player = self.tItems[inv.ID]
+			if player.class ~= nil then
+				if player.class == "Esper" then
+					nEsper = nEsper + 1
+				elseif player.class == "Engineer" then
+					nEngineer = nEngineer + 1
+				elseif player.class == "Medic" then
+					nMedic = nMedic + 1
+				elseif player.class == "Warrior" then
+					nWarrior = nWarrior + 1
+				elseif player.class == "Stalker" then
+					nStalker = nStalker + 1
+				elseif player.class == "Spellslinger" then
+					nSpellslinger = nSpellslinger + 1
+				end
+			end
+			
+			local wnd = Apollo.LoadForm(self.xmlDoc,"InviteEntry",self.wndInv:FindChild("ListInvited"),self)
+		else
+		
+		end
+		
+		
+	end
+
+end
 
 
 -----------------------------------------------------------------------------------------------

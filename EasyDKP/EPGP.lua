@@ -111,7 +111,7 @@ function DKP:OnLootedItem(item)
 end
 
 function DKP:EPGPGetTokenItemID(strToken)
-	if string.find(strToken,"Calculated") then --DS
+	if string.find(strToken,"Calculated") or string.find(strToken,"Algebraic") or string.find(strToken,"Logarithmic") then --DS
 		if string.find(strToken,"Chestplate") then return DataScapeTokenIds["Chest"] 
 		elseif string.find(strToken,"Greaves") then return DataScapeTokenIds["Legs"] 
 		elseif string.find(strToken,"Helm") then return DataScapeTokenIds["Head"] 
@@ -119,7 +119,7 @@ function DKP:EPGPGetTokenItemID(strToken)
 		elseif string.find(strToken,"Glove") then return DataScapeTokenIds["Hands"] 
 		elseif string.find(strToken,"Boot") then return DataScapeTokenIds["Feet"] 
 		end
-	elseif string.find(strToken,"Xenological") then --GA
+	elseif string.find(strToken,"Xenological") or string.find(strToken,"Xenobiotic") or string.find(strToken,"Xenogenetic") then --GA
 		if string.find(strToken,"Chestplate") then return GeneticTokenIds["Chest"] 
 		elseif string.find(strToken,"Greaves") then return GeneticTokenIds["Legs"] 
 		elseif string.find(strToken,"Helm") then return GeneticTokenIds["Head"] 

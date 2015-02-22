@@ -5,9 +5,11 @@
     <Script Name="libs/Serpent.lua"/>
     <Script Name="DKP.lua"/>
     <Script Name="RAID.lua"/>
+    <Script Name="RAID2.lua"/>
     <Script Name="BID.lua"/>
     <Script Name="EPGP.lua"/>
     <Script Name="RAIDOPS.lua"/>
     <Form Name="DKP.xml"/>
     <Form Name="DKP2.xml"/>
+    <Form Name="DKP3.xml"/>
 </Addon>
