@@ -21,7 +21,9 @@ local ktClassToIcon =
 	[GameLib.CodeEnumClass.Spellslinger]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
 
-local ktStringToIcon =
+local ktStringToIcon = {}
+
+local ktStringToIconOrig =
 {
 	["Medic"]       	= "Icon_Windows_UI_CRB_Medic",
 	["Esper"]       	= "Icon_Windows_UI_CRB_Esper",
@@ -30,6 +32,17 @@ local ktStringToIcon =
 	["Engineer"]    	= "Icon_Windows_UI_CRB_Engineer",
 	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
+
+local ktStringToNewIconOrig =
+{
+	["Medic"]       	= "BK3:UI_Icon_CharacterCreate_Class_Medic",
+	["Esper"]       	= "BK3:UI_Icon_CharacterCreate_Class_Esper",
+	["Warrior"]     	= "BK3:UI_Icon_CharacterCreate_Class_Warrior",
+	["Stalker"]     	= "BK3:UI_Icon_CharacterCreate_Class_Stalker",
+	["Engineer"]    	= "BK3:UI_Icon_CharacterCreate_Class_Engineer",
+	["Spellslinger"]  	= "BK3:UI_Icon_CharacterCreate_Class_Spellslinger",
+}
+
 
 local ktOptionToIcon =
 {
@@ -80,9 +93,15 @@ local umplauteConversions = {
 local bInitialized = false
 local timeout = 5
 function DKP:BidBeginInit()
+	if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
 	Apollo.RegisterTimerHandler(1, "OnWait", self)
 	self.wait_timer = ApolloTimer.Create(1, true, "OnWait", self)
 end
+
+function DKP:BidUpdateColorScheme()
+	if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
+end
+
 local wait_counter = 0
 function DKP:OnWait()
 	if wait_counter == 1 then 
@@ -2929,6 +2948,21 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
 					end
 				end
+			
+				-- Guild Bank
+				local wndGuildBank
+				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank then
+					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
+						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					else
+						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					end
+					
+					wndGuildBank:FindChild("CharacterName"):SetText("Guild Bank")
+					wndGuildBank:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
+					wndGuildBank:FindChild("CharacterLevel"):SetText("")
+				end
+
 				-- Finally Creating windows
 				local unitGBManager
 				for k,tab in pairs(tables) do
@@ -3019,22 +3053,12 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						end
 					end
 				end
-								-- For for ended
-				-- Guild Bank
-				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and unitGBManager then
-					local wnd
-					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
-						wnd = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
-					else
-						wnd = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
-					end
-					
-					wnd:FindChild("CharacterName"):SetText("Guild Bank")
-					wnd:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
-					wnd:FindChild("CharacterLevel"):SetText("")
-					wnd:SetTooltip(unitGBManager:GetName() .. " is behind this.")
-					wnd:SetData(unitGBManager)
+				-- For for ended
+				if wndGuildBank and unitGBManager then
+					wndGuildBank:SetTooltip(unitGBManager:GetName() .. " is behind this.")
+					wndGuildBank:SetData(unitGBManager)
 				end
+
 				
 
 				

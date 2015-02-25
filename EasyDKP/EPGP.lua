@@ -107,7 +107,7 @@ function DKP:OnLootedItem(item)
 		self.ItemDatabase[item:GetName()].slot = item:GetSlot()
 	end
 	--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Drutol Windchaser"))
+	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(), "Guild Bank"))
 end
 
 function DKP:EPGPGetTokenItemID(strToken)

@@ -34,7 +34,10 @@ local ktClassToString =
 	[GameLib.CodeEnumClass.Engineer]    	= "Engineer",
 	[GameLib.CodeEnumClass.Spellslinger]  	= "Spellslinger",
 }
-local ktStringToIcon =
+
+local ktStringToIcon = {}
+
+local ktStringToIconOrig =
 {
 	["Medic"]       	= "Icon_Windows_UI_CRB_Medic",
 	["Esper"]       	= "Icon_Windows_UI_CRB_Esper",
@@ -44,7 +47,7 @@ local ktStringToIcon =
 	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
 
-local ktStringToNewIcon =
+local ktStringToNewIconOrig =
 {
 	["Medic"]       	= "BK3:UI_Icon_CharacterCreate_Class_Medic",
 	["Esper"]       	= "BK3:UI_Icon_CharacterCreate_Class_Esper",
@@ -65,6 +68,14 @@ local umplauteConversions = {
 	["Ú"] = "U",
 	["ú"] = "u",
  }
+ 
+local ktRoleStringToIcon =
+{
+	["DPS"] = "IconSprites:Icon_Windows_UI_CRB_Attribute_BruteForce",
+	["Heal"] = "IconSprites:Icon_Windows_UI_CRB_Attribute_Health",
+	["Tank"] = "IconSprites:Icon_Windows_UI_CRB_Attribute_Shield",
+	["None"] = "",
+}
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -203,6 +214,10 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].networking == nil then self.tItems["settings"].networking = true end
 		if self.tItems["settings"].bTrackUndo == nil then self.tItems["settings"].bTrackUndo = false end
 		if self.tItems["settings"].nPopUpGPRed == nil then self.tItems["settings"].nPopUpGPRed = 25 end
+		if self.tItems["settings"].bColorIcons == nil then self.tItems["settings"].bColorIcons = false end
+		if self.tItems["settings"].bDisplayRoles == nil then self.tItems["settings"].bDisplayRoles = false end
+		if self.tItems["settings"].bSaveUndo == nil then self.tItems["settings"].bSaveUndo = false end
+		if self.tItems["settings"].bSkipGB == nil then self.tItems["settings"].bSkipGB = false end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -218,7 +233,22 @@ function DKP:OnDocLoaded()
 		self:LogsInit()
 		self:GIInit()
 		self:CloseBigPOPUP()
-
+		
+		-- Colors
+		
+		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
+		
+		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
+		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
+		self.wndMain:FindChild("ShowTank"):SetCheck(true)
+		self.wndMain:FindChild("MassEditControls"):FindChild("Invite"):Enable(false)
+		
+		for k,player in ipairs(self.tItems) do
+			if player.role == nil then
+				player.role = "DPS"
+				player.offrole = "None"
+			end
+		end
 		
 		-- Alts cleanup onetime
 		
@@ -259,8 +289,8 @@ function DKP:OnDocLoaded()
 			self:OnUnitCreated("Guild Bank",true)
 		end
 		
-		self.tSelectedItems = {}
-		self.bAwardingOnePlayer = false
+
+		
 		
 	end
 end
@@ -359,6 +389,7 @@ end
 function DKP:GIInit()
 	self.wndGuildImport = Apollo.LoadForm(self.xmlDoc,"GuildImport",nil,self)
 	self.wndGuildImport:Show(false,true)
+	self:ImportFromGuild()
 end
 
 function DKP:GIShow()
@@ -456,14 +487,9 @@ end
 function DKP:GotRoster(guildCurr, tRoster)
 	Apollo.RemoveEventHandler("GuildRoster",self)
 	tGuildRoster = tRoster
-	self:GIPopulateRanks()
-	--[[for k,player in ipairs(tRoster) do
-		if self:GetPlayerByIDByName(player.strName) == -1 then
-			self:OnUnitCreated(player.strName,true,true)
-			self:RegisterPlayerClass(self:GetPlayerByIDByName(player.strName),player.strClass)
-		end
-	end
-	self:RefreshMainItemList()]]
+	if self.wndGuildImport:IsShown() then self:GIPopulateRanks() end
+	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then self:RefreshMainItemList() end
+	--self:ExportShowPreloadedText(tohtml(tGuildRoster))
 end
 
 function DKP:FixOddCharacterInNames()
@@ -807,6 +833,7 @@ function DKP:OnSave(eLevel)
 			tSave["MyChoices"] = self.MyChoices
 			tSave["MyVotes"] = self.MyVotes
 			tSave["CE"] = self.tItems["CE"]
+			if self.tItems["settings"].bSaveUndo then tSave["ALogs"] = tUndoActions end
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
@@ -834,6 +861,8 @@ function DKP:OnRestore(eLevel, tData)
 			self.tItems["EPGP"].Enable = 0 
 		end
 		
+		tUndoActions = tData["ALogs"] or {}
+		self.tItems["ALogs"] = nil
 		
 		counter=table.maxn(self.tItems)+1
 		if tData["alts"] == nil then
@@ -1033,7 +1062,11 @@ function DKP:Add100DKP()
 			self:ShowAll()
 			if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity("Added "..self.tItems["settings"].dkp .. " DKP to whole raid."..#tMembers.." members affected.",tMembers) end
 		else
-			self:EPGPAwardRaid(self.tItems["settings"].dkp,self.tItems["settings"].dkp)
+			local EP
+			local GP
+			if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then EP = self.tItems["settings"].dkp end
+			if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then GP = self.tItems["settings"].dkp end
+			self:EPGPAwardRaid(EP,GP)
 		end
 		self:EnableActionButtons()
 end
@@ -1610,7 +1643,45 @@ function DKP:MassEditItemDeselected( wndHandler, wndControl, eMouseButton)
 	end
 end
 
+function DKP:StartOnlineRefreshTimer()
+	self.OnlineRefreshTimer = ApolloTimer.Create(10, true, "OnlineUpdate", self)
+	Apollo.RegisterTimerHandler(10, "OnlineUpdate", self)
+end
+
+function DKP:StopOnlineRefreshTimer()
+	self.OnlineRefreshTimer = nil
+	Apollo.RemoveEventHandler("OnlineUpdate", self)
+end
+
+function DKP:OnlineUpdate()
+	self:ImportFromGuild()
+end
+
+function DKP:GetOnlinePlayers()
+	local tOnlineMembers = {}
+	for k,player in ipairs(tGuildRoster) do
+		if player.fLastOnline == 0 then table.insert(tOnlineMembers,player.strName) end
+	end
+	return tOnlineMembers
+end
+
+function DKP:IsPlayerOnline(tPlayers,strPlayer)
+	for k,player in ipairs(tPlayers) do
+		if player == strPlayer then return true end
+	end
+	return false
+end
+
+function DKP:IsPlayerRoleDesired(strRole)
+	if strRole == "DPS" and self.wndMain:FindChild("ShowDPS"):IsChecked() then return true end
+	if strRole == "Heal" and self.wndMain:FindChild("ShowHeal"):IsChecked() then return true end
+	if strRole == "Tank" and self.wndMain:FindChild("ShowTank"):IsChecked() then return true end
+	return false
+end
+
+
 function DKP:RefreshMainItemList()
+	self.nHScroll = self.wndItemList:GetVScrollPos()
 	if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() return end
 	local selectedPlayer = ""
 	if self:LabelGetColumnNumberForValue("Name") > 0 then
@@ -1628,51 +1699,57 @@ function DKP:RefreshMainItemList()
 	self.wndSelectedListItem = nil
 	self.wndItemList:DestroyChildren()
 	local nameLabel = self:LabelGetColumnNumberForValue("Name")
+	local tOnlineMembers
+	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
 	for k,player in ipairs(self.tItems) do
 		if player.strName ~= "Guild Bank" then
 			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-					if not self.MassEdit then
-						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-					else
-						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-					end
-					
-					-- Cheking for alt
-					
-					self:UpdateItem(player)
-					if not self.MassEdit then
-						if player.strName == selectedPlayer then
-							self.wndSelectedListItem = player.wnd
-							player.wnd:SetCheck(true)	
-						end
-					else
-						local found = false
-						
-						for k,prevPlayer in ipairs(selectedPlayer) do
-							if prevPlayer == player.strName then
-								found = true
-								break
+					if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
+						if self:IsPlayerRoleDesired(player.role) then	
+							if not self.MassEdit then
+								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+							else
+								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 							end
+							
+							-- Cheking for alt
+							
+							self:UpdateItem(player)
+							if not self.MassEdit then
+								if player.strName == selectedPlayer then
+									self.wndSelectedListItem = player.wnd
+									player.wnd:SetCheck(true)	
+								end
+							else
+								local found = false
+								
+								for k,prevPlayer in ipairs(selectedPlayer) do
+									if prevPlayer == player.strName then
+										found = true
+										break
+									end
+								end
+								if found then
+									table.insert(selectedMembers,player.wnd)
+									player.wnd:SetCheck(true)
+								end
+								
+							end
+							player.wnd:SetData(k)
 						end
-						if found then
-							table.insert(selectedMembers,player.wnd)
-							player.wnd:SetCheck(true)
-						end
-						
 					end
-					player.wnd:SetData(k)
 				end
 			end
 		end
 	end
 	self:RaidQueueShow()
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
+	self.wndItemList:SetVScrollPos(self.nHScroll)
 	self:UpdateItemCount()
 end
 
 function DKP:IsPlayerInRaid(strPlayer)
-
 	local raidPre = self:Bid2GetTargetsTable()
 	local raid = {}
 	for k,player in ipairs(raidPre) do
@@ -1758,6 +1835,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
 	end
 	if playerItem.class then playerItem.wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[playerItem.class]) else playerItem.wnd:FindChild("ClassIcon"):Show(false,false) end
+	if self.tItems["settings"].bDisplayRoles and playerItem.role then playerItem.wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[playerItem.role]) else playerItem.wnd:FindChild("RoleIcon"):Show(false) end
 	if playerItem.alt then
 		playerItem.wnd:FindChild("Alt"):SetTooltip("Playing as : " .. playerItem.alt)
 		playerItem.wnd:FindChild("Alt"):Show(true,false)
@@ -2007,7 +2085,48 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			end
 		end
 	end
-	table.sort(esp,easyDKPSortPlayerbyLabelNotWnd)
+	
+	local tables = {}
+	
+	table.insert(tables,esp)
+	table.insert(tables,eng)
+	table.insert(tables,med)
+	table.insert(tables,war)
+	table.insert(tables,sta)
+	table.insert(tables,spe)
+	table.insert(tables,unknown)
+
+	
+	local tOnlineMembers
+	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
+	
+	for j,tab in ipairs(tables) do
+		table.sort(tab,easyDKPSortPlayerbyLabelNotWnd)
+		local added = false
+		for k,player in ipairs(tab) do
+			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
+				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
+					if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
+						if self:IsPlayerRoleDesired(player.role) then	
+							if not self.MassEdit then
+								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+							else
+								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+							end
+							self:UpdateItem(player,k,added)
+							player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+							added = true
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	
+	
+	
+	--[[table.sort(esp,easyDKPSortPlayerbyLabelNotWnd)
 	table.sort(eng,easyDKPSortPlayerbyLabelNotWnd)
 	table.sort(med,easyDKPSortPlayerbyLabelNotWnd)
 	table.sort(war,easyDKPSortPlayerbyLabelNotWnd)
@@ -2023,101 +2142,117 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	local addedSt = false
 	local addedU = false
 	
+
+	
 	for k,player in ipairs(esp) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedEs)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedEs = true
 				end
-				self:UpdateItem(player,k,addedEs)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEs = true
 			end
 		end
 	end	
 	for k,player in ipairs(eng) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedEn)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedEn = true
 				end
-				self:UpdateItem(player,k,addedEn)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedEn = true
 			end
 		end
 	end	
 	for k,player in ipairs(med) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedM)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedM = true
 				end
-				self:UpdateItem(player,k,addedM)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedM = true
 			end
 		end
 	end	
 	for k,player in ipairs(war) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then		
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedW)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedW = true
 				end
-				self:UpdateItem(player,k,addedW)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedW = true
 			end
 		end
 	end	
 	for k,player in ipairs(sta) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedSt)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedSt = true
 				end
-				self:UpdateItem(player,k,addedSt)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedSt = true
 			end
 		end
 	end	
 	for k,player in ipairs(spe) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then		
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedS)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedS = true
 				end
-				self:UpdateItem(player,k,addedS)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedS = true
 			end
 		end
 	end
 	for k,player in ipairs(unknown) do
 		if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 			if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-				if not self.MassEdit then
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-				else
-					player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+				if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then					
+					if not self.MassEdit then
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+					else
+						player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+					end
+					self:UpdateItem(player,k,addedU)
+					player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+					addedU = true
 				end
-				self:UpdateItem(player,k,addedU)
-				player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-				addedU = true
 			end
 		end
 	end
@@ -2143,9 +2278,11 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				end
 			end
 		end
-	end
+	end]]
+	
 	self:RaidQueueShow()
 	self.wndItemList:ArrangeChildrenVert()
+	self.wndItemList:SetVScrollPos(self.nHScroll)
 	self:UpdateItemCount()
 end
 
@@ -2608,6 +2745,14 @@ function DKP:SettingsRestore()
 
 	if self.tItems["settings"].bTrackUndo then self.wndSettings:FindChild("TrackUndo"):SetCheck(true) end
 	
+	-- Order
+	
+	self.wndSettings:FindChild("UseColorIcons"):SetCheck(self.tItems["settings"].bColorIcons)
+	self.wndSettings:FindChild("DisplayRoles"):SetCheck(self.tItems["settings"].bDisplayRoles)
+	self.wndSettings:FindChild("SaveUndo"):SetCheck(self.tItems["settings"].bSaveUndo)
+	self.wndSettings:FindChild("SkipGB"):SetCheck(self.tItems["settings"].bSkipGB)
+	
+	
 end
 
 function DKP:SettingsEnablePlayerCollection( wndHandler, wndControl, eMouseButton )
@@ -2636,6 +2781,46 @@ end
 
 function DKP:SettingsDisableSync( wndHandler, wndControl, eMouseButton )
 	self.sChannel = nil
+end
+
+function DKP:SettingsColorIconsEnable()
+	self.tItems["settings"].bColorIcons = true
+	self:BidUpdateColorScheme()
+	ktStringToIcon = ktStringToNewIconOrig
+	self:RefreshMainItemList()
+end
+
+function DKP:SettingsColorIconsDisable()
+	self.tItems["settings"].bColorIcons = false
+	self:BidUpdateColorScheme()
+	ktStringToIcon = ktStringToIconOrig
+	self:RefreshMainItemList()
+end
+
+function DKP:SettingsDisplayRolesEnable()
+	self.tItems["settings"].bDisplayRoles = true
+	self:RefreshMainItemList()
+end
+
+function DKP:SettingsDisplayRolesDisable()
+	self.tItems["settings"].bDisplayRoles = false
+	self:RefreshMainItemList()
+end
+
+function DKP:SettingsSaveUndoEnable()
+	self.tItems["settings"].bSaveUndo = true
+end
+
+function DKP:SettingsSaveUndoDisable()
+	self.tItems["settings"].bSaveUndo = false
+end
+
+function DKP:SettingsSkipGBEnable()
+	self.tItems["settings"].bSkipGB = true
+end
+
+function DKP:SettingsSkipGBDisable()
+	self.tItems["settings"].bSkipGB = false
 end
 
 function DKP:OnSyncMessage(channel, tMsg, strSender)
@@ -3141,6 +3326,10 @@ end
 
 function DKP:PopUpWindowOpen(strName,strItem)
 	if self.tItems["settings"].PopupEnable == 0 then return end
+	if self:GetPlayerByIDByName("Guild Bank") ~= -1 and strName == "Guild Bank" and self.tItems["settings"].bSkipGB then 
+		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
+		return
+	end
 	local ID_popup = nil
 	for i=1, table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then
@@ -3450,7 +3639,58 @@ function DKP:ConChangeClass(wndHandler,wndControl)
 	wndControl:SetText(strCurrClass)
 	self.tItems[self.wndContext:GetData()].class = strCurrClass
 	self.wndContext:FindChild("Class"):FindChild("ClassIcon"):SetSprite(ktStringToIcon[strCurrClass])
-	
+end
+
+function DKP:ConChangeRole(wndHandler,wndControl)
+	local strRole = self:ConGetNextRole(self.tItems[self.wndContext:GetData()])
+	self.tItems[self.wndContext:GetData()].role = strRole
+	wndControl:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[strRole])
+	wndControl:SetText(strRole)
+end
+
+function DKP:ConChangeOffRole(wndHandler,wndControl)
+	local strRole = self:ConGetNextOffRole(self.tItems[self.wndContext:GetData()])
+	self.tItems[self.wndContext:GetData()].offrole = strRole
+	wndControl:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[strRole])
+	wndControl:SetText(strRole)
+end
+
+function DKP:ConGetNextRole(player)
+	if player.class == "Spellslinger" or player.class == "Esper" or player.class == "Medic" then
+		if player.role then
+			if player.role == "DPS" then return "Heal" else return "DPS" end
+		else
+			return "DPS"
+		end
+	else
+		if player.role then
+			if player.role == "DPS" then return "Tank" else return "DPS" end
+		else
+			return "DPS"
+		end
+	end
+end
+
+function DKP:ConGetNextOffRole(player)
+	if player.class == "Spellslinger" or player.class == "Esper" or player.class == "Medic" then
+		if player.offrole then
+			if player.offrole == "DPS" then return "Heal" 
+			elseif player.offrole == "Heal" then return "None" 
+			elseif player.offrole == "None" then return "DPS" 
+			end
+		else
+			return "DPS"
+		end
+	else
+		if player.offrole then
+			if player.offrole == "DPS" then return "Tank" 
+			elseif player.offrole == "Tank" then return "None" 
+			elseif player.offrole == "None" then return "DPS" 
+			end
+		else
+			return "DPS"
+		end
+	end
 end
 
 function DKP:ConShow(wndHandler,wndControl,eMouseButton)
@@ -3467,6 +3707,14 @@ function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 		self.wndContext:FindChild("Class"):SetText(self.tItems[ID].class or "Set Class") 
 		if self.tItems[ID].class then
 			self.wndContext:FindChild("Class"):FindChild("ClassIcon"):SetSprite(ktStringToIcon[self.tItems[ID].class])
+		end
+		if self.tItems[ID].role then
+			self.wndContext:FindChild("MainRole"):SetText(self.tItems[ID].role)
+			self.wndContext:FindChild("MainRole"):FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[self.tItems[ID].role])			
+		end
+		if self.tItems[ID].offrole then
+			self.wndContext:FindChild("OffspecRole"):SetText(self.tItems[ID].offrole)
+			self.wndContext:FindChild("OffspecRole"):FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[self.tItems[ID].offrole])
 		end
 	end
 end
@@ -3515,6 +3763,8 @@ function DKP:ConRemoveContextIndicator()
 		end
 	end
 end
+
+
 
 -----------------------------------------------------------------------------------------------
 -- Alts
