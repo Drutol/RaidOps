@@ -3057,6 +3057,8 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				if wndGuildBank and unitGBManager then
 					wndGuildBank:SetTooltip(unitGBManager:GetName() .. " is behind this.")
 					wndGuildBank:SetData(unitGBManager)
+				elseif wndGuildBank then
+					wndGuildBank:Destroy()
 				end
 
 				

@@ -243,6 +243,12 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("ShowTank"):SetCheck(true)
 		self.wndMain:FindChild("MassEditControls"):FindChild("Invite"):Enable(false)
 		
+		-- Bidding
+		
+		self.tSelectedItems = {}
+		self.bAwardingOnePlayer = false
+		
+		
 		for k,player in ipairs(self.tItems) do
 			if player.role == nil then
 				player.role = "DPS"
@@ -572,6 +578,8 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 		newPlayer.GP = self.tItems["EPGP"].BaseGP
 		newPlayer.alts = {}
 		newPlayer.logs = {}
+		newPlayer.role = "DPS"
+		newPlayer.offrole = "None"
 		if self.tItems["settings"].TradeEnable == 1 then
 			newPlayer.TradeCap = self.tItems["settings"].TradeCap
 		end
@@ -812,6 +820,8 @@ function DKP:OnSave(eLevel)
 					tSave[k].class = self.tItems[k].class
 					tSave[k].alts = self.tItems[k].alts
 					tSave[k].logs = self.tItems[k].logs
+					tSave[k].role = self.tItems[k].role
+					tSave[k].offrole = self.tItems[k].offrole
 				end
 			end
 			if self.tItems["alts"] ~= nil then
