@@ -493,7 +493,7 @@ end
 function DKP:HubSettingsAutoSessionEnable()
 	Apollo.RegisterEventHandler("Group_Join","HubCheckForAutoSession",self)
 	self.tItems["settings"].HubAutoSession = 1
-	if GroupLib.InRaid() and not self.bIsRaidSession then self:RaidOpenSummary("New") end
+	if GroupLib.InRaid() and not self.bIsRaidSession and self.tItems["Raids"]["Save"] == nil then self:RaidOpenSummary("New") end
 end
 
 function DKP:HubSettingsAutoSessionDisable()

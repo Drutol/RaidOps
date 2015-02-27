@@ -163,6 +163,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
+		Apollo.RegisterEventHandler("Group_Invite_Result","InviteOnResult", self)
 		
 		--Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
 		--Apollo.RegisterEventHandler("LootedItem", "OnLootedItem", self)
@@ -218,6 +219,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bDisplayRoles == nil then self.tItems["settings"].bDisplayRoles = false end
 		if self.tItems["settings"].bSaveUndo == nil then self.tItems["settings"].bSaveUndo = false end
 		if self.tItems["settings"].bSkipGB == nil then self.tItems["settings"].bSkipGB = false end
+		if self.tItems["settings"].bRemErrInv == nil then self.tItems["settings"].bRemErrInv = true end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -232,6 +234,7 @@ function DKP:OnDocLoaded()
 		self:AltsInit()
 		self:LogsInit()
 		self:GIInit()
+		self:InvitesInit()
 		self:CloseBigPOPUP()
 		
 		-- Colors
@@ -241,7 +244,7 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
 		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
 		self.wndMain:FindChild("ShowTank"):SetCheck(true)
-		self.wndMain:FindChild("MassEditControls"):FindChild("Invite"):Enable(false)
+		--self.wndMain:FindChild("MassEditControls"):FindChild("Invite"):Enable(false)
 		
 		-- Bidding
 		
@@ -807,22 +810,20 @@ function DKP:OnSave(eLevel)
 			self.tItems["AwardTimer"].DKP = self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):IsChecked()
 			
 			
-			for k=1,table.maxn(self.tItems) do
-				if self.tItems[k] ~= nil then
+			for k,player in ipairs(self.tItems) do
 					tSave[k] = {}
-					tSave[k].strName = self.tItems[k].strName
-					tSave[k].net = self.tItems[k].net
-					tSave[k].tot = self.tItems[k].tot
-					tSave[k].Hrs = self.tItems[k].Hrs
-					tSave[k].TradeCap = self.tItems[k].TradeCap
-					tSave[k].EP = self.tItems[k].EP
-					tSave[k].GP = self.tItems[k].GP
-					tSave[k].class = self.tItems[k].class
-					tSave[k].alts = self.tItems[k].alts
-					tSave[k].logs = self.tItems[k].logs
-					tSave[k].role = self.tItems[k].role
-					tSave[k].offrole = self.tItems[k].offrole
-				end
+					tSave[k].strName = player.strName
+					tSave[k].net = player.net
+					tSave[k].tot = player.tot
+					tSave[k].Hrs = player.Hrs
+					tSave[k].TradeCap = player.TradeCap
+					tSave[k].EP = player.EP
+					tSave[k].GP = player.GP
+					tSave[k].class = player.class
+					tSave[k].alts = player.alts
+					tSave[k].logs = player.logs
+					tSave[k].role = player.role
+					tSave[k].offrole = player.offrole
 			end
 			if self.tItems["alts"] ~= nil then
 				tSave["alts"]=self.tItems["alts"]
@@ -831,9 +832,6 @@ function DKP:OnSave(eLevel)
 			tSave["settings"] = self.tItems["settings"]
 			tSave["Raids"] = self.tItems["Raids"]
 			tSave["trades"] = self.tItems["trades"]
-			if self.tItems["EPGP"].ForceItemSave == 1 then
-				self.tItems["EPGP"].Loot = self.ItemDatabase
-			end
 			tSave["EPGP"] = self.tItems["EPGP"]
 			tSave["Standby"] = self.tItems["Standby"]
 			tSave["AwardTimer"] = self.tItems["AwardTimer"]
@@ -1601,9 +1599,10 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 	self:UndoAddActivity("Removed " .. #tMembers .. " players",tMembers,true)
 	
 	for k,wnd in ipairs(selectedMembers) do 
-		if wnd:GetData() and self.tItems[wnd:GetData()] then
-			for k,alt in ipairs(self.tItems[wnd:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
-			table.remove(self.tItems,self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()))
+		local ID = self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+		if ID ~= -1 then
+			for k,alt in ipairs(self.tItems[ID].alts) do self.tItems["alts"][string.lower(alt)] = nil end
+			table.remove(self.tItems,ID)
 		end
 	end
 	self:RefreshMainItemList()
@@ -1670,7 +1669,14 @@ end
 function DKP:GetOnlinePlayers()
 	local tOnlineMembers = {}
 	for k,player in ipairs(tGuildRoster) do
-		if player.fLastOnline == 0 then table.insert(tOnlineMembers,player.strName) end
+		if player.fLastOnline == 0 then 
+			local strNewName = ""
+			for uchar in string.gfind(player.strName, "([%z\1-\127\194-\244][\128-\191]*)") do
+				if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+				strNewName = strNewName .. uchar
+			end
+			table.insert(tOnlineMembers,strNewName) 
+		end
 	end
 	return tOnlineMembers
 end
@@ -2761,6 +2767,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("DisplayRoles"):SetCheck(self.tItems["settings"].bDisplayRoles)
 	self.wndSettings:FindChild("SaveUndo"):SetCheck(self.tItems["settings"].bSaveUndo)
 	self.wndSettings:FindChild("SkipGB"):SetCheck(self.tItems["settings"].bSkipGB)
+	self.wndSettings:FindChild("RemoveErrorInvites"):SetCheck(self.tItems["settings"].bRemErrInv)
 	
 	
 end
@@ -2831,6 +2838,14 @@ end
 
 function DKP:SettingsSkipGBDisable()
 	self.tItems["settings"].bSkipGB = false
+end
+
+function DKP:SettingsRemoveInvErrorsEnable()
+	self.tItems["settings"].bRemErrInv = true
+end
+
+function DKP:SettingsRemoveInvErrorsDisable()
+	self.tItems["settings"].bRemErrInv = false	
 end
 
 function DKP:OnSyncMessage(channel, tMsg, strSender)
@@ -3049,11 +3064,33 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 	end
 	
 	if self.wndExport:FindChild("ButtonExportSerialize"):IsChecked() then
-		self.wndExport:FindChild("ExportBox"):SetText(Base64.Encode(serpent.dump(self.tItems)))
+		local exportTables = {}
+		exportTables.tPlayers = {}
+		for k , player in ipairs(self.tItems) do
+			table.insert(exportTables.tPlayers,player)
+		end
+		exportTables.tSettings = self.tItems["settings"]
+		exportTables.tEPGP = self.tItems["EPGP"]
+		exportTables.tStandby = self.tItems["Standby"]
+		exportTables.tCE = self.tItems["CE"]
+		
+
+
+		self.wndExport:FindChild("ExportBox"):SetText(Base64.Encode(serpent.dump(exportTables)))
 	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
-		newImportedDatabaseGlobal = serpent.load(Base64.Decode(self.wndExport:FindChild("ExportBox"):GetText()))
-		if type(newImportedDatabaseGlobal) ~= "table" or newImportedDatabaseGlobal["settings"] == nil then newImportedDatabaseGlobal = nil
-		else ChatSystemLib.Command("/reloadui") end
+		local tImportedTables = serpent.load(Base64.Decode(self.wndExport:FindChild("ExportBox"):GetText()))
+		for k,player in ipairs(self.tItems) do
+			self.tItems[k] = nil
+		end
+		for k,player in ipairs(tImportedTables.tPlayers) do
+			table.insert(self.tItems,player)
+		end
+		self.tItems["settings"] = tImportedTables.tSettings
+		self.tItems["EPGP"] = tImportedTables.tEPGP
+		self.tItems["Standby"] = tImportedTables.tStandby
+		self.tItems["CE"] = tImportedTables.tCE
+		
+		ChatSystemLib.Command("/reloadui")
 	end
 end
 
@@ -3935,8 +3972,14 @@ function DKP:LogsPopulate()
 	end
 end
 
-function DKP:DetailAddLog(strComment,strType,strModifier,ID)
+function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 	if self.tItems["settings"].logs then
+		local strComment = ""
+		for uchar in string.gfind(strCommentPre, "([%z\1-\127\194-\244][\128-\191]*)") do
+			if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+			strComment = strComment .. uchar
+		end
+	
 		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = os.date("%x",os.time()) .. "  " .. os.date("%X",os.time())})
 		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
 		if #self.tItems[ID].logs > 20 then table.remove(self.tItems[ID].logs,20) end
@@ -4036,6 +4079,7 @@ function DKP:CEShow()
 	self.wndCE:Show(true,false)
 	self.wndCE:ToFront()
 	self:CEPopulate()
+	self.wndMain:BringChildToTop(self.wndCE)
 end
 
 function DKP:CEHide()
@@ -4128,7 +4172,8 @@ function DKP:CETriggerEvent(eID)
 	local event = self.tItems["CE"][eID]
 	if event then
 		local raid = self:Bid2GetTargetsTable()
-		local strMob = event.bType or event.strUnit
+		table.insert(raid,GameLib.GetPlayerUnit():GetName())
+		if event.uType == "Unit" then strMob = event.strUnit else strMob = event.bType end
 		if event.rType == "RMQ" then
 			for k,queued in ipairs(self.tItems.tQueuedPlayers) do
 				if self.tItems[queued] then table.insert(raid,self.tItems[queued].strName) end
@@ -4139,16 +4184,16 @@ function DKP:CETriggerEvent(eID)
 			if pID ~= -1 then
 				if event.EP then
 					self.tItems[pID].EP = self.tItems[pID].EP + event.EP
-					self:DetailAddLog("Award for triggering event : "..eID,"{EP}",event.EP,pID)
+					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")","{EP}",event.EP,pID)
 				end
 				if event.GP then
 					self.tItems[pID].GP = self.tItems[pID].GP + event.GP
-					self:DetailAddLog("Award for triggering event : "..eID,"{GP}",event.EP,pID)
+					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")","{GP}",event.EP,pID)
 				end
 				if event.DKP then
 					self.tItems[pID].net = self.tItems[pID].net + event.DKP
 					self.tItems[pID].tot = self.tItems[pID].tot + event.DKP
-					self:DetailAddLog("Award for triggering event : "..eID,"{DKP}",event.EP,pID)
+					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")","{DKP}",event.EP,pID)
 				end
 			end
 		end
@@ -4212,7 +4257,6 @@ end
 function DKP:CELShow()
 	self.wndCEL:Show(true,false)
 	self:CELPopulate()
-	self.wndCEL:ToFront()
 end
 
 function DKP:CELHide()
@@ -4222,22 +4266,32 @@ end
 function DKP:CELPopulate()
 	self.wndCEL:FindChild("List"):DestroyChildren()
 	for k,event in ipairs(self.tItems["CE"]) do
-		local wnd = Apollo.LoadForm(self.xmlDoc,"CEEntry",self.wndCEL:FindChild("List"),self)
+		
+		local strMob
 		if event.uType == "Unit" then 
-			wnd:FindChild("UnitName"):SetText(event.strUnit)
+			strMob = event.strUnit
 		else
-			wnd:FindChild("UnitName"):SetText(event.bType)
+			strMob = event.bType
 		end
-		wnd:FindChild("Recipents"):SetText(event.rType == "RM" and "Raid Members" or "Raid Members + Queue")
-		local strAwards = ""
-		if event.EP then strAwards = strAwards .. " EP : " .. event.EP end
-		if event.GP then strAwards = strAwards .. " GP : " .. event.GP end
-		if event.DKP then strAwards = strAwards .. " DKP : " .. event.DKP end
-		if strAwards == "" then strAwards = "None" end
-		wnd:FindChild("Awards"):SetText(strAwards)
-		wnd:FindChild("TriggerCount"):SetText(event.nTriggerCount or 0)
-		wnd:FindChild("ID"):SetText(k)
-		wnd:SetData(k)
+		
+		if self:string_starts(strMob,self.wndCEL:FindChild("Search"):GetText()) then
+			local wnd = Apollo.LoadForm(self.xmlDoc,"CEEntry",self.wndCEL:FindChild("List"),self)
+			if event.uType == "Unit" then 
+				wnd:FindChild("UnitName"):SetText(event.strUnit)
+			else
+				wnd:FindChild("UnitName"):SetText(event.bType)
+			end
+			wnd:FindChild("Recipents"):SetText(event.rType == "RM" and "Raid Members" or "Raid Members + Queue")
+			local strAwards = ""
+			if event.EP then strAwards = strAwards .. " EP : " .. event.EP end
+			if event.GP then strAwards = strAwards .. " GP : " .. event.GP end
+			if event.DKP then strAwards = strAwards .. " DKP : " .. event.DKP end
+			if strAwards == "" then strAwards = "None" end
+			wnd:FindChild("Awards"):SetText(strAwards)
+			wnd:FindChild("TriggerCount"):SetText(event.nTriggerCount .. " times.")
+			wnd:FindChild("ID"):SetText(k)
+			wnd:SetData(k)
+		end
 	end
 	self.wndCEL:FindChild("List"):ArrangeChildrenTiles()
 end
@@ -4363,7 +4417,10 @@ function DKP:InviteOpen(tIDs)
 		end
 		if not found then table.insert(tInvited,{ID = ID,status = "P"}) end
 	end
+	self:InvitePopulate()
 end
+
+-- "P" = Pending -- "A" = Accepted 
 
 function DKP:InvitePopulate()
 	self.wndInv:FindChild("ListInvited"):DestroyChildren()
@@ -4375,6 +4432,9 @@ function DKP:InvitePopulate()
 	local nSpellslinger = 0
 	local nStalker = 0
 	
+	local nDPS = 0
+	local nHeal = 0
+	local nTank = 0
 	
 	for k,inv in ipairs(tInvited) do
 		if inv.status == "P" then
@@ -4395,14 +4455,141 @@ function DKP:InvitePopulate()
 				end
 			end
 			
+			if player.role == "DPS" then nDPS = nDPS + 1
+			elseif player.role == "Heal" then nHeal = nHeal + 1
+			elseif player.role == "Tank" then nTank = nTank + 1
+			end
+			
 			local wnd = Apollo.LoadForm(self.xmlDoc,"InviteEntry",self.wndInv:FindChild("ListInvited"),self)
-		else
-		
+			wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+			wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[player.role])
+			wnd:FindChild("CharacterName"):SetText(player.strName)
 		end
-		
-		
 	end
+	
+	self.wndInv:FindChild("TotalPending"):SetText(nEsper+nEngineer+nWarrior+nMedic+nSpellslinger+nStalker)
+	self.wndInv:FindChild("PendingClasses"):FindChild("Esper"):SetText(nEsper)
+	self.wndInv:FindChild("PendingClasses"):FindChild("Engineer"):SetText(nEngineer)
+	self.wndInv:FindChild("PendingClasses"):FindChild("Warrior"):SetText(nWarrior)
+	self.wndInv:FindChild("PendingClasses"):FindChild("Medic"):SetText(nMedic)
+	self.wndInv:FindChild("PendingClasses"):FindChild("Spellslinger"):SetText(nSpellslinger)
+	self.wndInv:FindChild("PendingClasses"):FindChild("Stalker"):SetText(nStalker)
+	
+	self.wndInv:FindChild("PendingRoles"):FindChild("DPS"):SetText(nDPS)
+	self.wndInv:FindChild("PendingRoles"):FindChild("Heal"):SetText(nHeal)
+	self.wndInv:FindChild("PendingRoles"):FindChild("Tank"):SetText(nTank)
+	
+	nEsper = 0
+	nEngineer = 0
+	nWarrior = 0
+	nMedic = 0
+	nSpellslinger = 0
+	nStalker = 0
+	
+	nDPS = 0
+	nHeal = 0
+	nTank = 0
+		
+	for k,inv in ipairs(tInvited) do
+		if inv.status == "A" then
+			local player = self.tItems[inv.ID]
+			if player.class ~= nil then
+				if player.class == "Esper" then
+					nEsper = nEsper + 1
+				elseif player.class == "Engineer" then
+					nEngineer = nEngineer + 1
+				elseif player.class == "Medic" then
+					nMedic = nMedic + 1
+				elseif player.class == "Warrior" then
+					nWarrior = nWarrior + 1
+				elseif player.class == "Stalker" then
+					nStalker = nStalker + 1
+				elseif player.class == "Spellslinger" then
+					nSpellslinger = nSpellslinger + 1
+				end
+			end
+			
+			
+			if player.role == "DPS" then nDPS = nDPS + 1
+			elseif player.role == "Heal" then nHeal = nHeal + 1
+			elseif player.role == "Tank" then nTank = nTank + 1
+			end
+			
+			
+			local wnd = Apollo.LoadForm(self.xmlDoc,"InviteEntry",self.wndInv:FindChild("ListInvited"),self)
+			wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+			wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[player.role])
+			wnd:FindChild("CharacterName"):SetText(player.strName)
+			wnd:FindChild("Status"):SetSprite("achievements:sprAchievements_Icon_Complete")
+		end
+	end	
+	
+	
+	self.wndInv:FindChild("TotalAccepted"):SetText(nEsper+nEngineer+nWarrior+nMedic+nSpellslinger+nStalker)
+	self.wndInv:FindChild("AcceptedClasses"):FindChild("Esper"):SetText(nEsper)
+	self.wndInv:FindChild("AcceptedClasses"):FindChild("Engineer"):SetText(nEngineer)
+	self.wndInv:FindChild("AcceptedClasses"):FindChild("Warrior"):SetText(nWarrior)
+	self.wndInv:FindChild("AcceptedClasses"):FindChild("Medic"):SetText(nMedic)
+	self.wndInv:FindChild("AcceptedClasses"):FindChild("Spellslinger"):SetText(nSpellslinger)
+	self.wndInv:FindChild("AcceptedClasses"):FindChild("Stalker"):SetText(nStalker)
+	
+	self.wndInv:FindChild("AcceptedRoles"):FindChild("DPS"):SetText(nDPS)
+	self.wndInv:FindChild("AcceptedRoles"):FindChild("Heal"):SetText(nHeal)
+	self.wndInv:FindChild("AcceptedRoles"):FindChild("Tank"):SetText(nTank)
+		
+	for k,inv in ipairs(tInvited) do
+		if inv.status == "D" then
+			local player = self.tItems[inv.ID]
+			local wnd = Apollo.LoadForm(self.xmlDoc,"InviteEntry",self.wndInv:FindChild("ListInvited"),self)
+			wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[player.class])
+			wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[player.role])
+			wnd:FindChild("CharacterName"):SetText(player.strName)
+			wnd:FindChild("Status"):SetSprite("ClientSprites:LootCloseBox_Holo")
+		end
+	end
+	
+	if self.wndInv:FindChild("TotalAccepted"):GetText() == "0" then  self.wndInv:FindChild("TotalAccepted"):SetText("") end
+	if self.wndInv:FindChild("TotalPending"):GetText() == "0" then  self.wndInv:FindChild("TotalPending"):SetText("") end
+	
+	self.wndInv:FindChild("ListInvited"):ArrangeChildrenVert()
+	self.wndInv:Show(true,false)
+	
+end
 
+function DKP:InviteOnResult(strName,eResult)
+	if eResult ~= GroupLib.Result.Accepted and eResult ~= GroupLib.Result.Declined and not self.tItems["settings"].bRemErrInv then return
+	elseif eResult ~= GroupLib.Result.Accepted and eResult ~= GroupLib.Result.Declined and self.tItems["settings"].bRemErrInv then
+		for k,inv in ipairs(tInvited) do
+		local player = self.tItems[inv.ID]
+		if string.lower(player.strName) == string.lower(strName) then
+			table.remove(tInvited,k)
+			break
+		end
+	end
+	end
+	for k,inv in ipairs(tInvited) do
+		local player = self.tItems[inv.ID]
+		if string.lower(player.strName) == string.lower(strName) then
+			if eResult == GroupLib.Result.Accepted then inv.status = "A"
+			elseif eResult == GroupLib.Result.Declined then inv.status = "D" end
+			break
+		end
+	end
+	self:InvitePopulate()
+end
+
+function DKP:InviteClearList()
+	tInvited = {}
+	self:InvitePopulate()
+end
+
+function DKP:InviteHide()
+	self.wndInv:Show(false,false)
+end
+
+function DKP:InviteShow()
+	self.wndInv:Show(true,false)
+	self.wndInv:ToFront()
 end
 
 

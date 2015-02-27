@@ -682,7 +682,7 @@ end
 
 function DKP:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 	self.tItems["EPGP"].Tooltips = 0
-	self:UnhookAll()
+	self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow")
 end
 
 

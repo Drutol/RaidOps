@@ -2348,7 +2348,6 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,nDuration,bReceived,tLabel
 		targetWnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 		targetWnd:FindChild("ItemName"):SetText(item:GetName())
 		targetWnd:FindChild("ItemCost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
-		if not self.tItems["settings"]["Bid2"].bAllowOffspec then targetWnd:FindChild("Controls"):FindChild("Greed"):Enable(false) end
 		targetWnd:SetData(itemID)
 		targetWnd:SetText(item:GetName())
 		targetWnd:FindChild("TimeLeft"):SetProgress(progress,1000)
