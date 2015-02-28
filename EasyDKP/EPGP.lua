@@ -64,7 +64,7 @@ function DKP:EPGPInit()
 		self.tItems["EPGP"] = {}
 		self.tItems["EPGP"].SlotValues = defaultSlotValues
 		self.tItems["EPGP"].QualityValues = defaultQualityValues
-		self.tItems["EPGP"].Enable = 0
+		self.tItems["EPGP"].Enable = 1
 		self.tItems["EPGP"].FormulaModifier = 0.5
 		self.tItems["EPGP"].BaseGP = 1
 		self.tItems["EPGP"].MinEP = 100
@@ -648,7 +648,7 @@ function DKP:EPGPGetPRByName(strName)
 	local ID = self:GetPlayerByIDByName(strName)
 	if ID ~= -1 then
 		if self.tItems[ID].GP ~= 0 then
-			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/self.tItems[ID].GP)
+			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].GP + self.tItems["EPGP"].BaseGP))
 		else
 			return "0"
 		end

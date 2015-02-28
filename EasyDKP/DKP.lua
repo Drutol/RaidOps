@@ -119,6 +119,7 @@ end
 function DKP:OnLoad()
 	self.xmlDoc = XmlDoc.CreateFromFile("DKP.xml")
 	self.xmlDoc2 = XmlDoc.CreateFromFile("DKP2.xml")
+	self.xmlDoc3 = XmlDoc.CreateFromFile("DKP3.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 end
 
@@ -236,6 +237,8 @@ function DKP:OnDocLoaded()
 		self:GIInit()
 		self:InvitesInit()
 		self:CloseBigPOPUP()
+		
+		self:IBDebugInit() -- Raid Summaries v2
 		
 		-- Colors
 		
@@ -3079,18 +3082,22 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 		self.wndExport:FindChild("ExportBox"):SetText(Base64.Encode(serpent.dump(exportTables)))
 	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
 		local tImportedTables = serpent.load(Base64.Decode(self.wndExport:FindChild("ExportBox"):GetText()))
-		for k,player in ipairs(self.tItems) do
-			self.tItems[k] = nil
+			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
+			for k,player in ipairs(self.tItems) do
+				self.tItems[k] = nil
+			end
+			for k,player in ipairs(tImportedTables.tPlayers) do
+				table.insert(self.tItems,player)
+			end
+			self.tItems["settings"] = tImportedTables.tSettings
+			self.tItems["EPGP"] = tImportedTables.tEPGP
+			self.tItems["Standby"] = tImportedTables.tStandby
+			self.tItems["CE"] = tImportedTables.tCE
+			
+			ChatSystemLib.Command("/reloadui")
+		else
+			Print("Error processing database")
 		end
-		for k,player in ipairs(tImportedTables.tPlayers) do
-			table.insert(self.tItems,player)
-		end
-		self.tItems["settings"] = tImportedTables.tSettings
-		self.tItems["EPGP"] = tImportedTables.tEPGP
-		self.tItems["Standby"] = tImportedTables.tStandby
-		self.tItems["CE"] = tImportedTables.tCE
-		
-		ChatSystemLib.Command("/reloadui")
 	end
 end
 
