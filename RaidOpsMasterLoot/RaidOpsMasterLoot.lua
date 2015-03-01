@@ -455,6 +455,20 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
 					end
 				end
+				-- GuildBank
+				local wndGuildBank
+				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank then
+					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
+						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					else
+						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+					end
+					
+					wndGuildBank:FindChild("CharacterName"):SetText("Guild Bank")
+					wndGuildBank:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
+					wndGuildBank:FindChild("CharacterLevel"):SetText("")
+				end
+				
 				local unitGBManager
 				--Creating windows
 				for k,tab in pairs(tables) do
@@ -530,19 +544,11 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 					end
 				end
 				-- Guild Bank
-				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and unitGBManager then
-					local wnd
-					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
-						wnd = Apollo.LoadForm(DKPInstance.xmlDoc, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
-					else
-						wnd = Apollo.LoadForm(DKPInstance.xmlDoc, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
-					end
-					
-					wnd:FindChild("CharacterName"):SetText("Guild Bank")
-					wnd:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
-					wnd:FindChild("CharacterLevel"):SetText("")
-					wnd:SetTooltip(unitGBManager:GetName() .. " is behind this.")
-					wnd:SetData(unitGBManager)
+				if wndGuildBank and unitGBManager then
+					wndGuildBank:SetTooltip(unitGBManager:GetName() .. " is behind this.")
+					wndGuildBank:SetData(unitGBManager)
+				elseif wndGuildBank then
+					wndGuildBank:Destroy()
 				end
 
 				if not bStillHaveLooter then

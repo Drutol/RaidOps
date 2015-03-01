@@ -238,7 +238,7 @@ function DKP:OnDocLoaded()
 		self:InvitesInit()
 		self:CloseBigPOPUP()
 		
-		self:IBDebugInit() -- Raid Summaries v2
+		--self:IBDebugInit() -- Raid Summaries v2
 		
 		-- Colors
 		
@@ -375,6 +375,11 @@ function DKP:UndoShowActions()
 	
 	self.wndActivity:Show(true,false)
 	self.wndActivity:ToFront()
+	self:UndoPopulate()
+end
+
+function DKP:UndoClear()
+	tUndoActions = {}
 	self:UndoPopulate()
 end
 
@@ -707,6 +712,9 @@ function DKP:SetDKP(cycling)
 				if self:LabelGetColumnNumberForValue("GP") ~= -1 then
 					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP))
 				end
+				if self:LabelGetColumnNumberForValue("RealGP") ~= -1 then
+					self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("RealGP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP - self.tItems["EPGP"].BaseGP))
+				end
 				if self:LabelGetColumnNumberForValue("PR") ~= -1 then
 					if self.tItems[ID].GP ~= 0 then 
 						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText(string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/self.tItems[ID].GP))
@@ -946,6 +954,9 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					end
 					if self:LabelGetColumnNumberForValue("GP") ~= -1 then
 						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP))
+					end		
+					if self:LabelGetColumnNumberForValue("RealGP") ~= -1 then
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("RealGP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP - self.tItems["EPGP"].BaseGP))
 					end
 					if self:LabelGetColumnNumberForValue("PR") ~= -1 then
 						if self.tItems[ID].GP ~= 0 then 
@@ -1027,6 +1038,9 @@ function DKP:SubtractDKP(cycling)
 					end
 					if self:LabelGetColumnNumberForValue("GP") ~= -1 then
 						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP))
+					end
+					if self:LabelGetColumnNumberForValue("RealGP") ~= -1 then
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("RealGP"))):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[ID].GP - self.tItems["EPGP"].BaseGP))
 					end
 					if self:LabelGetColumnNumberForValue("PR") ~= -1 then
 						if self.tItems[ID].GP ~= 0 then 
@@ -1849,6 +1863,8 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP))
 			elseif self.tItems["settings"].LabelOptions[i] == "PR" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(self:EPGPGetPRByName(playerItem.strName))
+			elseif self.tItems["settings"].LabelOptions[i] == "RealGP" then
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP - self.tItems["EPGP"].BaseGP))
 			end
 		end
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
@@ -1938,6 +1954,7 @@ function DKP:LabelAddTooltipByValue(value)
 	elseif value == "PR" then return "Value calculated by dividing the EP value by GP value"
 	elseif value == "Raids" then return "Value of player's attended raids"
 	elseif value == "Item" then return "Last item received.Recoreded via bidding (chat and network)"
+	elseif value == "RealGP" then return "Current GP Value decreased by BaseGP"
 	end
 end
 

@@ -72,6 +72,7 @@ function DKP:EPGPInit()
 	if self.tItems["EPGP"].bDecayEP == nil then self.tItems["EPGP"].bDecayEP = false end
 	if self.tItems["EPGP"].bDecayGP == nil then self.tItems["EPGP"].bDecayGP = false end
 	if self.tItems["EPGP"].nDecayValue == nil then self.tItems["EPGP"].nDecayValue = 25 end
+	if self.tItems["EPGP"].bDecayRealGP == nil then self.tItems["EPGP"].bDecayRealGP = false end
 	
 	self.wndEPGPSettings:FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
 	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
@@ -81,6 +82,8 @@ function DKP:EPGPInit()
 	
 	self.wndEPGPSettings:FindChild("DecayGP"):SetCheck(self.tItems["EPGP"].bDecayGP)
 	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayGP"):SetCheck(self.tItems["EPGP"].bDecayGP)
+	
+	self.wndEPGPSettings:FindChild("DecayRealGP"):SetCheck(self.tItems["EPGP"].bDecayRealGP)
 	
 	self:EPGPFillInSettings()
 	self:EPGPAddValuesToMembers()
@@ -252,6 +255,7 @@ function DKP:EPGPChangeUI()
 		labelTypes:FindChild("EP"):Show(true,false)
 		labelTypes:FindChild("GP"):Show(true,false)
 		labelTypes:FindChild("PR"):Show(true,false)
+		labelTypes:FindChild("RealGP"):Show(true,false)
 		self.wndLabelOptions:FindChild("LabelTypes"):ArrangeChildrenVert()
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(true)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(true)
@@ -272,6 +276,7 @@ function DKP:EPGPChangeUI()
 		labelTypes:FindChild("EP"):Show(false,false)
 		labelTypes:FindChild("GP"):Show(false,false)
 		labelTypes:FindChild("PR"):Show(false,false)
+		labelTypes:FindChild("RealGP"):Show(false,false)
 		if self:LabelGetColumnNumberForValue("EP") ~= -1 then
 			self.tItems["settings"].LabelOptions[self:LabelGetColumnNumberForValue("EP")] = "Nil"
 		end
@@ -527,7 +532,11 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 				self.tItems[i].EP = self.tItems[i].EP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
-				self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
+				if self.tItems["EPGP"].bDecayRealGP then
+					self.tItems[i].GP = (self.tItems[i].GP - self.tItems["EPGP"].BaseGP) * ((100 - self.tItems["EPGP"].nDecayValue)/100) + self.tItems["EPGP"].BaseGP
+				else
+					self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
+				end
 			end
 		end
 	end
@@ -648,13 +657,20 @@ function DKP:EPGPGetPRByName(strName)
 	local ID = self:GetPlayerByIDByName(strName)
 	if ID ~= -1 then
 		if self.tItems[ID].GP ~= 0 then
-			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].GP + self.tItems["EPGP"].BaseGP))
+			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].GP))
 		else
 			return "0"
 		end
 	else return "0" end
 end
 
+function DKP:EPGPDecayRealGPEnable()
+	self.tItems["EPGP"].bDecayRealGP = true
+end
+
+function DKP:EPGPDecayRealGPDisable()
+	self.tItems["EPGP"].bDecayRealGP = false
+end
 
 
 -- Hook Part
