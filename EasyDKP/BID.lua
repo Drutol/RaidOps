@@ -1762,6 +1762,7 @@ function DKP:InitBid2()
 	if self.tItems["settings"]["Bid2"].bWhitelist == nil then self.tItems["settings"]["Bid2"].bWhitelist = false end
 	if self.tItems["settings"]["Bid2"].tWhitelisted == nil then self.tItems["settings"]["Bid2"].tWhitelisted = {} end
 	if self.tItems["settings"]["Bid2"].bRegisterPass == nil then self.tItems["settings"]["Bid2"].bRegisterPass = false end
+	if self.tItems["settings"]["Bid2"].bCloseOnAssign == nil then self.tItems["settings"]["Bid2"].bCloseOnAssign = false end
 	
 	self.ActiveAuctions = {}
 	self:DSInit()
@@ -2507,6 +2508,7 @@ function DKP:Bid2RestoreSettings()
 	self.wndBid2Settings:FindChild("AssignActionSelection"):FindChild(self.tItems["settings"]["Bid2"].assignAction):SetCheck(true)
 	self.wndBid2Settings:FindChild("WhitelistOption"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bWhitelist)
 	self.wndBid2Settings:FindChild("RegisterPass"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bRegisterPass)
+	self.wndBid2Settings:FindChild("CloseOnAssign"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bCloseOnAssign)
 end
 
 function DKP:BidSetAuctionTime(wndHandler,wndControl,strText)
@@ -2587,6 +2589,9 @@ function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
 	local currAuction
 	local ofID
 	local previousWho
+	
+	if self.tItems["settings"]["Bid2"].bWhitelist and not self:Bid2IsPlayerOnWhitelist(strAssistant) then return end
+	
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == itemID then 
 			currAuction = auction 
@@ -2726,6 +2731,57 @@ end
 function DKP:Bid2EnablePass()
 	self.tItems["settings"]["Bid2"].bRegisterPass = true
 end
+
+function DKP:Bid2CloseOnAssignEnable()
+	self.tItems["settings"]["Bid2"].bCloseOnAssign = true
+end
+
+function DKP:Bid2CloseOnAssignDisable()
+	self.tItems["settings"]["Bid2"].bCloseOnAssign = false
+end
+
+function DKP:Bid2CloseOnAssign(strItem)
+	if not self.ItemDatabase[strItem] or not self.tItems["settings"]["Bid2"].bCloseOnAssign then return end
+	local itemID = self.ItemDatabase[strItem].ID
+	
+	for k,auction in ipairs(self.ActiveAuctions) do
+		if auction.wnd:GetData() == itemID then
+			table.remove(self.ActiveAuctions,k)
+			auction.wnd:Detach()
+			auction.wnd:Destroy()
+			for l,choice in ipairs(self.MyChoices) do
+				if choice.item == auction.wnd:GetData() then
+					table.remove(self.MyChoices,l)
+					break
+				end
+			end
+			for l,vote in ipairs(self.MyVotes) do
+				if vote.item == auction.wnd:GetData() then
+					table.remove(self.MyVotes,l)
+					break
+				end
+			end
+			break
+		end
+	end
+	
+	if self.wndBid2:FindChild("Auctions") == nil and #self.ActiveAuctions == 0 then
+		local wnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2,self)
+		wnd:SetName("Auctions")
+		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
+		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Status"):SetText("No Active Auctions")
+		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Button"):Show(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Stop"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Start"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("Assign"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
+		self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
+		self:BidCustomLabelsUpdate(false)
+	else
+		self.ActiveAuctions[1].wnd:SetName("Auctions")
+	end
+end
+
 
 function DKP:Bid2AddWhitelistedName(wndHandler,wndControl,strText)
 	table.insert(self.tItems["settings"]["Bid2"].tWhitelisted,strText)
@@ -2942,9 +2998,12 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				-- Requesting EquippedItems
 				if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar or DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then
 					if tItem.itemDrop:IsEquippable() then
-						DKPInstance:SendRequestsForCurrItem(tItem.itemDrop:GetItemId())
-						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()] = {}
-						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
+						local myName = GameLib.GetPlayerUnit():GetName()
+						if myName then
+							DKPInstance:SendRequestsForCurrItem(tItem.itemDrop:GetItemId())
+							self.tEquippedItems[myName] = {}
+							self.tEquippedItems[myName][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
+						end
 					end
 				end
 			

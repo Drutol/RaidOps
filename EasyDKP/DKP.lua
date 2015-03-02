@@ -221,6 +221,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bSaveUndo == nil then self.tItems["settings"].bSaveUndo = false end
 		if self.tItems["settings"].bSkipGB == nil then self.tItems["settings"].bSkipGB = false end
 		if self.tItems["settings"].bRemErrInv == nil then self.tItems["settings"].bRemErrInv = true end
+		if self.tItems["settings"].bDisplayCounter == nil then self.tItems["settings"].bDisplayCounter = false end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -565,7 +566,7 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 	end
 	
 	
-	if isNew == false then
+	if not isNew then
 			local i = {}
 			i = self.tItems[existingID]
 			i.strName = self.tItems[existingID].strName
@@ -579,7 +580,7 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 			if self.tItems[existingID].listed == 0 then
 				self.tItems[existingID].listed = 1
 			end
-	elseif isNew == true and self.tItems["settings"].CheckAffiliation == 0 or isNew == true and self.tItems["settings"].CheckAffiliation == 1 and isStr == nil or isNew == true and isStr and self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):GetText() ~= "Input New Entry Name" then
+	elseif isNew then
 		local newPlayer = {}
 		newPlayer.strName = strName
 		newPlayer.net = self.tItems["settings"].default_dkp
@@ -1123,6 +1124,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					strName = strName .. " " .. words[i]
 				end
 			end
+			
+			self:Bid2CloseOnAssign(string.sub(itemStr,2))
 			strName = string.sub(strName,2)
 			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
@@ -1778,6 +1781,12 @@ function DKP:RefreshMainItemList()
 	end
 	self:RaidQueueShow()
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
+	if self.tItems["settings"].bDisplayCounter then
+		for k,child in ipairs(self.wndItemList:GetChildren()) do
+			child:FindChild("Counter"):Show(true)
+			child:FindChild("Counter"):SetText(k..".")
+		end
+	end
 	self.wndItemList:SetVScrollPos(self.nHScroll)
 	self:UpdateItemCount()
 end
@@ -1826,8 +1835,9 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			if playerItem.alt then break end
 		end
 	end
-	
-	if k and k == 1 or  bAddedClass == false then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
+	if self.tItems["settings"].GroupByClass then
+		if k and k == 1 or bAddedClass == false then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
+	end
 	for i=1,5 do
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
 			if self.tItems["settings"].LabelOptions[i] == "Name" then
@@ -2149,7 +2159,13 @@ function DKP:RefreshMainItemListAndGroupByClass()
 							else
 								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 							end
+							
 							self:UpdateItem(player,k,added)
+							
+							if self.tItems["settings"].bDisplayCounter then
+								player.wnd:FindChild("Counter"):SetText(k..".")
+								player.wnd:FindChild("Counter"):Show(true)
+							end
 							player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
 							added = true
 						end
@@ -2347,6 +2363,12 @@ function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
 	else
 		self.SortedLabel = nil
 		self:RefreshMainItemList()
+	end
+	if self.tItems["settings"].bDisplayCounter and not self.tItems["settings"].GroupByClass then
+		for k,child in ipairs(self.wndItemList:GetChildren()) do
+			child:FindChild("Counter"):Show(true)
+			child:FindChild("Counter"):SetText(k..".")
+		end
 	end
 	self:LabelHideIndicators()
 end
@@ -2788,6 +2810,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("SaveUndo"):SetCheck(self.tItems["settings"].bSaveUndo)
 	self.wndSettings:FindChild("SkipGB"):SetCheck(self.tItems["settings"].bSkipGB)
 	self.wndSettings:FindChild("RemoveErrorInvites"):SetCheck(self.tItems["settings"].bRemErrInv)
+	self.wndSettings:FindChild("DisplayCounter"):SetCheck(self.tItems["settings"].bDisplayCounter)
 	
 	
 end
@@ -2866,6 +2889,16 @@ end
 
 function DKP:SettingsRemoveInvErrorsDisable()
 	self.tItems["settings"].bRemErrInv = false	
+end
+
+function DKP:SettingsDisplayCounterEnable()
+	self.tItems["settings"].bDisplayCounter = true
+	self:RefreshMainItemList()
+end
+
+function DKP:SettingsDisplayCounterDisable()
+	self.tItems["settings"].bDisplayCounter = false
+	self:RefreshMainItemList()
 end
 
 function DKP:OnSyncMessage(channel, tMsg, strSender)
