@@ -49,6 +49,15 @@ local GeneticTokenIds =
 	["Feet"] = 69819,
 }
 
+local ktUndoActions =
+{
+	["raep"] = "{Raid EP Award}",
+	["ragp"] = "{Raid GP Award}",
+	["epgpd"] = "{EP GP Decay}",
+	["epd"] = "{EP Decay}",
+	["gpd"] = "{GP Decay}",
+}
+
 
 -- constants from ETooltip
 local kUIBody = "ff39b5d4"
@@ -383,9 +392,9 @@ function DKP:EPGPAwardRaid(EP,GP)
 			end
 		end
 	end
-	if EP == nil then EP = 0 end
-	if GP == nil then GP = 0 end
-	if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity("Added ".. EP .."/".. GP .. " EP/GP to whole raid."..#tMembers.." members affected.",tMembers) end
+	local strType
+	if EP then strType = ktUndoActions["raep"] elseif GP then strType = ktUndoActions["ragp"] end
+	if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity(strType,EP or GP,tMembers) end
 	self:ShowAll()
 end
 
@@ -519,10 +528,12 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 				table.insert(tMembers,player)
 			end
 		end
-		local strAffectedFields = ""
-		if self.tItems["EPGP"].bDecayEP then strAffectedFields = strAffectedFields .. "EP " end
-		if self.tItems["EPGP"].bDecayGP then strAffectedFields = strAffectedFields .. "GP " end
-		self:UndoAddActivity("Performed ".. self.tItems["EPGP"].nDecayValue .. " % " .. strAffectedFields .. " Decay on " .. #tMembers .. " players.",tMembers) 
+		local strType = ""
+		if self.tItems["EPGP"].bDecayEP and self.tItems["EPGP"].bDecayGP then strType = ktUndoActions["epgpd"]
+		elseif self.tItems["EPGP"].bDecayEP then strType = ktUndoActions["epd"]
+		elseif self.tItems["EPGP"].bDecayGP then strType = ktUndoActions["gpd"]
+		end
+		self:UndoAddActivity(strType,self.tItems["EPGP"].nDecayValue.."%",tMembers) 
 	end
 	
 	

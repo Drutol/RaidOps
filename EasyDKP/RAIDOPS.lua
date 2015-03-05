@@ -114,7 +114,7 @@ end
 function DKP:HubGetTop3Stats()
 	local arr = {}
 	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i]~= nil then
+		if self.tItems[i]~= nil and self.tItems[i].strName ~= "Guild Bank" then
 			if self.tItems["EPGP"].Enable == 1 then
 				table.insert(arr,{strName = self.tItems[i].strName, value = tonumber(self:EPGPGetPRByName(self.tItems[i].strName))})
 			else

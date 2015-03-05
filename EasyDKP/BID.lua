@@ -514,7 +514,7 @@ end]]
 
 function DKP:StartChatBidding(tCustomData)
 		if self.bIsBidding == false then
-			if tCustomData.strItem == nil then
+			if tCustomData == nil then
 				if Hook.wndMasterLoot:IsShown() == false then
 					self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):SetText(self.SelectedLooterItem)
 					if self.ItemDatabase[self.SelectedLooterItem] ~= nil then
@@ -553,7 +553,11 @@ function DKP:StartChatBidding(tCustomData)
 end
 
 function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
-	self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
+	if eMouseButton == GameLib.CodeEnumInputMouse.Right then
+		self:StartChatBidding()
+	else
+		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
+	end
 end
 
 function DKP:BidStartCustom( wndHandler, wndControl, eMouseButton )
@@ -2094,7 +2098,7 @@ function DKP:BidRegisterChoice(strSender,option,item,currItem)
 end
 
 function easyDKpsortBid2Bidders(a,b)
-	return a.pr*(a.votes+100) < b.pr*(b.votes+100)
+	return a.pr < b.pr
 end
 
 function easyDKpsortBid2BiddersLootCouncil(a,b)
