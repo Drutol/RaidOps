@@ -132,7 +132,7 @@ function DKP:BidCompleteInit()
 	self:InitBid2()
 
 	--Hook.wndLooter:Show(true,false)
-	--Hook.wndMasterLoot:Show(true,false)
+	Hook.wndMasterLoot:Show(true,false)
 
 	
 	if self.ItemDatabase == nil then
@@ -146,8 +146,8 @@ function DKP:BidCompleteInit()
 	self.InsertedCountersList = {}
 	self.SelectedLooterItem = nil
 	self.SelectedMasterItem = nil
-	self.wndInsertedLooterButton = Apollo.LoadForm(self.xmlDoc,"InsertLooterBid",Hook.wndLooter,self)
-	self.wndInsertedLooterButton:Enable(false)
+	--self.wndInsertedLooterButton = Apollo.LoadForm(self.xmlDoc,"InsertLooterBid",Hook.wndLooter,self)
+	--self.wndInsertedLooterButton:Enable(false)
 
 	if self.tItems["settings"]["ML"].bStandardLayout then
 		self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
@@ -155,8 +155,7 @@ function DKP:BidCompleteInit()
 		self.wndInsertedMasterButton:Enable(false)
 		Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(5,84,-131,128)
 		local l,t,r,b = Hook.wndMasterLoot:FindChild("Assignment"):GetAnchorOffsets()
-		self.wndInsertedMasterButton:SetAnchorPoints(.5,1,1,1)
-		Hook.wndMasterLoot:FindChild("Assignment"):SetAnchorOffsets(l,t,r,b-22)
+		Hook.wndMasterLoot:FindChild("Assignment"):SetAnchorOffsets(l,t,r-225,b)
 
 	else
 		Hook.wndMasterLoot:Destroy()
@@ -171,28 +170,27 @@ function DKP:BidCompleteInit()
 		Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(37,238,-128,282)
 		self.wndInsertedSearch:SetAnchorOffsets(-122,238,-40,282)
 	end
-
+	Hook.wndMasterLoot:SetSizingMinimum(800, 310)
 	self.wndSlotValues = Apollo.LoadForm(self.xmlDoc2,"ItemValues",nil,self)
 	self.wndSlotValues:Show(false,true)
-	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-250,63)
+	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-325,63)
 	--Asc/Desc
 	if self.tItems["settings"].BidSortAsc == nil then self.tItems["settings"].BidSortAsc = 1 end
 	if self.tItems["settings"].BidMLSorting == nil then self.tItems["settings"].BidMLSorting = 1 end
 	
 	
 	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc2,"InsertMLControls",Hook.wndMasterLoot,self)
+	
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
 	
-	if self.tItems["settings"].BidSortAsc == 1 then self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):SetCheck(true) 
-	else self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):SetCheck(true) end
-	
-	if self.tItems["settings"].BidMLSorting == 0 then
-		self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):Enable(false)
-		self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):Enable(false)
-	else
-		self.wndInsertedControls:FindChild("Window"):FindChild("Sort"):SetCheck(true)
+	if self.tItems["settings"].BidSortAsc == 1 then 
+		self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):SetCheck(true) 
+	else 
+		self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):SetCheck(true) 
 	end
 	
+	self.wndInsertedControls:FindChild("DispApplicable"):SetCheck(self.tItems["settings"]["ML"].bDisplayApplicable)
+	if not self.tItems["settings"]["ML"].bSortByName then self.wndInsertedControls:FindChild("SortPR"):SetCheck(true) else self.wndInsertedControls:FindChild("SortName"):SetCheck(true) end
 
 	self:HookToMasterLootDisp()
 	Hook:OnMasterLootUpdate(true)
@@ -207,13 +205,6 @@ function DKP:BidCompleteInit()
 	if self.tItems["BidSlots"].Enable == 1 then self.wndSettings:FindChild("ButtonSettingsForceBidMinValues"):SetCheck(true) end
 	
 	-- Anchors stuff
-	
-	if self.tItems["settings"].BidAnchorInsertion == nil then
-		Hook.wndLooter:SetAnchorPoints(0,0,0,0)
-		local l,t,r,b = Hook.wndLooter:GetAnchorOffsets()
-		Hook.wndLooter:SetAnchorOffsets(l,t,r,b+30)
-		self.tItems["settings"].BidAnchorInsertion = 1
-	end
 
 	self:BidUpdateItemDatabase()
 	
@@ -251,11 +242,14 @@ function DKP:BidCompleteInit()
 	--Post Update To generate Labels for Main DKP window
 	if self:LabelGetColumnNumberForValue("Item") ~= - 1 then self:LabelUpdateList() end
 	
-	--local test = Item.GetDataFromId(60420)
+	--local test = Item.GetDataFromId(41213)
+	--Print(test:GetItemCategoryName())
+	
+	
 	--Tooltip.GetItemTooltipForm(self,self.wndMain:FindChild("RaidOnly"),test,{bPrimary = true, bSelling = false})
 	
 	--self:BidInsertChildren()
-	
+	--Hook.wndMasterLoot:Show(true,false)
 end
 
 function DKP:BidFillInSlotValues()
@@ -312,17 +306,14 @@ end
 	end
 end]]
 
-function DKP:BidMLSortEnable()
-	self.tItems["settings"].BidMLSorting = 1
-	self.wndInsertedControls:FindChild("Asc"):Enable(true)
-	self.wndInsertedControls:FindChild("Desc"):Enable(true)
-
+function DKP:BidMLSortByNameEnable()
+	self.tItems["settings"]["ML"].bSortByName = true
+	Hook:OnMasterLootUpdate()
 end
 
-function DKP:BidMLSortDisable()
-	self.tItems["settings"].BidMLSorting = 0
-	self.wndInsertedControls:FindChild("Asc"):Enable(false)
-	self.wndInsertedControls:FindChild("Desc"):Enable(false)
+function DKP:BidMLSortByNameDisable()
+	self.tItems["settings"]["ML"].bSortByName = false
+	Hook:OnMasterLootUpdate()
 end
 
 
@@ -2913,28 +2904,32 @@ end
 function sortMasterLootEasyDKPNonWnd(a,b)
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
 	if DKPInstance.tItems["settings"].BidSortAsc == 0 then
-		if DKPInstance.tItems["EPGP"].Enable == 1 then
-			return DKPInstance:EPGPGetPRByName(a:GetName()) < DKPInstance:EPGPGetPRByName(b:GetName()) 
-		else
-			local IDa = DKPInstance:GetPlayerByIDByName(a:GetName())
-			local IDb = DKPInstance:GetPlayerByIDByName(b:GetName())
-			if IDa ~= -1 and IDb ~= -1 then
-				return DKPInstance.tItems[IDa].net < DKPInstance.tItems[IDb].net
+		if not DKPInstance.tItems["settings"]["ML"].bSortByName then
+			if DKPInstance.tItems["EPGP"].Enable == 1 then
+				return DKPInstance:EPGPGetPRByName(a:GetName()) < DKPInstance:EPGPGetPRByName(b:GetName()) 
 			else
-				return a:GetName() < b:GetName()
+				local IDa = DKPInstance:GetPlayerByIDByName(a:GetName())
+				local IDb = DKPInstance:GetPlayerByIDByName(b:GetName())
+				if IDa ~= -1 and IDb ~= -1 then
+					return DKPInstance.tItems[IDa].net < DKPInstance.tItems[IDb].net
+				end
 			end
+		else -- name
+			return a:GetName() < b:GetName()
 		end
 	else -- asc
-		if DKPInstance.tItems["EPGP"].Enable == 1 then
-			return DKPInstance:EPGPGetPRByName(a:GetName()) > DKPInstance:EPGPGetPRByName(b:GetName()) 
-		else
-			local IDa = DKPInstance:GetPlayerByIDByName(a:GetName())
-			local IDb = DKPInstance:GetPlayerByIDByName(b:GetName())
-			if IDa ~= -1 and IDb ~= -1 then
-				return DKPInstance.tItems[IDa].net > DKPInstance.tItems[IDb].net
+		if not DKPInstance.tItems["settings"]["ML"].bSortByName then
+			if DKPInstance.tItems["EPGP"].Enable == 1 then
+				return DKPInstance:EPGPGetPRByName(a:GetName()) > DKPInstance:EPGPGetPRByName(b:GetName()) 
 			else
-				return a:GetName() < b:GetName()
+				local IDa = DKPInstance:GetPlayerByIDByName(a:GetName())
+				local IDb = DKPInstance:GetPlayerByIDByName(b:GetName())
+				if IDa ~= -1 and IDb ~= -1 then
+					return DKPInstance.tItems[IDa].net > DKPInstance.tItems[IDb].net
+				end
 			end
+		else -- name
+			return a:GetName() > b:GetName()
 		end
 	end
 end
@@ -2974,25 +2969,68 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				else
 					tables.all = {}
 				end
+				
+				-- Determining applicable classes
+				local bWantEsp = true
+				local bWantWar = true
+				local bWantSpe = true
+				local bWantMed = true
+				local bWantSta = true
+				local bWantEng = true
+				
+				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
+					local strCategory = tItem.itemDrop:GetItemCategoryName()
+					if string.find(strCategory,"Light") then
+						local bWantEng = false
+						local bWantWar = false
+						local bWantSta = false
+						local bWantMed = false
+					elseif string.find(strCategory,"Medium") then
+						local bWantEng = false
+						local bWantWar = false
+						local bWantSpe = false
+						local bWantEsp = false
+					elseif string.find(strCategory,"Heavy") then
+						local bWantEsp = false
+						local bWantSpe = false
+						local bWantSta = false
+						local bWantMed = false
+					end
+				end
+				
+				
 				-- Grouping Players
 				for idx, unitLooter in pairs(tItem.tLooters) do
 					if DKPInstance.tItems["settings"]["ML"].bGroup then
 						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" then
+						if class == "Esper" and bWantEng then
 							table.insert(tables.esp,unitLooter)
-						elseif class == "Engineer" then
+						elseif class == "Engineer" and bWantEng then
 							table.insert(tables.eng,unitLooter)
-						elseif class == "Medic" then
+						elseif class == "Medic" and bWantMed then
 							table.insert(tables.med,unitLooter)
-						elseif class == "Warrior" then
+						elseif class == "Warrior" and bWantWar then
 							table.insert(tables.war,unitLooter)
-						elseif class == "Stalker" then
+						elseif class == "Stalker" and bWantSta then
 							table.insert(tables.sta,unitLooter)
-						elseif class == "Spellslinger" then
+						elseif class == "Spellslinger" and bWantSpe then
 							table.insert(tables.spe,unitLooter)
 						end
 					else
-						table.insert(tables.all,unitLooter)
+						class = ktClassToString[unitLooter:GetClassId()]
+						if class == "Esper" and bWantEng then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Engineer" and bWantEng then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Medic" and bWantMed then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Warrior" and bWantWar then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Stalker" and bWantSta then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Spellslinger" and bWantSpe then
+							table.insert(tables.all,unitLooter)
+						end
 					end	
 				end
 				-- Sorting in groups
@@ -3244,6 +3282,8 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bAllowMulti == nil then self.tItems["settings"]["ML"].bAllowMulti = false end
 	if self.tItems["settings"]["ML"].bShowGuildBank == nil then self.tItems["settings"]["ML"].bShowGuildBank = false end
 	if self.tItems["settings"]["ML"].strGBManager == nil then self.tItems["settings"]["ML"].strGBManager = "" end
+	if self.tItems["settings"]["ML"].bDisplayApplicable == nil then self.tItems["settings"]["ML"].bDisplayApplicable = false end
+	if self.tItems["settings"]["ML"].bSortByName == nil then self.tItems["settings"]["ML"].bSortByName = false end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
 	
 	if self.tItems["settings"]["ML"].bShowClass then self.wndMLSettings:FindChild("ShowClass"):SetCheck(true) end
@@ -3360,6 +3400,15 @@ function DKP:MLSetGBManager(wndHandler,wndControl,strText)
 	self.tItems["settings"]["ML"].strGBManager = strText
 end
 
+function DKP:BidMLDisplayApplicableEnable()
+	self.tItems["settings"]["ML"].bDisplayApplicable = true
+	Hook:OnMasterLootUpdate(true)
+end
+
+function DKP:BidMLDisplayApplicableDisable()
+	self.tItems["settings"]["ML"].bDisplayApplicable = false
+	Hook:OnMasterLootUpdate(true)
+end
 
 
 --- ML Responses

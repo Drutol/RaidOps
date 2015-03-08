@@ -70,6 +70,12 @@ function DKP:IBDebugInit()
 	
 end
 
+function DKP:RSDebugInit()
+	self.wndRS = Apollo.LoadForm(self.xmlDoc3,"RaidSelection",nil,self)
+	local wndDS = Apollo.LoadForm(self.xmlDoc3,"RaidCategoryDS",self.wndRS,self)
+	self.wndRS:FindChild("RaidCategoryGA"):AttachTab(wndDS,false)
+end
+
 function DKP:IBExpand(wndHandler,wndControl)
 	self:IBPopulate(wndControl:GetParent())
 	wndControl:GetParent():GetData().bExpanded = true

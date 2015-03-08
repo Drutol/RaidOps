@@ -241,9 +241,9 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].LabelOptions == nil then
 			self.tItems["settings"].LabelOptions = {}
 			self.tItems["settings"].LabelOptions[1] = "Name"
-			self.tItems["settings"].LabelOptions[2]= "Net"
-			self.tItems["settings"].LabelOptions[3] = "Tot"
-			self.tItems["settings"].LabelOptions[4] = "Nil"
+			self.tItems["settings"].LabelOptions[2]= "EP"
+			self.tItems["settings"].LabelOptions[3] = "GP"
+			self.tItems["settings"].LabelOptions[4] = "PR"
 			self.tItems["settings"].LabelOptions[5] = "Nil"
 		end
 		if self.tItems["settings"].LabelSortOrder == nil then self.tItems["settings"].LabelSortOrder = "asc" end
@@ -282,6 +282,7 @@ function DKP:OnDocLoaded()
 		self:CloseBigPOPUP()
 		
 		--self:IBDebugInit() -- Raid Summaries v2
+		--self:RSDebugInit()
 		
 		-- Colors
 		
@@ -1684,6 +1685,7 @@ function DKP:MassEditInvert()
 	for k,wnd in ipairs(selectedMembers) do
 		wnd:SetCheck(true)
 	end
+	self:UpdateItemCount()
 	
 end
 
@@ -1692,6 +1694,7 @@ function DKP:MassEditDeselect( wndHandler, wndControl, eMouseButton )
 		wnd:SetCheck(false)
 	end
 	selectedMembers = {}
+	self:UpdateItemCount()
 end
 
 function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
@@ -1700,6 +1703,7 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 		table.insert(selectedMembers,child)
 		child:SetCheck(true)
 	end
+	self:UpdateItemCount()
 end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
@@ -4162,6 +4166,8 @@ end
 function DKP:LogsInit()
 	self.wndLogs = Apollo.LoadForm(self.xmlDoc,"Logs",nil,self)
 	self.wndLogs:Show(false,true)
+	self.wndLogs:SetSizingMinimum(519,332)
+	self.wndLogs:SetSizingMaximum(519,700)
 end
 
 function DKP:LogsOpenGuildBank()
@@ -4285,7 +4291,11 @@ local tCreatedEvent = {}
 
 
 function DKP:CEInit()
-	self.wndCE = self.wndMain:FindChild("CustomEvents")
+	self.wndCE = Apollo.LoadForm(self.xmlDoc,"CustomEvents",nil,self)
+	
+	self.wndCE:SetSizingMaximum(692,700)
+	self.wndCE:SetSizingMinimum(692,414)
+	
 	self.wndCEL = Apollo.LoadForm(self.xmlDoc,"HandledEventsList",nil,self)
 	self.wndCEL:Show(false,true)
 	self.wndCE:Show(false,true)
@@ -4305,10 +4315,14 @@ function DKP:CEInit()
 end
 
 function DKP:CEShow()
+	if not self.wndCE:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndCE:Move(tCursor.x - 500, tCursor.y - 450, self.wndCE:GetWidth(), self.wndCE:GetHeight())
+	end
+	
 	self.wndCE:Show(true,false)
 	self.wndCE:ToFront()
 	self:CEPopulate()
-	self.wndMain:BringChildToTop(self.wndCE)
 end
 
 function DKP:CEHide()
@@ -4338,35 +4352,35 @@ end
 
 
 function DKP:CEExpandRecipents()
-	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(77,72,285,186)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(138,118,346,232)
 	self.wndCE:FindChild("RecipentTypeSelection"):SetText("")
 	self.wndCE:FindChild("RecipentTypeSelection"):ToFront()
 end
 
 function DKP:CECollapseRecipents()
-	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(77,72,285,98)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(138,118,346,145)
 	self.wndCE:FindChild("RecipentTypeSelection"):SetText(tCreatedEvent.rType == "RM" and "Raid Members" or "Raid Members + Queue")
 end
 
 function DKP:CEExpandUnits()
-	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(60,25,185,122)
+	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(119,71,244,167)
 	self.wndCE:FindChild("UnitTypeSelection"):SetText("")
 	self.wndCE:FindChild("UnitTypeSelection"):ToFront()
 end
 
 function DKP:CECollapseUnits()
-	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(60,25,185,52)
+	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(119,71,244,97)
 	self.wndCE:FindChild("UnitTypeSelection"):SetText(tCreatedEvent.uType)
 end
 
 function DKP:CEExpandBosses()
-	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetAnchorOffsets(57,3,276,131)
+	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetAnchorOffsets(68,7,288,131)
 	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetText("")
 	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):ToFront()
 end
 
 function DKP:CECollapseBosses()
-	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetAnchorOffsets(57,3,276,29)
+	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetAnchorOffsets(69,7,288,29)
 	if tCreatedEvent.bType then self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetText(tCreatedEvent.bType) end
 end
 
@@ -4496,6 +4510,7 @@ end
 
 function DKP:CELShow()
 	self.wndCEL:Show(true,false)
+	self.wndCEL:ToFront()
 	self:CELPopulate()
 end
 
@@ -4662,7 +4677,8 @@ end
 
 -- "P" = Pending -- "A" = Accepted 
 
-function DKP:InvitePopulate()
+function DKP:InvitePopulate(bOpen)
+	if bOpen == nil then bOpen = true end
 	self.wndInv:FindChild("ListInvited"):DestroyChildren()
 	
 	local nEsper = 0
@@ -4792,7 +4808,7 @@ function DKP:InvitePopulate()
 	if self.wndInv:FindChild("TotalPending"):GetText() == "0" then  self.wndInv:FindChild("TotalPending"):SetText("") end
 	
 	self.wndInv:FindChild("ListInvited"):ArrangeChildrenVert()
-	self.wndInv:Show(true,false)
+	if bOpen then self.wndInv:Show(true,false) end
 	
 end
 
@@ -4820,7 +4836,7 @@ function DKP:InviteOnResult(strName,eResult)
 			break
 		end
 	end
-	self:InvitePopulate()
+	self:InvitePopulate(false)
 end
 
 function DKP:InviteClearList()
