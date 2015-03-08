@@ -10,7 +10,7 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
-local knVersion = 1.6
+local knVersion = 1.7
  
 local kUIBody = "ff39b5d4"
 local ktAuctionHeight = 106
@@ -50,6 +50,16 @@ local ktStringToIcon =
 	["Stalker"]     	= "Icon_Windows_UI_CRB_Stalker",
 	["Engineer"]    	= "Icon_Windows_UI_CRB_Engineer",
 	["Spellslinger"]  	= "Icon_Windows_UI_CRB_Spellslinger",
+}
+
+local ktClassToString =
+{
+	[GameLib.CodeEnumClass.Medic]       	= "Medic",
+	[GameLib.CodeEnumClass.Esper]       	= "Esper",
+	[GameLib.CodeEnumClass.Warrior]     	= "Warrior",
+	[GameLib.CodeEnumClass.Stalker]     	= "Stalker",
+	[GameLib.CodeEnumClass.Engineer]    	= "Engineer",
+	[GameLib.CodeEnumClass.Spellslinger]  	= "Spellslinger",
 }
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -121,6 +131,7 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.tooltips == true then self:EPGPHookToETooltip() end
 		if self.settings.bKeepOnTop == nil then self.settings.bKeepOnTop = true end
 		if self.settings.nReportedVersion == nil then self.settings.nReportedVersion = knVersion end
+		if self.settings.bDisplayApplicable == nil then self.settings.bDisplayApplicable = false end
 		
 		if self.settings.nReportedVersion > knVersion then Print("Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
 		
@@ -205,6 +216,7 @@ function RaidOpsMM:ApplyMyPreviousChoices(forAuction)
 		end
 	end
 end
+
 
 
 function RaidOpsMM:Bid2GetTargetsTable()
@@ -312,6 +324,7 @@ end
 
 function RaidOpsMM:RestoreSettings()
 	self.wndSettings:FindChild("ChannelName"):SetText(self.settings.strChannel)
+	self.wndSettings:FindChild("DispApplicable"):SetCheck(self.settings.bDisplayApplicable)
 	if self.settings.enable then self.wndSettings:FindChild("Enable"):SetCheck(true) end
 	if self.settings.tooltip then self.wndSettings:FindChild("TooltipCost"):SetCheck(true) end
 	if self.settings.resize then self.wndSettings:FindChild("AllowResize"):SetCheck(true) end
@@ -447,6 +460,13 @@ function RaidOpsMM:CloseSettings( wndHandler, wndControl, eMouseButton )
 	wndControl:GetParent():Show(false,false)
 end
 
+function RaidOpsMM:DisplayApplicableEnable()
+	self.settings.bDisplayApplicable = true
+end
+
+function RaidOpsMM:DisplayApplicableDisable()
+	self.settings.bDisplayApplicable = false
+end
 ---------------------------------------------------------------------------------------------------
 -- Auction Functions
 ---------------------------------------------------------------------------------------------------
@@ -454,11 +474,29 @@ end
 function RaidOpsMM:AddAuction(itemID,cost,duration,progress,pass,tLabels,tLabelState)
 	if progress == nil then progress = 0 end
 	local item = Item.GetDataFromId(itemID)
+	
+	if self.settings.bDisplayApplicable and item then
+		local myClass = GameLib.GetPlayerUnit():GetClassId()
+		 if myClass then
+			local strCategory = item:GetItemCategoryName()
+			local strClass = ktClassToString[myClass]
+			if string.find(strCategory,"Light") and strClass == "Esper" or string.find(strCategory,"Light") and strClass == "Spellslinger" then
+			elseif  string.find(strCategory,"Medium") and strClass == "Stalker" or string.find(strCategory,"Medium") and strClass == "Medic" then
+			elseif  string.find(strCategory,"Heavy") and strClass == "Warrior" or string.find(strCategory,"Heavy") and strClass == "Engineer" then
+			elseif not string.find(strCategory,"Heavy") and not string.find(strCategory,"Medium") and not string.find(strCategory,"Light") then
+			else item = nil end
+			if item then
+				if string.find(strCategory,"Psyblade") and strClass ~= "Esper" or string.find(strCategory,"Heavy Gun") and strClass ~= "Engineer" or string.find(strCategory,"Pistols") and strClass ~= "Spellslinger" or string.find(strCategory,"Claws") and strClass ~= "Stalker" or string.find(strCategory,"Greatsword") and strClass ~= "Warrior" or string.find(strCategory,"Resonators") and strClass ~= "Medic" then item = nil end 
+			end
+		end 
+	end
+
+
 	if item then
 		local wndAuction = Apollo.LoadForm(self.xmlDoc,"Auction",self.wndLootList:FindChild("Auctions"),self)
-		wndAuction:FindChild("Icon"):SetSprite(item:GetIcon())
+		wndAuction:FindChild("Frame"):SetSprite(self:GetSlotSpriteByQuality(item:GetItemQuality()))
 		wndAuction:FindChild("Remove"):Enable(false)
-		wndAuction:FindChild("Icon"):FindChild("Frame"):SetSprite(self:GetSlotSpriteByQuality(item:GetItemQuality()))
+		wndAuction:FindChild("Frame"):FindChild("Icon"):SetSprite(item:GetIcon())
 		
 		for k,strLabel in ipairs(tLabels) do
 			wndAuction:FindChild("Opt"..k):SetText(strLabel)
