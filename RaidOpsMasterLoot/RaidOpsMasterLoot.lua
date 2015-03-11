@@ -158,7 +158,6 @@ function RaidOpsMasterLoot:CompleteInit()
 	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc,"InsertMLControls",Hook.wndMasterLoot,self)
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
 	Hook:OnMasterLootUpdate(true)
-	if self.tItems["settings"]["ML"].strChannel == nil then self.tItems["settings"]["ML"].strChannel = "your guild's channel" end
 	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
 end
 
@@ -226,17 +225,19 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 		self.tItems["settings"]["ML"].bArrTiles = true
 		self.tItems["settings"]["ML"].bShowValues = true
 	end
+	if self.tItems["settings"]["ML"].strChannel == nil then self.tItems["settings"]["ML"].strChannel = "your guild's channel" end
 	if self.tItems["settings"]["ML"].bArrItemTiles == nil then self.tItems["settings"]["ML"].bArrItemTiles = true end
 	if self.tItems["settings"]["ML"].bStandardLayout == nil then self.tItems["settings"]["ML"].bStandardLayout = true end
 	if self.tItems["settings"]["ML"].bListIndicators == nil then self.tItems["settings"]["ML"].bListIndicators = true end
 	if self.tItems["settings"]["ML"].bGroup == nil then self.tItems["settings"]["ML"].bGroup = false end
 	if self.tItems["settings"]["ML"].bShowLastItemBar == nil then self.tItems["settings"]["ML"].bShowLastItemBar = true end
-	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = false end	
-	if self.tItems["settings"]["ML"].bShowCurrItemBar == nil then self.tItems["settings"]["ML"].bShowCurrItemBar = true end
+	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = true end	
+	if self.tItems["settings"]["ML"].bShowCurrItemBar == nil then self.tItems["settings"]["ML"].bShowCurrItemBar = false end
 	if self.tItems["settings"]["ML"].bShowCurrItemTile == nil then self.tItems["settings"]["ML"].bShowCurrItemTile = false end
 	if self.tItems["settings"]["ML"].bAllowMulti == nil then self.tItems["settings"]["ML"].bAllowMulti = false end
 	if self.tItems["settings"]["ML"].bShowGuildBank == nil then self.tItems["settings"]["ML"].bShowGuildBank = false end
 	if self.tItems["settings"]["ML"].strGBManager == nil then self.tItems["settings"]["ML"].strGBManager = "" end
+	if self.tItems["settings"]["ML"].bDisplayApplicable == nil then self.tItems["settings"]["ML"].bDisplayApplicable = false end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
 	
 	if self.tItems["settings"]["ML"].bArrTiles then self.wndMLSettings:FindChild("Tiles"):SetCheck(true) else self.wndMLSettings:FindChild("List"):SetCheck(true) end
@@ -254,6 +255,7 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 	
 	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
 	self.wndMLSettings:FindChild("ChannelName"):SetText(self.tItems["settings"]["ML"].strChannel)
+	self.wndMLSettings:FindChild("DisplayApplicable"):SetCheck(self.tItems["settings"]["ML"].bDisplayApplicable)
 
 end
 
@@ -426,25 +428,67 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 				else
 					tables.all = {}
 				end
+				-- Determining applicable classes.
+				local bWantEsp = true
+				local bWantWar = true
+				local bWantSpe = true
+				local bWantMed = true
+				local bWantSta = true
+				local bWantEng = true
+				
+				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
+					local strCategory = tItem.itemDrop:GetItemCategoryName()
+					if string.find(strCategory,"Light") then
+						local bWantEng = false
+						local bWantWar = false
+						local bWantSta = false
+						local bWantMed = false
+					elseif string.find(strCategory,"Medium") then
+						local bWantEng = false
+						local bWantWar = false
+						local bWantSpe = false
+						local bWantEsp = false
+					elseif string.find(strCategory,"Heavy") then
+						local bWantEsp = false
+						local bWantSpe = false
+						local bWantSta = false
+						local bWantMed = false
+					end
+				end
+				
+				
 				-- Grouping Players
 				for idx, unitLooter in pairs(tItem.tLooters) do
 					if DKPInstance.tItems["settings"]["ML"].bGroup then
 						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" then
+						if class == "Esper" and bWantEng then
 							table.insert(tables.esp,unitLooter)
-						elseif class == "Engineer" then
+						elseif class == "Engineer" and bWantEng then
 							table.insert(tables.eng,unitLooter)
-						elseif class == "Medic" then
+						elseif class == "Medic" and bWantMed then
 							table.insert(tables.med,unitLooter)
-						elseif class == "Warrior" then
+						elseif class == "Warrior" and bWantWar then
 							table.insert(tables.war,unitLooter)
-						elseif class == "Stalker" then
+						elseif class == "Stalker" and bWantSta then
 							table.insert(tables.sta,unitLooter)
-						elseif class == "Spellslinger" then
+						elseif class == "Spellslinger" and bWantSpe then
 							table.insert(tables.spe,unitLooter)
 						end
 					else
-						table.insert(tables.all,unitLooter)
+						class = ktClassToString[unitLooter:GetClassId()]
+						if class == "Esper" and bWantEng then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Engineer" and bWantEng then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Medic" and bWantMed then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Warrior" and bWantWar then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Stalker" and bWantSta then
+							table.insert(tables.all,unitLooter)
+						elseif class == "Spellslinger" and bWantSpe then
+							table.insert(tables.all,unitLooter)
+						end
 					end	
 				end
 				-- Create name table to send request
@@ -459,14 +503,15 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 				local wndGuildBank
 				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank then
 					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
-						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
 					else
-						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
 					end
-					
-					wndGuildBank:FindChild("CharacterName"):SetText("Guild Bank")
-					wndGuildBank:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
-					wndGuildBank:FindChild("CharacterLevel"):SetText("")
+					if wndGuildBank then
+						wndGuildBank:FindChild("CharacterName"):SetText("Guild Bank")
+						wndGuildBank:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
+						wndGuildBank:FindChild("CharacterLevel"):SetText("")
+					end
 				end
 				
 				local unitGBManager
@@ -714,6 +759,16 @@ end
 function RaidOpsMasterLoot:BidDisAllowMultiSelection()
 	self.tItems["settings"]["ML"].bAllowMulti = false
 	self.tSelectedItems = {}
+	Hook:OnMasterLootUpdate(true)
+end
+
+function RaidOpsMasterLoot:BidDisplayApplicableEnable( wndHandler, wndControl, eMouseButton )
+	self.tItems["settings"]["ML"].bDisplayApplicable = true
+	Hook:OnMasterLootUpdate(true)
+end
+
+function RaidOpsMasterLoot:BidDisplayApplicableDisable( wndHandler, wndControl, eMouseButton )
+	self.tItems["settings"]["ML"].bDisplayApplicable = false
 	Hook:OnMasterLootUpdate(true)
 end
 

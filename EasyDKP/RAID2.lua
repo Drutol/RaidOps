@@ -13,7 +13,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local knBubbleDefWidth = 250
 local knBubbleDefHeight = 43
 
-local knBubbleMaxWidth = 400
+local knBubbleMaxWidth = 600
 local knBubbleMaxHeight = 210
 
 local knItemTileWidth = 65
@@ -119,7 +119,7 @@ function DKP:IBPopulate(wndBubble)
 	end
 	
 	if nUniqueLoot > 2 then -- splitting to 2 rows
-		local nWidth = (#tLoot * knItemTileWidth) / 4 -- 2 rows = 1/2 width
+		local nWidth = (#tLoot * knItemTileWidth) / 2.5 -- 2 rows = 1/2 width
 		wndBubble:GetData().nWidthMod = nWidth
 		wndBubble:GetData().nHeightMod = knBubbleMaxHeight
 	else

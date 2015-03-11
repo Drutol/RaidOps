@@ -128,7 +128,6 @@ function DKP:new(o)
 	o.tItems = {}
 	o.wndSelectedListItem = nil 
 	
-
     return o
 end
 
@@ -279,6 +278,7 @@ function DKP:OnDocLoaded()
 		self:LogsInit()
 		self:GIInit()
 		self:InvitesInit()
+		self:LLInit()
 		self:CloseBigPOPUP()
 		
 		--self:IBDebugInit() -- Raid Summaries v2
@@ -3438,6 +3438,11 @@ function DKP:ExportAsFormattedHTMLEPGP()
 	return tohtml(formatedTable)
 end
 
+function DKP:MainWindowToFront()
+	self.wndMain:ToFront()
+	self.wndMain:SetFocus()
+end
+
 function DKP:ExportAsFormattedHTMLList()
 	local formatedTable ={}
 	for k,child in ipairs(self.wndItemList:GetChildren()) do
@@ -4007,6 +4012,10 @@ function DKP:ConLogs()
 	self:LogsShow()
 end
 
+function DKP:ConLootLogs()
+	self:LLOpen(self.wndContext:GetData())
+end
+
 function DKP:ConStandbyEnable()
 	self:StandbyListAdd(nil,nil,self.tItems[self.wndContext:GetData()].strName)
 end
@@ -4429,9 +4438,10 @@ function DKP:CETriggerEvent(eID)
 				if ID ~= -1 then
 					table.insert(tMembers,self.tItems[ID])
 				end
-				self:UndoAddActivity(string.format(ktUndoActions["cetrig"],strMob,eID),event.EP or event.GP or event.DKP,tMembers)
 			end
+			self:UndoAddActivity(string.format(ktUndoActions["cetrig"],strMob,eID),event.EP or event.GP or event.DKP,tMembers)
 		end
+
 		
 		for k,member in ipairs(raid) do
 			local pID = self:GetPlayerByIDByName(member)
@@ -4570,13 +4580,14 @@ local tKilledBossesInSession = {
 function DKP:CEOnUnitDamage(tArgs)
 	if self.tItems["settings"].CERaidOnly and not GroupLib.InRaid() then return end
 	if  tArgs.bTargetKilled== false then return end
-	
+	if tArgs.unitTarget == nil then return end
 	local tUnits = {}
 	local tBosses = {}
 	
 	for k,event in ipairs(self.tItems["CE"]) do 
 		if event.uType == "Unit" then table.insert(tUnits,{strUnit = event.strUnit,ID = k}) else table.insert(tBosses,{bType = event.bType,ID = k}) end
 	end
+
 	local name =tArgs.unitTarget:GetName()
 	
 	
@@ -4853,6 +4864,34 @@ function DKP:InviteShow()
 	self.wndInv:ToFront()
 end
 
+-----------------------------------------------------------------------------------------------
+-- DKP Instance
+-----------------------------------------------------------------------------------------------
+
+function DKP:LLInit()
+	self.wndLL = Apollo.LoadForm(self.xmlDoc,"LootLogs",nil,self)
+	self.wndLL:Show(false,true)
+	
+end
+
+function DKP:LLOpen(ID)
+	if self.tItems[ID] == nil then return end
+	
+	if not self.wndLL:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndLL:Move(tCursor.x - 100, tCursor.y - 100, self.wndLL:GetWidth(), self.wndLL:GetHeight())
+	end
+	
+	self.wndLL:Show(true,false)
+end
+
+function DKP:LLPrepareData(ID)
+	
+end
+
+function DKP:LLPopuplate(wndList)
+	--for day , items in pai
+end
 
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

@@ -9,7 +9,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.6
+local knMemberModuleVersion = 1.7
 
 local ktClassToIcon =
 {
@@ -193,7 +193,7 @@ function DKP:BidCompleteInit()
 	if not self.tItems["settings"]["ML"].bSortByName then self.wndInsertedControls:FindChild("SortPR"):SetCheck(true) else self.wndInsertedControls:FindChild("SortName"):SetCheck(true) end
 
 	self:HookToMasterLootDisp()
-	Hook:OnMasterLootUpdate(true)
+	--Hook:OnMasterLootUpdate(true)
 	self.PrevSelectedLooterItem = nil
 	self.CurrentItemChatStr = nil
 	
@@ -249,8 +249,9 @@ function DKP:BidCompleteInit()
 	--Tooltip.GetItemTooltipForm(self,self.wndMain:FindChild("RaidOnly"),test,{bPrimary = true, bSelling = false})
 	
 	--self:BidInsertChildren()
-	--Hook.wndMasterLoot:Show(true,false)
+	Hook.wndMasterLoot:Show(false,false)
 end
+
 
 function DKP:BidFillInSlotValues()
 	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Weapon"])
@@ -308,12 +309,12 @@ end]]
 
 function DKP:BidMLSortByNameEnable()
 	self.tItems["settings"]["ML"].bSortByName = true
-	Hook:OnMasterLootUpdate()
+	Hook:OnMasterLootUpdate(true)
 end
 
 function DKP:BidMLSortByNameDisable()
 	self.tItems["settings"]["ML"].bSortByName = false
-	Hook:OnMasterLootUpdate()
+	Hook:OnMasterLootUpdate(true)
 end
 
 
@@ -345,14 +346,17 @@ end
 function DKP:BidRandomLooter()
 	local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
 	
-	local luckyChild = children[math.random(#children)]
-	if not luckyChild:IsEnabled() then
-		self:BidRandomLooter()
-		return
+	local luckyChild
+	for k,child in ipairs(children) do
+		if not child:IsEnabled() or child:FindChild("CharacterName"):GetText() == "Guild Bank" then table.remove(children,k) end
 	end
+	
 	for k,child in pairs(children) do
 		child:SetCheck(false)
 	end
+	
+	luckyChild = children[math.random(#children)]
+	
 	Hook.tMasterLootSelectedLooter = luckyChild:GetData()
 	Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
 	luckyChild:SetCheck(true)
@@ -432,10 +436,11 @@ function DKP:BidMLSearch(wndHandler,wndControl)
 end
 
 function DKP:BidMLSortPlayers()
-	local MLHook = Apollo.GetAddon("MasterLoot") -- mitigating an issue where the caller is differnt then DKP
+	Hook:OnMasterLootUpdate(true)
+	--[[local MLHook = Apollo.GetAddon("MasterLoot") -- mitigating an issue where the caller is differnt then DKP
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
 	DKPInstance:BidMLSearch()
-	if not DKPInstance.tItems["settings"]["ML"].bGroup then
+	if not DKPInstance.tItems["settings"]["ML"].bGroup and then
 		if not DKPInstance.tItems["settings"]["ML"].bArrTiles then
 			if DKPInstance.tItems["settings"].BidMLSorting == 1 then
 				if DKPInstance.tItems["settings"].BidSortAsc == 1 then
@@ -459,7 +464,7 @@ function DKP:BidMLSortPlayers()
 		end
 	else -- Refresh everything
 		Hook:OnMasterLootUpdate(true)
-	end
+	end]]
 	
 end
 
@@ -606,17 +611,17 @@ function DKP:BidStart(strName)
 	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("BoxOpen"):IsChecked() == true then self.mode = "EPGP" end
 
 	if self.mode ~= nil then
-		if self.CurrentBidSession == nil then
-			self.CurrentBidSession = {} 
-			self.CurrentBidSession.HighestBidEver = {}
-			self.CurrentBidSession.HighestBidEver.value = 0
-			self.CurrentBidSession.HighestBidEver.name = ""
-			self.CurrentBidSession.Bidders = {}
-			self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()
-			self.CurrentBidSession.HighestOffBid = {}
-			self.CurrentBidSession.HighestOffBid.name = "" 
-			self.CurrentBidSession.HighestOffBid.value = 0
-		end
+
+		self.CurrentBidSession = {} 
+		self.CurrentBidSession.HighestBidEver = {}
+		self.CurrentBidSession.HighestBidEver.value = 0
+		self.CurrentBidSession.HighestBidEver.name = ""
+		self.CurrentBidSession.Bidders = {}
+		self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()
+		self.CurrentBidSession.HighestOffBid = {}
+		self.CurrentBidSession.HighestOffBid.name = "" 
+		self.CurrentBidSession.HighestOffBid.value = 0
+
 
 
 		Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
@@ -662,7 +667,7 @@ function DKP:BidStart(strName)
 					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] If you want to participate in an auction for item" .. self.CurrentItemChatStr .." write !bid in /party channel.")
 				end
 				if self.bAllowOffspec == true then 
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled ,  for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. ".")
+					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled ,  for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. "%.")
 				end
 		end
 	end
@@ -671,7 +676,7 @@ end
 function DKP:BidSetOffspecModifierForEPGP( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
 		value = tonumber(strText)
-		if value >= 1 and value <=100 then
+		if value >= 0 and value <=100 then
 			self.tItems["settings"].BidEPGPOffspec = value
 		else
 			wndControl:SetText(self.tItems["settings"].BidEPGPOffspec)
@@ -740,7 +745,7 @@ function DKP:BidProcessMessageEPGP(tData)
 					self.CurrentBidSession.HighestBidEver.value = self.CurrentBidSession.Bidders[bidID].HighestBid
 					self.CurrentBidSession.HighestBidEver.name = self.CurrentBidSession.Bidders[bidID].strName
 				end
-			else
+			elseif bAlreadyBid and tData.strMsg ~= "!off" then
 				strReturn = "Already bid"
 			end
 			self:BidUpdateBiddersList()
@@ -1009,7 +1014,7 @@ function DKP:BidPerformCountdown()
 		if self.CurrentBidSession.HighestBidEver.name ~= "" then
 			ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Bidding has ended, and the winner is...")
 			if self.tItems["EPGP"].Enable == 1 then
-				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestBidEver.name .. " for " .. self.CurrentBidSession.HighestBidEver.value ..   " GP")
+				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestBidEver.name .. " with " .. self.CurrentBidSession.HighestBidEver.value ..   " PR")
 			else
 				ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] " .. self.CurrentBidSession.HighestBidEver.name .. " for " .. self.CurrentBidSession.HighestBidEver.value ..   " DKP")
 			end
@@ -2869,35 +2874,52 @@ function DKP:MLRegisterItemWinner()
 end
 
 function sortMasterLootEasyDKPasc(a,b)
-	if a:FindChild("CharacterName"):GetText() == "Guild Bank" then return b end
-	if b:FindChild("CharacterName"):GetText() == "Guild Bank" then return a end
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	if DKPInstance == nil then return end
+	if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 		if DKPInstance.tItems["EPGP"].Enable == 1 then
-			return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) > DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
+			return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) * (a:FindChild("CharacterName"):GetText() == "Guild Bank" and 1000000 or 1) > DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) * (b:FindChild("CharacterName"):GetText() == "Guild Bank" and 1000000 or 1)
 		else
 			local IDa = DKPInstance:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
 			local IDb = DKPInstance:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
 			if IDa ~= -1 and IDb ~= -1 then
-				return DKPInstance.tItems[IDa].net > DKPInstance.tItems[IDb].net
-			else
-				return a:FindChild("CharacterName"):GetText() < b:FindChild("CharacterName"):GetText() 
+				return DKPInstance.tItems[IDa].net * (a:FindChild("CharacterName"):GetText() == "Guild Bank" and 1000000 or 1) > DKPInstance.tItems[IDb].net * (b:FindChild("CharacterName"):GetText() == "Guild Bank" and 1000000 or 1)
 			end
 		end
+	else -- name
+		local nameA = a:FindChild("CharacterName"):GetText()
+		local nameB = b:FindChild("CharacterName"):GetText()
+		if nameA == "Guild Bank" then nameA = "ZZZZZZZZZZZZZZZZZZ" end
+		if nameB == "Guild Bank" then nameB = "ZZZZZZZZZZZZZZZZZZ" end
+		
+		if not a:IsEnabled() then nameA = "AAAAAAAAAAAAAAAAAA" end
+		if not b:IsEnabled() then nameB = "AAAAAAAAAAAAAAAAAA" end
+		return nameA > nameB
+	end
 end
+
 function sortMasterLootEasyDKPdesc(a,b)
-	if a:FindChild("CharacterName"):GetText() == "Guild Bank" then return a end
-	if b:FindChild("CharacterName"):GetText() == "Guild Bank" then return b end
 	local DKPInstance = Apollo.GetAddon("EasyDKP")
-	if DKPInstance.tItems["EPGP"].Enable == 1 then
-		return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) < DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) 
-	else
-		local IDa = DKPInstance:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
-		local IDb = DKPInstance:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
-		if IDa ~= -1 and IDb ~= -1 then
-			return DKPInstance.tItems[IDa].net < DKPInstance.tItems[IDb].net
+	if DKPInstance == nil then return end
+	if not DKPInstance.tItems["settings"]["ML"].bSortByName then
+		if DKPInstance.tItems["EPGP"].Enable == 1 then
+			return DKPInstance:EPGPGetPRByName(a:FindChild("CharacterName"):GetText()) * (a:FindChild("CharacterName"):GetText() == "Guild Bank" and  0.0000001 or 1) < DKPInstance:EPGPGetPRByName(b:FindChild("CharacterName"):GetText()) * (b:FindChild("CharacterName"):GetText() == "Guild Bank" and  0.0000001 or 1)
 		else
-			return a:FindChild("CharacterName"):GetText() < b:FindChild("CharacterName"):GetText() 
+			local IDa = DKPInstance:GetPlayerByIDByName(a:FindChild("CharacterName"):GetText())
+			local IDb = DKPInstance:GetPlayerByIDByName(b:FindChild("CharacterName"):GetText())
+			if IDa ~= -1 and IDb ~= -1 then
+				return DKPInstance.tItems[IDa].net * (a:FindChild("CharacterName"):GetText() == "Guild Bank" and  0.0000001 or 1) < DKPInstance.tItems[IDb].net * (b:FindChild("CharacterName"):GetText() == "Guild Bank" and  0.0000001 or 1)
+			end
 		end
+	else -- name
+		local nameA = a:FindChild("CharacterName"):GetText()
+		local nameB = b:FindChild("CharacterName"):GetText()
+		if nameA == "Guild Bank" then nameA = "AAAAAAAAAAAAAAAAAA" end
+		if nameB == "Guild Bank" then nameB = "AAAAAAAAAAAAAAAAAA" end
+		
+		if not a:IsEnabled() then nameA = "ZZZZZZZZZZZZZZZ" end
+		if not b:IsEnabled() then nameB = "ZZZZZZZZZZZZZZZ" end
+		return nameA < nameB
 	end
 end
 
@@ -2980,30 +3002,51 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				
 				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
 					local strCategory = tItem.itemDrop:GetItemCategoryName()
+
 					if string.find(strCategory,"Light") then
-						local bWantEng = false
-						local bWantWar = false
-						local bWantSta = false
-						local bWantMed = false
+						Print(strCategory)
+						bWantEng = false
+						bWantWar = false
+						bWantSta = false
+						bWantMed = false
 					elseif string.find(strCategory,"Medium") then
-						local bWantEng = false
-						local bWantWar = false
-						local bWantSpe = false
-						local bWantEsp = false
+						bWantEng = false
+						bWantWar = false
+						bWantSpe = false
+						bWantEsp = false
 					elseif string.find(strCategory,"Heavy") then
-						local bWantEsp = false
-						local bWantSpe = false
-						local bWantSta = false
-						local bWantMed = false
+						bWantEsp = false
+						bWantSpe = false
+						bWantSta = false
+						bWantMed = false
 					end
+					
+					if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+						bWantEsp = false
+						bWantWar = false
+						bWantSpe = false
+						bWantMed = false
+						bWantSta = false
+						bWantEng = false
+					end 
+					
+					if string.find(strCategory,"Psyblade") then bWantEsp = true
+					elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
+					elseif string.find(strCategory,"Pistols") then bWantSpe = true
+					elseif string.find(strCategory,"Claws") then bWantSta = true
+					elseif string.find(strCategory,"Greatsword") then bWantWar = true
+					elseif string.find(strCategory,"Resonators") then bWantMed = true
+					end 
 				end
 				
 				
 				-- Grouping Players
+				local unitGBManager
 				for idx, unitLooter in pairs(tItem.tLooters) do
+					if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and string.lower(unitLooter:GetName()) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then unitGBManager = unitLooter end
 					if DKPInstance.tItems["settings"]["ML"].bGroup then
 						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" and bWantEng then
+						if class == "Esper" and bWantEsp then
 							table.insert(tables.esp,unitLooter)
 						elseif class == "Engineer" and bWantEng then
 							table.insert(tables.eng,unitLooter)
@@ -3018,7 +3061,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						end
 					else
 						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" and bWantEng then
+						if class == "Esper" and bWantEsp then
 							table.insert(tables.all,unitLooter)
 						elseif class == "Engineer" and bWantEng then
 							table.insert(tables.all,unitLooter)
@@ -3051,7 +3094,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 			
 				-- Guild Bank
 				local wndGuildBank
-				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank then
+				if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and unitGBManager then
 					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
 						wndGuildBank = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
 					else
@@ -3061,10 +3104,12 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					wndGuildBank:FindChild("CharacterName"):SetText("Guild Bank")
 					wndGuildBank:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
 					wndGuildBank:FindChild("CharacterLevel"):SetText("")
+					wndGuildBank:SetTooltip(unitGBManager:GetName() .. " is behind this.")
+					wndGuildBank:SetData(unitGBManager)
 				end
 
 				-- Finally Creating windows
-				local unitGBManager
+
 				for k,tab in pairs(tables) do
 					for j,unitLooter in ipairs(tab) do
 						local wndCurrentLooter
@@ -3143,7 +3188,6 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						end
 						wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())
 						
-						if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and string.lower(unitLooter:GetName()) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then unitGBManager = unitLooter end
 						wndCurrentLooter:SetData(unitLooter)
 						
 						
@@ -3154,12 +3198,6 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					end
 				end
 				-- For for ended
-				if wndGuildBank and unitGBManager then
-					wndGuildBank:SetTooltip(unitGBManager:GetName() .. " is behind this.")
-					wndGuildBank:SetData(unitGBManager)
-				elseif wndGuildBank then
-					wndGuildBank:Destroy()
-				end
 
 				
 
@@ -3179,13 +3217,13 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					end
 				end
 				DKPInstance:BidMLSearch()
-				if not DKPInstance.tItems["settings"]["ML"].bGroup then DKPInstance:BidMLSortPlayers() else 
-					if DKPInstance.tItems["settings"]["ML"].bArrTiles then
-						luaCaller.wndMasterLoot_LooterList:ArrangeChildrenTiles()
-					else
-						luaCaller.wndMasterLoot_LooterList:ArrangeChildrenVert()
-					end
+				
+				if DKPInstance.tItems["settings"]["ML"].bArrTiles then
+					luaCaller.wndMasterLoot_LooterList:ArrangeChildrenTiles()
+				else
+					luaCaller.wndMasterLoot_LooterList:ArrangeChildrenVert()
 				end
+				
 			end
 		end
 	end
