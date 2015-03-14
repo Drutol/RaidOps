@@ -2568,6 +2568,41 @@ function DKP:Bid2HideAuctionVotes(wndHandler,wndControl)
 	wndControl:GetParent():FindChild("Votes1"):Show(false,false)
 end
 
+function DKP:Bid2SelectBidderAtRandom(wndHandler,wndControl)
+	for k , auction in ipairs(self.ActiveAuctions) do
+		if auction.wnd == wndControl:GetParent() then
+			local tBidders = {}
+			local highestOpt = 4
+			for k,bidder in ipairs(auction.bidders) do
+				if tonumber(string.sub(bidder.option,4)) < highestOpt then
+					tBidders = {}
+					table.insert(tBidders,bidder.strName)
+					highestOpt = tonumber(string.sub(bidder.option,3))
+				else
+					table.insert(tBidders,bidder.strName)
+				end
+			end
+			
+			local luckyBidder = tBidders[math.random(#tBidders)]
+			
+			for k , child in ipairs(auction.wnd:FindChild("Responses"):GetChildren()) do
+				if child:GetData().strName == luckyBidder then
+					child:SetCheck(true)
+					luckyBidder = child
+				else
+					child:SetCheck(false)
+				end
+			end
+			
+			self:Bid2PopulatePlayerInfo(luckyBidder:GetData(),luckyBidder:GetParent():GetParent():FindChild("Info"))
+			self.Bid2SelectedPlayerName = luckyBidder:GetData().strName
+			self.Bid2SelectedPlayerTile = luckyBidder
+			
+			break
+		end
+	end
+end
+
 function DKP:Bid2PopulateAuctionVotes(auction)
 	local grid = auction.wnd:FindChild("Votes1"):FindChild("Grid")
 	

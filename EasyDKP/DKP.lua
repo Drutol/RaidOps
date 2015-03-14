@@ -279,7 +279,9 @@ function DKP:OnDocLoaded()
 		self:GIInit()
 		self:InvitesInit()
 		self:LLInit()
+		self:DFInit()
 		self:CloseBigPOPUP()
+		
 		
 		--self:IBDebugInit() -- Raid Summaries v2
 		--self:RSDebugInit()
@@ -1193,6 +1195,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			
 			self:Bid2CloseOnAssign(string.sub(itemStr,2))
 			strName = string.sub(strName,2)
+			self:LLAddLog(strName:sub(1, #strName - 1),string.sub(itemStr,2))
 			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
 				if not item:IsEquippable() then return end
@@ -2970,14 +2973,6 @@ function DKP:SettingsPurgeDatabaseOff()
 		purge_database = 0
 end
 
-function DKP:SettingsEnableSync( wndHandler, wndControl, eMouseButton )
-	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel","OnSyncMessage",self)
-end
-
-function DKP:SettingsDisableSync( wndHandler, wndControl, eMouseButton )
-	self.sChannel = nil
-end
-
 function DKP:SettingsColorIconsEnable()
 	self.tItems["settings"].bColorIcons = true
 	self:BidUpdateColorScheme()
@@ -3036,48 +3031,7 @@ function DKP:SettingsDisplayCounterDisable()
 	self:RefreshMainItemList()
 end
 
-function DKP:OnSyncMessage(channel, tMsg, strSender)
-	if tMsg.type then
-		if tMsg.type == "SendMeData" then
-			self.sChannel:SendPrivateMessage({[1] = strSender},{type = "EncodedData",strData = self:GetEncodedData()})
-		elseif tMsg.type == "EncodedData" then
-			self:ProccesEncodedData(tMsg.strData)
-		end
-	end
-end
 
-function DKP:ProccesEncodedData(strData)
-	local tData = serpent.load(Base64.Decode(strData))
-	
-	if tData then
-		for k,player in ipairs(tData) do
-			if self:GetPlayerByIDByName(player.strName) == -1 then
-				table.insert(self.tItems,player)
-			else
-				self.tItems[self:GetPlayerByIDByName(player.strName)] = player
-			end
-		end
-	end
-	Print("Data received and proccessed")
-	
-	self:RefreshMainItemList()
-	
-
-end
-
-function DKP:GetEncodedData()
-	local tData = {}
-	
-	for k,player in ipairs(self.tItems) do
-		table.insert(tData,player)
-	end
-	
-	return Base64.Encode(serpent.dump(tData))
-end
-
-function DKP:SettingsFetchData()
-	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.wndSettings:FindChild("EditBoxFetchedName"):GetText()},{type = "SendMeData"}) end
-end
 
 
 
@@ -3439,8 +3393,8 @@ function DKP:ExportAsFormattedHTMLEPGP()
 end
 
 function DKP:MainWindowToFront()
-	self.wndMain:ToFront()
-	self.wndMain:SetFocus()
+	--self.wndMain:ToFront()
+	--self.wndMain:SetFocus()
 end
 
 function DKP:ExportAsFormattedHTMLList()
@@ -4865,13 +4819,25 @@ function DKP:InviteShow()
 end
 
 -----------------------------------------------------------------------------------------------
--- DKP Instance
+-- LootLogs
 -----------------------------------------------------------------------------------------------
 
 function DKP:LLInit()
 	self.wndLL = Apollo.LoadForm(self.xmlDoc,"LootLogs",nil,self)
 	self.wndLL:Show(false,true)
-	
+end
+
+function DKP:LLAddLog(strPlayer,strItem)
+	local ID = self:GetPlayerByIDByName(strPlayer)
+	if ID ~= -1 and self.ItemDatabase[strItem] then
+		local item = self.ItemDatabase[strItem].ID
+		if item then
+			if self.tItems[ID].tLLogs == nil then self.tItems[ID].tLLogs = {} end
+			table.insert(self.tItems[ID].tLLogs,1,{itemID = self.ItemDatabase[strItem].ID,nDate = os.time()})
+			if #self.tItems[ID].tLLogs > 50 then table.remove(self.tItems[ID].tLLogs,51) end
+
+		end
+	end
 end
 
 function DKP:LLOpen(ID)
@@ -4882,17 +4848,272 @@ function DKP:LLOpen(ID)
 		self.wndLL:Move(tCursor.x - 100, tCursor.y - 100, self.wndLL:GetWidth(), self.wndLL:GetHeight())
 	end
 	
+	self.wndLL:SetData(ID)
 	self.wndLL:Show(true,false)
+	self:LLPopuplate()
 end
 
 function DKP:LLPrepareData(ID)
+	local tGrouppedItems = {}
+	if self.tItems[self.wndLL:GetData()].tLLogs == nil then return {} end
+	for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
+		local item = Item.GetDataFromId(entry.itemID)
+		if item then
+			if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+			table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
+		end
+	end
+	return tGrouppedItems
+end
+
+function DKP:LLResize()
+	self:RIRequestRearrange(self.wndLL:FindChild("List"))
+end
+
+function DKP:LLPopuplate()
+	local wndList = self.wndLL:FindChild("List")
+	wndList:DestroyChildren()
+	local tData = self:LLPrepareData()
+	for cat , items in pairs(tData) do
+		local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
+		wndBubble:SetData({bExpanded = false,bPopulated = false,strTitle = "Drutol Windchaser",nWidthMod = 1,nHeightMod = 0,tCustomData = items})
+		wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
+	end
+	
+	self:RIRequestRearrange(wndList)
+	
 	
 end
 
-function DKP:LLPopuplate(wndList)
-	--for day , items in pai
+-----------------------------------------------------------------------------------------------
+--  DataFetching
+-----------------------------------------------------------------------------------------------
+
+function DKP:DFInit()
+	self.wndDF = Apollo.LoadForm(self.xmlDoc,"DataFetching",nil,self)
+	self.wndDF:Show(false,true)
+	
+	if self.tItems["settings"].DF == nil then self.tItems["settings"].DF = {} end
+	if self.tItems["settings"].DF.bFetchRaid == nil then self.tItems["settings"].DF.bFetchRaid = false end
+	if self.tItems["settings"].DF.bFetchTimed == nil then self.tItems["settings"].DF.bFetchTimed = false end
+	if self.tItems["settings"].DF.bFetchOOC == nil then self.tItems["settings"].DF.bFetchOOC = true end
+	if self.tItems["settings"].DF.strSource == nil then self.tItems["settings"].DF.strSource = "Fill with EXACT player name." end
+	if self.tItems["settings"].DF.nPeriod == nil then self.tItems["settings"].DF.nPeriod = 5 end
+	
+	if self.tItems["settings"].DF.bSend == nil then self.tItems["settings"].DF.bSend = true end
+	if self.tItems["settings"].DF.bSendRaid == nil then self.tItems["settings"].DF.bSendRaid = false end
+	if self.tItems["settings"].DF.bSendOOC == nil then self.tItems["settings"].DF.bSendOOC = false end
+	
+	if self.tItems["settings"].DF.tLogs == nil then self.tItems["settings"].DF.tLogs = {} end
+	
+	self.wndDF:FindChild("FetchOnlyInRaid"):SetCheck(self.tItems["settings"].DF.bFetchRaid)
+	self.wndDF:FindChild("FetchOnlyCombat"):SetCheck(self.tItems["settings"].DF.bFetchOOC)
+	self.wndDF:FindChild("TimedFetchEnable"):SetCheck(self.tItems["settings"].DF.bFetchTimed)
+	
+	self.wndDF:FindChild("SendEnable"):SetCheck(self.tItems["settings"].DF.bSend)
+	self.wndDF:FindChild("SendRaidOnly"):SetCheck(self.tItems["settings"].DF.bSendRaid)
+	self.wndDF:FindChild("SendOutOfCombat"):SetCheck(self.tItems["settings"].DF.bSendOOC)
+	
+	self.wndDF:FindChild("Source"):SetText(self.tItems["settings"].DF.strSource)
+	self.wndDF:FindChild("Minutes"):SetText(self.tItems["settings"].DF.nPeriod)
+	
+	if self.tItems["settings"].DF.bFetchTimed then self:DFStartTimer() end
+	
+	self:DFJoinSyncChannel()
 end
 
+local nTicks = 0
+function DKP:DFShow()
+	self.wndDF:Show(true,false)
+	self.wndDF:ToFront()
+	self:DFPopulate()
+end
+
+function DKP:DFClose()
+	self.wndDF:Show(false,false)
+end
+
+function DKP:DFFetchRaidEnable()
+	self.tItems["settings"].DF.bFetchRaid = true
+end
+
+function DKP:DFFetchRaidDisable()
+	self.tItems["settings"].DF.bFetchRaid = false
+end
+
+function DKP:DFFetchOOCEnable()
+	self.tItems["settings"].DF.bFetchOOC = true
+end
+
+function DKP:DFFetchOOCDisable()
+	self.tItems["settings"].DF.bFetchOOC = false
+end
+
+function DKP:DFTimedFetchEnable()
+	self.tItems["settings"].DF.bFetchTimed = true
+	self:DFStartTimer()
+end
+
+function DKP:DFTimedFetchDisable()
+	self.tItems["settings"].DF.bFetchTimed = false
+	self:DFStopTimer()
+end
+
+function DKP:DFSendEnable()
+	self.tItems["settings"].DF.bSend = true
+end
+
+function DKP:DFSendDisable()
+	self.tItems["settings"].DF.bSend = false
+end
+
+function DKP:DFSendRaidEnable()
+	self.tItems["settings"].DF.bSendRaid = true
+end
+
+function DKP:DFSendRaidDisable()
+	self.tItems["settings"].DF.bSendRaid = false
+end
+
+function DKP:DFSendOOCEnable()
+	self.tItems["settings"].DF.bSendOOC = true
+end
+
+function DKP:DFSendOOCDisable()
+	self.tItems["settings"].DF.bSendOOC = false
+end
+
+function DKP:DFSetSource(wndHandler,wndControl,strText)
+	self.tItems["settings"].DF.strSource = strText
+end
+
+function DKP:DFSetPeriod(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val then
+		if val > 0 then
+			self.tItems["settings"].DF.nPeriod = math.floor(val)
+			wndControl:SetText(self.tItems["settings"].DF.nPeriod)
+			nTicks = 0
+		else
+			wndControl:SetText(self.tItems["settings"].DF.nPeriod)
+		end
+	else
+		wndControl:SetText(self.tItems["settings"].DF.nPeriod)
+	end
+end
+
+function DKP:DFPopulate()
+	local grid = self.wndDF:FindChild("Grid")
+	
+	grid:DeleteAll()
+	
+	for k, entry in ipairs(self.tItems["settings"].DF.tLogs) do
+		grid:AddRow(k)
+		grid:SetCellData(k,1,entry.strRequester)
+		grid:SetCellData(k,2,entry.strState)
+		grid:SetCellData(k,3,entry.strTimestamp)
+	end
+end
+
+function DKP:DFStartTimer()
+	Apollo.RegisterTimerHandler(1,"DFTimerTick",self)
+	self.DFTimer = ApolloTimer.Create(1, true, "DFTimerTick", self)
+end
+
+function DKP:DFStopTimer()
+	Apollo.RemoveEventHandler("DFTimerTick",self)
+	self.DFTimer:Stop()
+	self.wndDF:FindChild("CountDown"):SetText("--:--:--")
+	nTicks = 0
+end
+
+function DKP:DFTimerTick()
+	nTicks = nTicks + 1
+	if nTicks >= self.tItems["settings"].DF.nPeriod * 60 then
+		nTicks = 0
+		self:DFFetchDataTimed()
+	end
+	
+	local nTimeLeft = self.tItems["settings"].DF.nPeriod * 60 - nTicks
+	local diff =  os.date("*t",nTimeLeft)
+	if diff ~= nil then
+		self.wndDF:FindChild("CountDown"):SetText((diff.hour-1 <=9 and "0" or "" ) .. diff.hour-1 .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
+	else
+		self.wndDF:FindChild("CountDown"):SetText("--:--:--")
+	end
+end
+
+-- Syncing
+
+function DKP:DFJoinSyncChannel( wndHandler, wndControl, eMouseButton )
+	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel","DFOnSyncMessage",self)
+end
+
+function DKP:DFOnSyncMessage(channel, tMsg, strSender)
+	if tMsg.type then
+		if tMsg.type == "SendMeData" then
+			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
+		elseif tMsg.type == "EncodedData" then
+			self:ProccesEncodedData(tMsg.strData)
+		elseif tMsg.type == "Data unavailable" then
+			Print("Permission to data was denied , contact the person in charge")
+		end
+	end
+end
+
+function DKP:ProccesEncodedData(strData)
+	local tData = serpent.load(Base64.Decode(strData))
+	
+	if tData then
+		for k,player in ipairs(tData) do
+			if self:GetPlayerByIDByName(player.strName) == -1 then
+				table.insert(self.tItems,player)
+			else
+				self.tItems[self:GetPlayerByIDByName(player.strName)] = player
+			end
+		end
+	end
+	Print("Data received and proccessed")
+	
+	self:RefreshMainItemList()
+	
+
+end
+
+function DKP:GetEncodedData(strRequester)
+	local tData = {}
+	local myUnit = GameLib.GetPlayerUnit()
+	if not self.tItems["settings"].DF.bSend or self.tItems["settings"].DF.bSendRaid and not self:IsPlayerInRaid(strRequester) or self.tItems["settings"].DF.bSendOOC and myUnit:IsInCombat() then
+		tData.type = "Data unavailable"
+		self:DFAddLog(strRequester,false)
+	else
+		tData.type = "EncodedData"
+		local tPlayers = {}
+		for k,player in ipairs(self.tItems) do
+			table.insert(tPlayers,player)
+		end
+		tData.strData = Base64.Encode(serpent.dump(tPlayers))
+		self:DFAddLog(strRequester,true)
+	end
+	return tData
+end
+
+function DKP:DFAddLog(strPlayer,bSucces)
+	table.insert(self.tItems["settings"].DF.tLogs,1,{strRequester = strPlayer,strState = bSucces and "{Yes}" or "{No}",strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
+	if #self.tItems["settings"].DF.tLogs > 20 then table.remove(self.tItems["settings"].DF.tLogs,21) end
+end
+
+
+
+function DKP:DFFetchDataTimed()
+	local myUnit = GameLib.GetPlayerUnit()
+	if self.tItems["settings"].bFetchOOC and myUnit:IsInCombat() or self.tItems["settings"].DF.bFetchRaid and not GroupLib.InRaid() then return end
+	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
+end
+
+function DKP:DFFetchData()
+	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
+end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance
 -----------------------------------------------------------------------------------------------

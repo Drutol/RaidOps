@@ -104,7 +104,12 @@ function DKP:IBPopulate(wndBubble)
 
 	if wndBubble:GetData().bPopulated then return end -- Buuble is already filled -> no need to do this again
 
-	local tLoot = self:RIRequestLootForBubble(wndBubble:GetData())
+	local tLoot
+	if wndBubble:GetData().tCustomData == nil then
+		tLoot = self:RIRequestLootForBubble(wndBubble:GetData())
+	else
+		tLoot = wndBubble:GetData().tCustomData
+	end
 	local wndBubbleGrid = wndBubble:FindChild("ItemGridFrame"):FindChild("ItemGrid")
 	
 	local nUniqueLoot = 0
@@ -164,7 +169,15 @@ function DKP:RIRequestLootForBubble(tBubbleData)
 	return tDebug
 end
 
+local tPrevOffsets = {}
 function DKP:RIRequestRearrange(wndList)
+	if tPrevOffsets[wndList] then
+		if tPrevOffsets[wndList] == wndList:GetAnchorOffsets() then return end
+		tPrevOffsets[wndList] = wndList:GetAnchorOffsets()
+	else
+		tPrevOffsets[wndList] = wndList:GetAnchorOffsets()
+	end
+	
 	local prevChild
 	local highestInRow = {}
 	local tRows = {}
@@ -217,6 +230,4 @@ function DKP:RIRequestRearrange(wndList)
 			table.insert(tRows,{wnd = child , nHeight = child:GetHeight()})
 		end
 	end
-	local l,t,r,b = tRows[#tRows].wnd:GetAnchorOffsets()
-	wndList:SetVScrollInfo(b,100,100)
 end
