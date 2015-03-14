@@ -187,6 +187,7 @@ function DKP:OnDocLoaded()
 			self.wndPopUp:MoveToLocation(WindowLocation.new(self.tItems.wndPopUpLoc))
 			self.tItems.wndPopUpLoc = nil
 		end
+
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
 		self.wndMain:Show(false, true)
@@ -924,6 +925,7 @@ function DKP:OnSave(eLevel)
 			if self.tItems["settings"].bSaveUndo then tSave["ALogs"] = tUndoActions end
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
+			tSave.wndLLLoc = self.wndLL:GetLocation():ToTable()
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
 			for k,auction in ipairs(self.ActiveAuctions) do
@@ -1863,7 +1865,7 @@ function DKP:RefreshMainItemList()
 				--for k,wnd in ipairs(player:GetChildren()) do Print(wnd:GetName()) end
 				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 			end
-		elseif self.wndSelectedListItem then
+		elseif self.wndSelectedListItem and self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name"))  then
 			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 		end
 	end
@@ -4825,6 +4827,23 @@ end
 function DKP:LLInit()
 	self.wndLL = Apollo.LoadForm(self.xmlDoc,"LootLogs",nil,self)
 	self.wndLL:Show(false,true)
+	
+	if self.tItems.wndLLLoc ~= nil and self.tItems.wndLLLoc.nOffsets[1] ~= 0 then 
+		self.wndLL:MoveToLocation(WindowLocation.new(self.tItems.wndLLLoc))
+		self.tItems.wndLLLoc = nil
+	end
+	
+	if self.tItems["settings"].LL == nil then self.tItems["settings"].LL = {} end
+	if self.tItems["settings"].LL.strGroup == nil then self.tItems["settings"].LL.strGroup = "GroupCategory" end
+	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
+	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
+	
+	self.wndLL:SetSizingMinimum(768,493)
+end
+
+function DKP:LLGroupModeChanged(wndHandler,wndControl)
+	self.tItems["settings"].LL.strGroup = wndControl:GetName()
+	self:LLPopuplate()
 end
 
 function DKP:LLAddLog(strPlayer,strItem)
@@ -4838,30 +4857,81 @@ function DKP:LLAddLog(strPlayer,strItem)
 
 		end
 	end
+	if self.wndLL:IsShown() then self:LLPopuplate() end
 end
 
 function DKP:LLOpen(ID)
 	if self.tItems[ID] == nil then return end
 	
-	if not self.wndLL:IsShown() then 
-		local tCursor = Apollo.GetMouse()
-		self.wndLL:Move(tCursor.x - 100, tCursor.y - 100, self.wndLL:GetWidth(), self.wndLL:GetHeight())
-	end
+	--if not self.wndLL:IsShown() then 
+	--	local tCursor = Apollo.GetMouse()
+	--	self.wndLL:Move(tCursor.x - 100, tCursor.y - 100, self.wndLL:GetWidth(), self.wndLL:GetHeight())
+	--end
 	
 	self.wndLL:SetData(ID)
 	self.wndLL:Show(true,false)
+	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText(self.tItems[ID].strName)
+	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(false)
+	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
+	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
 	self:LLPopuplate()
+end
+
+function DKP:LLOpenWhole()
+	self.wndLL:Show(true,false)
+	self.wndLL:SetData("AllMode")
+	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Whole Roster")
+	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(true)
+	self:LLPopuplate()
+end
+
+function DKP:LLClose()
+	self.wndLL:Show(false,false)
 end
 
 function DKP:LLPrepareData(ID)
 	local tGrouppedItems = {}
-	if self.tItems[self.wndLL:GetData()].tLLogs == nil then return {} end
-	for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
-		local item = Item.GetDataFromId(entry.itemID)
-		if item then
-			if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
-			table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
+	if self.wndLL:GetData() ~= "AllMode" then
+		if self.tItems[self.wndLL:GetData()].tLLogs == nil then return {} end
+		for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
+			if self.tItems["settings"].LL.strGroup == "GroupCategory" then
+				local item = Item.GetDataFromId(entry.itemID)
+				if item then
+					if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+					table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
+				end
+			else -- Group Date
+				local strDate = os.date("%x",entry.nDate)
+				if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+				table.insert(tGrouppedItems[strDate],entry.itemID)		
+			end
 		end
+	else
+		for k , player in ipairs(self.tItems) do
+			if player.tLLogs then
+				if self.tItems["settings"].LL.strGroup == "GroupName" then
+					tGrouppedItems[player.strName] = {}
+					for j , entry in ipairs(player.tLLogs) do
+						table.insert(tGrouppedItems[player.strName],entry.itemID)
+					end
+				elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
+					for j , entry in ipairs(player.tLLogs) do
+						local item = Item.GetDataFromId(entry.itemID)
+						if item then
+							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)		
+						end
+					end
+				else
+					for j , entry in ipairs(player.tLLogs) do
+						local strDate = os.date("%x",entry.nDate)
+						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+						table.insert(tGrouppedItems[strDate],entry.itemID)	
+					end
+				end
+			end
+		end
+	
 	end
 	return tGrouppedItems
 end
@@ -4871,18 +4941,49 @@ function DKP:LLResize()
 end
 
 function DKP:LLPopuplate()
+
 	local wndList = self.wndLL:FindChild("List")
+	local tExpandedBubbles = {}
+	for k , bubble in ipairs(wndList:GetChildren()) do
+		if bubble:GetData().bExpanded then
+			table.insert(tExpandedBubbles,bubble:GetData().strTitle)
+		end
+	end
 	wndList:DestroyChildren()
 	local tData = self:LLPrepareData()
 	for cat , items in pairs(tData) do
+		if cat == "" then cat = "Miscellaneous" end
 		local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
-		wndBubble:SetData({bExpanded = false,bPopulated = false,strTitle = "Drutol Windchaser",nWidthMod = 1,nHeightMod = 0,tCustomData = items})
+		wndBubble:SetData({bExpanded = false,bPopulated = false, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items})
 		wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
+		
+		for k , prevBubble in ipairs(tExpandedBubbles) do
+			if prevBubble == cat then 
+				self:IBExpand(nil,wndBubble:FindChild("Header")) 
+				wndBubble:FindChild("Expand"):SetCheck(true)
+				break 
+			end
+		end
+		
 	end
 	
 	self:RIRequestRearrange(wndList)
 	
 	
+end
+
+function DKP:LLBubblesExpand()
+	for k, bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
+		self:IBExpand(nil,bubble:FindChild("Header"))
+		bubble:FindChild("Expand"):SetCheck(true)
+	end
+end
+
+function DKP:LLBubblesCollapse()
+	for k, bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
+		self:IBECollapse(nil,bubble:FindChild("Header"))
+		bubble:FindChild("Expand"):SetCheck(false)
+	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -5101,13 +5202,13 @@ end
 function DKP:DFAddLog(strPlayer,bSucces)
 	table.insert(self.tItems["settings"].DF.tLogs,1,{strRequester = strPlayer,strState = bSucces and "{Yes}" or "{No}",strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
 	if #self.tItems["settings"].DF.tLogs > 20 then table.remove(self.tItems["settings"].DF.tLogs,21) end
+	if self.wndDF:IsShown() then self:DFPopulate() end
 end
-
 
 
 function DKP:DFFetchDataTimed()
 	local myUnit = GameLib.GetPlayerUnit()
-	if self.tItems["settings"].bFetchOOC and myUnit:IsInCombat() or self.tItems["settings"].DF.bFetchRaid and not GroupLib.InRaid() then return end
+	if self.tItems["settings"].DF.bFetchOOC and myUnit:IsInCombat() or self.tItems["settings"].DF.bFetchRaid and not GroupLib.InRaid() then return end
 	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
 end
 
