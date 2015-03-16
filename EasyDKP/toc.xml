@@ -3,6 +3,9 @@
     <Script Name="libs/GeminiHook-1.0.lua"/>
     <Script Name="libs/Base64.lua"/>
     <Script Name="libs/Serpent.lua"/>
+    <Script Name="libs/GeminiLocale.lua"/>
+    <Script Name="locale/enUS.lua"/>
+    <Script Name="locale/deDE.lua"/>
     <Script Name="DKP.lua"/>
     <Script Name="RAID.lua"/>
     <Script Name="RAID2.lua"/>

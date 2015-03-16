@@ -116,6 +116,31 @@ local ktUndoActions =
 	["raward"] = "{Raid Award}",
 
 }
+-- Localization stuff
+local ktLocales = {
+	[1] = "enUS",
+	[2] = "deDE",
+	[3] = "frFR",
+	[4] = "koKR",
+}
+
+local function GetLocale()
+	local strCancel = Apollo.GetString(1)
+	
+	-- German
+	if strCancel == "Abbrechen" then 
+		return ktLocales[2]
+	end
+	
+	-- French
+	if strCancel == "Annuler" then
+		return ktLocales[3]
+	end
+	
+	-- Other
+	return ktLocales[1]
+end
+local strLocale = GetLocale()
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -173,6 +198,43 @@ function DKP:OnDocLoaded()
 		self.wndExport = Apollo.LoadForm(self.xmlDoc, "Export" , nil , self)
 		self.wndPopUp = Apollo.LoadForm(self.xmlDoc, "MasterLootPopUp" , nil ,self)
 		self.wndStandby = Apollo.LoadForm(self.xmlDoc2, "StandbyList" , nil , self)
+		
+		
+		--Localisation
+		
+		self.GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+		self.Locale = self.GeminiLocale:GetLocale("EasyDKP", true)
+		self.GeminiLocale:TranslateWindow(self.Locale, self.wndMain)
+		
+		--Tooltip Translation
+		
+		--Controls
+		self.wndMain:FindChild("LogHelp"):SetTooltip(self.Locale["#wndMain:Tooltips:Controls:QuestionMark"])
+		self.wndMain:FindChild("TokenGroup"):SetTooltip(self.Locale["#wndMain:Tooltips:Controls:GroupTokens"])
+		--wndMain
+		self.wndMain:FindChild("Refresh"):SetTooltip(self.Locale["#wndMain:Tooltips:Refresh"])
+		self.wndMain:FindChild("CurrentlyListedAmount"):SetTooltip(self.Locale["#wndMain:Tooltips:Counter"])
+		self.wndMain:FindChild("ButtonLL"):SetTooltip(self.Locale["#wndMain:Tooltips:LLButton"])
+		self.wndMain:FindChild("ButtonCE"):SetTooltip(self.Locale["#wndMain:Tooltips:CEButton"])
+		self.wndMain:FindChild("ButtonInv"):SetTooltip(self.Locale["#wndMain:Tooltips:InvButton"])
+		self.wndMain:FindChild("ButtonGBL"):SetTooltip(self.Locale["#wndMain:Tooltips:GBLButton"])
+		self.wndMain:FindChild("ButtonGBL"):SetTooltip(self.Locale["#wndMain:Tooltips:GBLButton"])
+		self.wndMain:FindChild("RaidOnly"):SetTooltip(self.Locale["#wndMain:Tooltips:RaidOnlyButton"])
+		self.wndMain:FindChild("OnlineOnly"):SetTooltip(self.Locale["#wndMain:Tooltips:OnlineOnlyButton"])
+		self.wndMain:FindChild("MassEdit"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEditButton"])
+		self.wndMain:FindChild("RaidQueue"):SetTooltip(self.Locale["#wndMain:Tooltips:RaidQueue"])
+		self.wndMain:FindChild("ClearQueue"):SetTooltip(self.Locale["#wndMain:Tooltips:ClearRaidQueue"])
+		--massEditControls
+		self.wndMain:FindChild("ButtonSelectRaidOnly"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:SelectRaid"])
+		self.wndMain:FindChild("ButtonDeselectAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:SelectAll"])
+		self.wndMain:FindChild("ButtonSelectAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:DeselectAll"])
+		self.wndMain:FindChild("ButtonInvite"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Invite"])
+		self.wndMain:FindChild("ButtonInvert"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Invert"])
+		self.wndMain:FindChild("ButtonRemoveAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Remove"])
+		
+		--
+		
+		
 		if self.wndMain == nil then
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
@@ -201,6 +263,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("dkpbid", "BidOpen", self)
 		Apollo.RegisterSlashCommand("rops", "HubShow", self)
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
+		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
@@ -264,6 +327,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bDisplayCounter == nil then self.tItems["settings"].bDisplayCounter = false end
 		if self.tItems["settings"].bCountSelected == nil then self.tItems["settings"].bCountSelected = false end
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
+		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -905,6 +969,7 @@ function DKP:OnSave(eLevel)
 				tSave[k].logs = player.logs
 				tSave[k].role = player.role
 				tSave[k].offrole = player.offrole
+				tSave[k].tLLogs = player.tLLogs
 			end
 			if self.tItems["alts"] ~= nil then
 				tSave["alts"]=self.tItems["alts"]
@@ -1167,8 +1232,9 @@ function DKP:Add100DKP()
 		self:EnableActionButtons()
 end
 
-function DKP:OnChatMessage(channelCurrent, tMessage)
+function DKP:OnChatMessage(channelCurrent, tMessage)	
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
+		if strLocale == "enUS" then
 			local itemStr = ""
 			local strName = ""
 			local strTextLoot = ""
@@ -1195,6 +1261,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				end
 			end
 			
+			
 			self:Bid2CloseOnAssign(string.sub(itemStr,2))
 			strName = string.sub(strName,2)
 			self:LLAddLog(strName:sub(1, #strName - 1),string.sub(itemStr,2))
@@ -1203,10 +1270,33 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if not item:IsEquippable() then return end
 			end
 			if strName ~= "" and itemStr ~= "" then
-				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),itemStr) end
+				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
 				if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then self:RaidProccesNewPieceOfLoot(itemStr,strName:sub(1,#strName-1)) end
 				self:HubRegisterLoot(strName:sub(1, #strName - 1),string.sub(itemStr,2))
 			end
+		
+		elseif strLocale == "deDE" then
+			local strItem = ""
+			local strName = ""
+			local strTextLoot = ""
+			for i=1, table.getn(tMessage.arMessageSegments) do
+				strTextLoot = strTextLoot .. tMessage.arMessageSegments[i].strText
+			end
+			local words = {}
+			
+			for word in string.gmatch(strTextLoot,"%S+") do
+				table.insert(words,word)
+			end
+			 if words[1] ~= "Der" then return end
+			 strName = words[#words - 2] .. " " .. words[#words - 1]
+			 for k=4,#words - 3 do
+				strItem = strItem .. " " .. words[k]
+			 end
+		         	 strItem = string.sub(strItem,2)
+			 if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName,strItem) end
+			 self:HubRegisterLoot(strName,strItem)
+			 self:Bid2CloseOnAssign(strItem)
+		end
 	end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
 		if self.tItems["settings"].TradeEnable == 1 then 
@@ -1463,7 +1553,7 @@ function DKP:TimeAwardRefresh()
 		self.wndMain:FindChild("TimeAwardIndicator"):Show(true,false)
 	else
 		self.wndTimeAward:FindChild("StateFrame"):FindChild("State"):SetSprite("ClientSprites:LootCloseBox_Holo")
-		self.wndTimeAward:FindChild("CountDown"):SetText("Disabled")
+		self.wndTimeAward:FindChild("CountDown"):SetText(self.Locale["#wndMain:TimedAward:Disabled"])
 		self.wndMain:FindChild("TimeAwardIndicator"):Show(false,false)
 	end
 end
@@ -2091,19 +2181,7 @@ function DKP:LabelUpdateList()
 end
 
 function DKP:LabelAddTooltipByValue(value)
-	if value == "Name" then return "Name of Player."
-	elseif value == "Net" then return "Current value of player's DKP."
-	elseif value == "Tot" then return "Value of DKP that has been earned since account creation."
-	elseif value == "Spent" then return "Value of DKP player has spent."
-	elseif value == "Hrs" then return "How much time has this player spent Raiding.This is automatically tracked during raid session or optionally you can track it in Timed Awards module."
-	elseif value == "Priority" then return "Value calculated by dividing the Tot value by the Spent Value.AKA Relational DKP."
-	elseif value == "EP" then return "Value of player's Effort Points."
-	elseif value == "GP" then return "Value of player's Gear Points."
-	elseif value == "PR" then return "Value calculated by dividing the EP value by GP value"
-	elseif value == "Raids" then return "Value of player's attended raids"
-	elseif value == "Item" then return "Last item received.Recoreded via bidding (chat and network)"
-	elseif value == "RealGP" then return "Current GP Value decreased by BaseGP"
-	end
+	return self.Locale["#LabelTooltips:"..value]
 end
 
 function DKP:LabelTypeButtonsCheck(which)
@@ -2837,6 +2915,14 @@ function DKP:SettingsLogsEnable( wndHandler, wndControl, eMouseButton )
 	self.wndMain:FindChild("Controls"):FindChild("EditBox"):Enable(true)
 end
 
+function DKP:SettingsLootLogsEnable()
+	self.tItems["settings"].bLootLogs = true
+end
+
+function DKP:SettingsLootLogsDisable()
+	self.tItems["settings"].bLootLogs = false
+end
+
 function DKP:SettingsWhisperEnable( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].whisp = 1
 end
@@ -2951,6 +3037,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("DisplayCounter"):SetCheck(self.tItems["settings"].bDisplayCounter)
 	self.wndSettings:FindChild("CountSelected"):SetCheck(self.tItems["settings"].bCountSelected)
 	self.wndSettings:FindChild("TrackTimedUndo"):SetCheck(self.tItems["settings"].bTrackTimedAwardUndo)
+	self.wndSettings:FindChild("EnableLootLogs"):SetCheck(self.tItems["settings"].bLootLogs)
 	
 	
 end
@@ -4135,6 +4222,14 @@ function DKP:LogsInit()
 	self.wndLogs:SetSizingMaximum(519,700)
 end
 
+function DKP:LogsExport()
+	strExport = ""
+	for k,entry in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
+		strExport = strExport .. entry.strComment .. ";" .. entry.strType .. ";" .. entry.strModifier .. ";" .. entry.strTimestamp .. "\n"
+	end
+	self:ExportShowPreloadedText(strExport)
+end
+
 function DKP:LogsOpenGuildBank()
 	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:LogsShow(self:GetPlayerByIDByName("Guild Bank")) end
 end
@@ -4847,6 +4942,7 @@ function DKP:LLGroupModeChanged(wndHandler,wndControl)
 end
 
 function DKP:LLAddLog(strPlayer,strItem)
+	if not self.tItems["settings"].bLootLogs then return end
 	local ID = self:GetPlayerByIDByName(strPlayer)
 	if ID ~= -1 and self.ItemDatabase[strItem] then
 		local item = self.ItemDatabase[strItem].ID
@@ -4974,16 +5070,34 @@ end
 
 function DKP:LLBubblesExpand()
 	for k, bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
-		self:IBExpand(nil,bubble:FindChild("Header"))
-		bubble:FindChild("Expand"):SetCheck(true)
+		if not bubble:GetData().bExpanded then
+			self:IBExpand(nil,bubble:FindChild("Header"))
+			bubble:FindChild("Expand"):SetCheck(true)
+		end
 	end
 end
 
 function DKP:LLBubblesCollapse()
 	for k, bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
-		self:IBECollapse(nil,bubble:FindChild("Header"))
-		bubble:FindChild("Expand"):SetCheck(false)
+		if bubble:GetData().bExpanded then
+			self:IBECollapse(nil,bubble:FindChild("Header"))
+			bubble:FindChild("Expand"):SetCheck(false)
+		end
 	end
+end
+
+function DKP:LLExport()
+	local strExport = ""
+	for k , bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
+		strExport = strExport .. bubble:FindChild("Header"):FindChild("HeaderText"):GetText() .. "\n"
+		for j, itemID in ipairs(bubble:GetData().tCustomData) do
+			local item = Item.GetDataFromId(itemID)
+			if item then 
+				strExport = strExport .. item:GetName() .. ";" .. item:GetItemId() .. ";" .. string.sub(self:EPGPGetItemCostByID(item:GetItemId()),32) .. "\n"
+			end
+		end
+	end
+	self:ExportShowPreloadedText(strExport)
 end
 
 -----------------------------------------------------------------------------------------------

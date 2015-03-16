@@ -9,7 +9,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.7
+local knMemberModuleVersion = 1.8
 
 local ktClassToIcon =
 {
@@ -414,7 +414,7 @@ function DKP:InsertLootChildren()
 end]]
 
 function DKP:BidMLSearch(wndHandler,wndControl)
-	if self.wndInsertedSearch:GetText() ~= "Search" then
+	if self.wndInsertedSearch:GetText() ~= "Search..." then
 		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
 		
 		for k,child in ipairs(children) do
@@ -425,7 +425,7 @@ function DKP:BidMLSearch(wndHandler,wndControl)
 			if not self:string_starts(child:FindChild("CharacterName"):GetText(),self.wndInsertedSearch:GetText()) then child:Show(false,true) end
 		end
 		
-		if wndControl ~= nil and wndControl:GetText() == "" then wndControl:SetText("Search") end
+		if wndControl ~= nil and wndControl:GetText() == "" then wndControl:SetText("Search...") end
 		
 		if self.tItems["settings"]["ML"].bArrTiles then
 			Hook.wndMasterLoot_LooterList:ArrangeChildrenTiles()
@@ -1786,6 +1786,11 @@ function DKP:InitBid2()
 	--Print("[Network Bidding] - Restoring Auctions")
 end
 
+function DKP:Bid2ShowNetworkBidding()
+	self.wndBid2:Show(true,false)
+	self.wndBid2:ToFront()
+end
+
 function DKP:MLSettingShow()
 	self.wndMLSettings:Show(true,false)
 	self.wndMLSettings:ToFront()
@@ -2757,6 +2762,10 @@ function DKP:Bid2ShowWhiteList()
 	self.wndBid2Whitelist:Show(true,false)
 	self:Bid2PopulateWhitelist()
 	self.wndBid2Whitelist:ToFront()
+end
+
+function DKP:Bid2WhitelistClose()
+	self.wndBid2Whitelist:Show(false,false)
 end
 
 function DKP:Bid2DisablePass()
