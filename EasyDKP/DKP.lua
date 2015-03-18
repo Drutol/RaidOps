@@ -205,6 +205,7 @@ function DKP:OnDocLoaded()
 		self.GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
 		self.Locale = self.GeminiLocale:GetLocale("EasyDKP", true)
 		self.GeminiLocale:TranslateWindow(self.Locale, self.wndMain)
+		self.GeminiLocale:TranslateWindow(self.Locale, self.wndSettings)
 		
 		--Tooltip Translation
 		
@@ -231,7 +232,15 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("ButtonInvite"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Invite"])
 		self.wndMain:FindChild("ButtonInvert"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Invert"])
 		self.wndMain:FindChild("ButtonRemoveAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Remove"])
-		
+		--wndSettings
+		self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetTooltip(self.Locale["#wndSettings:Tooltips:AccCreation"])
+		self.wndSettings:FindChild("CatPopUp"):FindChild("PopUPDec"):SetTooltip(self.Locale["#wndSettings:Tooltips:PopUPDec"])
+		self.wndSettings:FindChild("ButtonShowGP"):SetTooltip(self.Locale["#wndSettings:Tooltips:GPTooltip"])
+		self.wndSettings:FindChild("ButtonSettingsBidModule"):SetTooltip(self.Locale["#wndSettings:Tooltips:EnableBidding"])
+		self.wndSettings:FindChild("RemoveErrorInvites"):SetTooltip(self.Locale["#wndSettings:Tooltips:InvErr"])
+		self.wndSettings:FindChild("FixUmlauts"):SetTooltip(self.Locale["#wndSettings:Tooltips:FixNames"])
+		self.wndSettings:FindChild("ButtonShowStandby"):SetTooltip(self.Locale["#wndSettings:Tooltips:Standby"])
+		self.wndSettings:FindChild("FilterKeywordsButton"):SetTooltip(self.Locale["#wndSettings:Tooltips:FilterKey"])
 		--
 		
 		
@@ -346,6 +355,7 @@ function DKP:OnDocLoaded()
 		self:LLInit()
 		self:DFInit()
 		self:CloseBigPOPUP()
+		self:FLInit()
 		
 		
 		--self:IBDebugInit() -- Raid Summaries v2
@@ -991,6 +1001,7 @@ function DKP:OnSave(eLevel)
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
 			tSave.wndLLLoc = self.wndLL:GetLocation():ToTable()
+			tSave.wndNBLoc = self.wndBid2:GetLocation():ToTable()
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
 			for k,auction in ipairs(self.ActiveAuctions) do
@@ -1243,9 +1254,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			end
 			local words = {}
 			for word in string.gmatch(strTextLoot,"%S+") do
-				if self.tItems["settings"].FilterWords then 
-					if word == "Gift" or word == "Sign" or word == "Pattern" then return end
-				end
+				if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
 				table.insert(words,word)
 			end
 			
@@ -1285,6 +1294,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			local words = {}
 			
 			for word in string.gmatch(strTextLoot,"%S+") do
+				if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
 				table.insert(words,word)
 			end
 			 if words[1] ~= "Der" then return end
@@ -1296,6 +1306,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName,strItem) end
 			 self:HubRegisterLoot(strName,strItem)
 			 self:Bid2CloseOnAssign(strItem)
+			 self:LLAddLog(strName,strItem)
 		end
 	end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
@@ -1500,7 +1511,6 @@ function DKP:ControlsSetQuickAdd( wndHandler, wndControl, strText )
 end
 
 function DKP:ControlsUpdateQuickAddButtons()
-	self.wndSettings:FindChild("EditBoxQuickAdd"):SetText(self.tItems["settings"].dkp)
 	self.wndMain:FindChild("Controls"):FindChild("QuickAddShortCut"):SetText(self.tItems["settings"].dkp)
 end
 
@@ -2981,8 +2991,6 @@ function DKP:SettingsRestore()
 		local wndGuild = self.wndSettings:FindChild("EditBoxGuldName"):SetText(self.tItems["settings"].guildname)
 		--self.wndMain:FindChild("Title"):SetText("EasyDKP - "..self.tItems["settings"].guildname)
 	end
-	--MASS ADD
-          self.wndSettings:FindChild("EditBoxQuickAdd"):SetText(tostring(self.tItems["settings"].dkp))
 	--COLLECT NEW
 	if self.tItems["settings"].collect_new == 1 then isChecked = true else isChecked = false end
 	local wndLogs = self.wndSettings:FindChild("ButtonSettingsPlayerCollection"):SetCheck(isChecked)
@@ -3016,7 +3024,6 @@ function DKP:SettingsRestore()
 	--Networking
 	self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(self.tItems["settings"].networking)
 	self.wndSettings:FindChild("ButtonSettingsEquip"):SetCheck(self.tItems["settings"].FilterEquippable)
-	self.wndSettings:FindChild("ButtonSettingsFilter"):SetCheck(self.tItems["settings"].FilterWords)
 	
 	--Slider
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
@@ -3050,8 +3057,9 @@ function DKP:SettingsDisablePlayerCollection( wndHandler, wndControl, eMouseButt
 	self.tItems["settings"].collect_new = 0
 end
 
-function DKP:SettingsSetDefDKP( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].default_dkp = tonumber(self.wndSettings:FindChild("EditBoxDefaultDKP"):GetText())
+function DKP:SetDefaultDKP( wndHandler, wndControl, strText )
+	if tonumber(strText) == nil then wndControl:SetText(self.tItems["settings"].default_dkp) return end
+	self.tItems["settings"].default_dkp = tonumber(strText)
 end
 
 function DKP:SettingsPurgeDatabaseOn( wndHandler, wndControl, eMouseButton )
@@ -5328,6 +5336,33 @@ end
 
 function DKP:DFFetchData()
 	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
+end
+
+-----------------------------------------------------------------------------------------------
+-- DKP Instance
+-----------------------------------------------------------------------------------------------
+
+function DKP:FLInit()
+	self.wndFL = Apollo.LoadForm(self.xmlDoc,"FilteredItems",nil,self)
+	self.wndFL:Show(false,true)
+	
+	if self.tItems["settings"].strFilteredKeywords == nil then self.tItems["settings"].strFilteredKeywords = "" end
+	
+	self.wndFL:FindChild("Words"):SetText(self.tItems["settings"].strFilteredKeywords)
+
+end
+
+function DKP:FLSetFilterString(wndHandler,wndControl,strText)
+	self.tItems["settings"].strFilteredKeywords = strText
+end
+
+function DKP:FLOpen()
+	self.wndFL:Show(true,false)
+	self.wndFL:ToFront()
+end
+
+function DKP:FLHide()
+	self.wndFL:Show(false,false)
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

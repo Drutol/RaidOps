@@ -1,5 +1,5 @@
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("EasyDKP", "enUS")
-
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("EasyDKP", "enUS",true)
+if not L then return end
 --wndMain
 L["#wndMain:Title"] = "RaidOps - DKP/EPGP Management" 
 L["#wndMain:Search"] = "Search" 
@@ -83,6 +83,47 @@ L["#wndMain:Tooltips:MassEditButton"] = "Enable mass editing.Any EP/GP/DKP modif
 L["#wndMain:Tooltips:RaidQueue"] = "Show raid queue."
 L["#wndMain:Tooltips:ClearRaidQueue"] = "Clear raid queue."
 
+--wndSettings
+L["#wndSettings:Title"] = "RaidOps DKP/EPGP Management Settings"
+L["#wndSettings:EnableLogs"] = "Enable Logs"
+L["#wndSettings:EnableWhispering"] = "Enable Whispering"
+L["#wndSettings:PlayerCollection"] = "Player Collection."
+L["#wndSettings:TrackTAUndo"] = "Track timed award undo."
+L["#wndSettings:EnableBidding"] = "Inject controls to Carbine's Master Loot addon.Enable bidding module."
+L["#wndSettings:RemInvErr"] = "Remove invite entry on error."
+L["#wndSettings:ShowGPTool"] = "Show GP Values on item tooltips*."
+L["#wndSettings:EnableNetworking"] = "Enable Networking"
+L["#wndSettings:SkipGPPopUp"] = "Skip Guild Bank PopUp and just add log."
+L["#wndSettings:PopUpDecrease"] = "Decrese GP by X% in PopUp."
+L["#wndSettings:EnablePop"] = "Enable PopUp window"
+L["#wndSettings:AllowEquippable"] = "Allow only equipable items"
+L["#wndSettings:FilterCreation"] = "Filter account creation"
+L["#wndSettings:LLEnable"] = "Enable Loot Logs."
+L["#wndSettings:UndoSave"] = "Save Activity Log between reloads."
+L["#wndSettings:FilteredKeywords"] = "Filtered keywords."
+L["#wndSettings:ColorIcons"] = "Use colored class icons."
+L["#wndSettings:DispNumber"] = "Display player number on the list."
+L["#wndSettings:DispRoles"] = "Display role incons on player bars."
+L["#wndSettings:MECount"] = "While in Mass Edit mode count selected players."
+L["#wndSettings:PRPrec"] = "Set PR precision (1-5)"
+L["#wndSettings:EPGPPrec"] = "Set EP / GP precision (1-5)"
+L["#wndSettings:FixNames"] = "Fix Names"
+L["#wndSettings:StandbyList"] = "Standby List"
+L["#wndSettings:ImportGuild"] = "Import players from guild."
+L["#wndSettings:DataShare"] = "Data Sharing"
+L["#wndSettings:TrackUndo"] = "Track Undo"
+L["#wndSettings:Export"] = "Export/Import"
+L["#wndSettings:EPGPSettings"] = "EPGP Settings"
+L["#wndSettings:Purge"] = "PURGE DATABASE"
+--wndSettings:Tooltips
+L["#wndSettings:Tooltips:AccCreation"] = "Account will be created only if player's Nameplate Affiliation is the same as your guild's name."
+L["#wndSettings:Tooltips:PopUPDec"] = "When assigning for offspec."
+L["#wndSettings:Tooltips:GPTooltip"] = "In order to use this feature you have to install addon EToolTip and enable ID Display."
+L["#wndSettings:Tooltips:EnableBidding"] = "The efffect will take place after UI is reloaded."
+L["#wndSettings:Tooltips:InvErr"] = "Error means anything different than Accepted / Declined."
+L["#wndSettings:Tooltips:FixNames"] = "This will get rid of umlauts and other non-standard character as they may cause some problems when it comes to player identification."
+L["#wndSettings:Tooltips:Standby"] = "List of players that won't be affected by the Decay. Both DKP and EPGP."
+L["#wndSettings:Tooltips:FilterKey"] = "If certain keyword is found in item name then addon will reject the fact of item assignment."
 
 
 

@@ -1736,6 +1736,13 @@ function DKP:InitBid2()
 	self.wndBid2Whitelist:Show(false,true)
 	self.wndMLResponses:Show(false,true)
 	
+	self.wndBid2:SetSizingMinimum(1017,627)
+	
+	if self.tItems.wndNBLoc ~= nil and self.tItems.wndNBLoc.nOffsets[1] ~= 0 then 
+		self.wndBid2:MoveToLocation(WindowLocation.new(self.tItems.wndNBLoc))
+		self.tItems.wndNBLoc = nil
+	end
+	
 	
 	self.wndBid2:FindChild("Auctions"):Lock(true)
 	self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
@@ -1812,6 +1819,9 @@ function DKP:Bid2RestoreMyChoices(auction)
 	end
 end
 
+function DKP:Bid2RearrBidders()
+	for k,auction in ipairs(self.ActiveAuctions) do self:Bid2ArrangeResponses(auction) end
+end
 
 -- Netorking
 function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
