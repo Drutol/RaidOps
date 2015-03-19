@@ -241,6 +241,7 @@ function DKP:OnDocLoaded()
 		self.wndSettings:FindChild("FixUmlauts"):SetTooltip(self.Locale["#wndSettings:Tooltips:FixNames"])
 		self.wndSettings:FindChild("ButtonShowStandby"):SetTooltip(self.Locale["#wndSettings:Tooltips:Standby"])
 		self.wndSettings:FindChild("FilterKeywordsButton"):SetTooltip(self.Locale["#wndSettings:Tooltips:FilterKey"])
+		self.wndSettings:FindChild("ButtonSettingsPurge"):SetTooltip(self.Locale["#wndSettings:Tooltips:Purge"])
 		--
 		
 		
@@ -2986,11 +2987,6 @@ function DKP:SettingsRestore()
 	--GUILD CHeCK
 	if self.tItems["settings"].forceCheck == 1 then isChecked = true else isChecked = false end
 	self.wndSettings:FindChild("ButtonSettingsForceGuildCheck"):SetCheck(isChecked)
-	--GUILDNAME
-	if self.tItems["settings"].guildname ~= nil then
-		local wndGuild = self.wndSettings:FindChild("EditBoxGuldName"):SetText(self.tItems["settings"].guildname)
-		--self.wndMain:FindChild("Title"):SetText("EasyDKP - "..self.tItems["settings"].guildname)
-	end
 	--COLLECT NEW
 	if self.tItems["settings"].collect_new == 1 then isChecked = true else isChecked = false end
 	local wndLogs = self.wndSettings:FindChild("ButtonSettingsPlayerCollection"):SetCheck(isChecked)
