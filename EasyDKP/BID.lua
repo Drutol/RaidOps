@@ -9,7 +9,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.8
+local knMemberModuleVersion = 1.9
 
 local ktClassToIcon =
 {
@@ -242,7 +242,7 @@ function DKP:BidCompleteInit()
 	--Post Update To generate Labels for Main DKP window
 	if self:LabelGetColumnNumberForValue("Item") ~= - 1 then self:LabelUpdateList() end
 	
-	--local test = Item.GetDataFromId(41213)
+	--local test = Item.GetDataFromId(41207)
 	--Print(test:GetItemCategoryName())
 	
 	
@@ -1770,6 +1770,7 @@ function DKP:InitBid2()
 	if self.tItems["settings"]["Bid2"].tWhitelisted == nil then self.tItems["settings"]["Bid2"].tWhitelisted = {} end
 	if self.tItems["settings"]["Bid2"].bRegisterPass == nil then self.tItems["settings"]["Bid2"].bRegisterPass = false end
 	if self.tItems["settings"]["Bid2"].bCloseOnAssign == nil then self.tItems["settings"]["Bid2"].bCloseOnAssign = false end
+	if self.tItems["settings"]["Bid2"].bNotify == nil then self.tItems["settings"]["Bid2"].bNotify = false end
 	
 	self.ActiveAuctions = {}
 	self:DSInit()
@@ -1893,7 +1894,7 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self:UpdatePlayerTileBar(strSender,item)
 		elseif tMsg.type =="SendMeThemStandings" then
 			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedStandings" , strData = self:DSGetEncodedStandings(strSender)})
-		elseif tMsg.type =="SendMeThemStandings" then
+		elseif tMsg.type =="SendMeThemLogs" then
 			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedLogs" , strData = self:DSGetEncodedLogs(strSender)})
 		elseif tMsg.type == "WantConfirmation" then
 			self.channel:SendPrivateMessage({[1] = strSender},{type = "Confirmation"})
@@ -2207,6 +2208,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		msg.tLabelsState = self.tItems["settings"]["Bid2"].tLabelsState
 		msg.ver = knMemberModuleVersion
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
+		if self.tItems["settings"]["Bid2"].bNotify then ChatSystemLib.Command("/s [Network Bidding] - Auction started for " .. Item.GetDataFromId(itemID):GetChatLinkString() .."!") end
 	end
 end
 
@@ -2524,6 +2526,7 @@ function DKP:Bid2RestoreSettings()
 	self.wndBid2Settings:FindChild("WhitelistOption"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bWhitelist)
 	self.wndBid2Settings:FindChild("RegisterPass"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bRegisterPass)
 	self.wndBid2Settings:FindChild("CloseOnAssign"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bCloseOnAssign)
+	self.wndBid2Settings:FindChild("NotifyRaid"):FindChild("Button"):SetCheck(self.tItems["settings"]["Bid2"].bNotify)
 end
 
 function DKP:BidSetAuctionTime(wndHandler,wndControl,strText)
@@ -2766,6 +2769,14 @@ end
 
 function DKP:Bid2DisableWhitelist()
 	self.tItems["settings"]["Bid2"].bWhitelist = false
+end
+
+function DKP:Bid2NotifyEnable()
+	self.tItems["settings"]["Bid2"].bNotify = true
+end
+
+function DKP:Bid2NotifyDisable()
+	self.tItems["settings"]["Bid2"].bNotify = false
 end
 
 function DKP:Bid2ShowWhiteList()
@@ -3056,41 +3067,42 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				
 				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
 					local strCategory = tItem.itemDrop:GetItemCategoryName()
-
-					if string.find(strCategory,"Light") then
-						Print(strCategory)
-						bWantEng = false
-						bWantWar = false
-						bWantSta = false
-						bWantMed = false
-					elseif string.find(strCategory,"Medium") then
-						bWantEng = false
-						bWantWar = false
-						bWantSpe = false
-						bWantEsp = false
-					elseif string.find(strCategory,"Heavy") then
-						bWantEsp = false
-						bWantSpe = false
-						bWantSta = false
-						bWantMed = false
+					if strCategory ~= "" then
+						if string.find(strCategory,"Light") then
+							Print(strCategory)
+							bWantEng = false
+							bWantWar = false
+							bWantSta = false
+							bWantMed = false
+						elseif string.find(strCategory,"Medium") then
+							bWantEng = false
+							bWantWar = false
+							bWantSpe = false
+							bWantEsp = false
+						elseif string.find(strCategory,"Heavy") then
+							bWantEsp = false
+							bWantSpe = false
+							bWantSta = false
+							bWantMed = false
+						end
+						
+						if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+							bWantEsp = false
+							bWantWar = false
+							bWantSpe = false
+							bWantMed = false
+							bWantSta = false
+							bWantEng = false
+						end 
+						
+						if string.find(strCategory,"Psyblade") then bWantEsp = true
+						elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
+						elseif string.find(strCategory,"Pistols") then bWantSpe = true
+						elseif string.find(strCategory,"Claws") then bWantSta = true
+						elseif string.find(strCategory,"Greatsword") then bWantWar = true
+						elseif string.find(strCategory,"Resonators") then bWantMed = true
+						end 
 					end
-					
-					if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
-						bWantEsp = false
-						bWantWar = false
-						bWantSpe = false
-						bWantMed = false
-						bWantSta = false
-						bWantEng = false
-					end 
-					
-					if string.find(strCategory,"Psyblade") then bWantEsp = true
-					elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
-					elseif string.find(strCategory,"Pistols") then bWantSpe = true
-					elseif string.find(strCategory,"Claws") then bWantSta = true
-					elseif string.find(strCategory,"Greatsword") then bWantWar = true
-					elseif string.find(strCategory,"Resonators") then bWantMed = true
-					end 
 				end
 				
 				

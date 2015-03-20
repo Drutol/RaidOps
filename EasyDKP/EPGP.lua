@@ -82,6 +82,7 @@ function DKP:EPGPInit()
 	if self.tItems["EPGP"].bDecayGP == nil then self.tItems["EPGP"].bDecayGP = false end
 	if self.tItems["EPGP"].nDecayValue == nil then self.tItems["EPGP"].nDecayValue = 25 end
 	if self.tItems["EPGP"].bDecayRealGP == nil then self.tItems["EPGP"].bDecayRealGP = false end
+	if self.tItems["EPGP"].bMinGP == nil then self.tItems["EPGP"].bMinGP = false end
 	
 	self.wndEPGPSettings:FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
 	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
@@ -335,6 +336,7 @@ function DKP:EPGPAdd(strName,EP,GP)
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP + GP
 		end
+		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then self.tItems[ID].GP = 1 end
 	end
 
 end
@@ -352,6 +354,7 @@ function DKP:EPGPSubtract(strName,EP,GP)
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP - GP
 		end
+		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then self.tItems[ID].GP = 1 end
 	end
 
 end
@@ -368,6 +371,7 @@ function DKP:EPGPSet(strName,EP,GP)
 		if GP ~= nil then
 			self.tItems[ID].GP = GP
 		end
+		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then self.tItems[ID].GP = 1 end
 	end
 end
 
@@ -406,8 +410,6 @@ function DKP:EPGPCheckTresholds()
 			end
 		end
 	end
-
-
 end
 ---------------------------------------------------------------------------------------------------
 -- CostList Functions
@@ -549,6 +551,7 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 					self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 				end
 			end
+			if self.tItems["EPGP"].bMinGP and self.tItems[i].GP < 1 then self.tItems[i].GP = 1 end
 		end
 	end
 	self:EPGPCheckTresholds()
@@ -681,6 +684,15 @@ end
 
 function DKP:EPGPDecayRealGPDisable()
 	self.tItems["EPGP"].bDecayRealGP = false
+end
+
+function DKP:EPGPMinGPEnable()
+	self.tItems["EPGP"].bMinGP = true
+	for k ,player in ipairs(self.tItems) do if player.GP < 1 then player.GP = 1 end end
+end
+
+function DKP:EPGPMinDisable()
+	self.tItems["EPGP"].bMinGP = false
 end
 
 

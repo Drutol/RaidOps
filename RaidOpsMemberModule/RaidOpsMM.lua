@@ -10,10 +10,10 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
-local knVersion = 1.7
+local knVersion = 1.9
  
 local kUIBody = "ff39b5d4"
-local ktAuctionHeight = 106
+local ktAuctionHeight = 115
 local nItemIDSpacing = 4
  
  local defaultSlotValues = 
@@ -132,6 +132,7 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.bKeepOnTop == nil then self.settings.bKeepOnTop = true end
 		if self.settings.nReportedVersion == nil then self.settings.nReportedVersion = knVersion end
 		if self.settings.bDisplayApplicable == nil then self.settings.bDisplayApplicable = false end
+		if self.settings.bOthers == nil then self.settings.bOthers = true end
 		
 		if self.settings.nReportedVersion > knVersion then Print("Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
 		
@@ -143,8 +144,8 @@ function RaidOpsMM:OnDocLoaded()
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
 		if self.ResizedWndBottom then self.wndLootList:SetAnchorOffsets(l,t,r,self.ResizedWndBottom) end
 		--Sizing
-		self.wndLootList:SetSizingMaximum(564,332)
-		self.wndLootList:SetSizingMinimum(564,123)
+		self.wndLootList:SetSizingMaximum(564,341)
+		self.wndLootList:SetSizingMinimum(564,132)
 		
 		self.tMLs = {}
 		Apollo.RegisterSlashCommand("ropsmm", "OnRaidOpsMMOn", self)
@@ -330,6 +331,7 @@ function RaidOpsMM:RestoreSettings()
 	if self.settings.resize then self.wndSettings:FindChild("AllowResize"):SetCheck(true) end
 	if self.settings.bKeepOnTop then self.wndSettings:FindChild("KeepOnTop"):SetCheck(true) end
 	if self.settings.bAutoClose then self.wndSettings:FindChild("AutoClose"):SetCheck(true) end
+	self.wndSettings:FindChild("ShowOthers"):SetCheck(self.settings.bOthers)
 end
 function RaidOpsMM:LootListOnTopEnable( wndHandler, wndControl, eMouseButton )
 	self.settings.resize = true
@@ -394,9 +396,55 @@ function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 				self:StandingsFetched(tMsg.strData)			
 			elseif tMsg.type == "EncodedLogs" then
 				self:LogsFetched(tMsg.strData)
+			elseif tMsg.type == "Choice" then
+				self:RegisterMemberChoice(strSender,tMsg.option,tMsg.item)
 			end
 		end
 	end
+end
+
+function RaidOpsMM:RegisterMemberChoice(strBidder,option,item)
+	if not self.settings.bOthers then return end
+	for k , auction in ipairs(self.ActiveAuctions) do
+		if auction.wnd:GetData() == item then
+			if auction.others == nil then auction.others = {} end
+			if auction.others[option] == nil then auction.others[option] = {} end
+			
+			for k , others in pairs(auction.others) do
+				for j, other in ipairs(others) do
+					if other == strBidder then table.remove(others,j) break end
+				end
+			end			
+			
+			table.insert(auction.others[option],strBidder)
+			self:UpdateOthers(auction)
+			break
+		end
+	end
+end
+
+function RaidOpsMM:UpdateOthers(auction)
+	if auction.others == nil then 
+		auction.others = {}
+		for k=1,4 do
+			if self.settings.bOthers then
+				auction.wnd:FindChild("OthersOpt"..k):SetText("")
+				auction.wnd:FindChild("OthersOpt"..k):SetTooltip("Nobody chose this option yet.") 
+			else
+				auction.wnd:FindChild("OthersOpt"..k):Show(false)
+			end
+		end
+		return
+	end
+	for k , others in pairs(auction.others) do
+		auction.wnd:FindChild("Others"..k):SetText(#others > 0 and #others or "")
+		strTooltip = #others > 0 and "Other players who chose this option:\n" or "Nobody chose this option yet."
+		for j, other in ipairs(others) do
+			strTooltip = strTooltip .. other .. "\n"
+		end
+		auction.wnd:FindChild("Others"..k):SetTooltip(strTooltip)
+	end
+
 end
 
 function RaidOpsMM:UpdateAuctionProgress(item,newProgress)
@@ -436,7 +484,11 @@ function RaidOpsMM:SetLootListPos()
 	self.wndLootList:MoveToLocation(self.wndAnchor:GetLocation())
 end
 function RaidOpsMM:AddTestAuction( wndHandler, wndControl, eMouseButton )
-	self:AddAuction(math.random(20000,40000),1000,30,nil,false,{[1] = "Test1" , [2] = "Test2" , [3] = "Test3"},{[1] = true , [2] = true , [3] = true})
+	local rItem = math.random(20000,40000)
+	self:AddAuction(rItem,1000,30,nil,false,{[1] = "Test1" , [2] = "Test2" , [3] = "Test3"},{[1] = true , [2] = true , [3] = true})
+	for k=1,math.random(20) do
+		self:RegisterMemberChoice("Player"..math.random(20),"Opt"..math.random(1,4),rItem)
+	end
 end
 
 function RaidOpsMM:EnableKeepOnTop( wndHandler, wndControl, eMouseButton )
@@ -466,6 +518,14 @@ end
 
 function RaidOpsMM:DisplayApplicableDisable()
 	self.settings.bDisplayApplicable = false
+end
+
+function RaidOpsMM:ShowOthersEnable()
+	self.settings.bOthers = true
+end	
+
+function RaidOpsMM:ShowOthersDisable()
+	self.settings.bOthers = false
 end
 ---------------------------------------------------------------------------------------------------
 -- Auction Functions
@@ -513,6 +573,7 @@ function RaidOpsMM:AddAuction(itemID,cost,duration,progress,pass,tLabels,tLabelS
 		Tooltip.GetItemTooltipForm(self, wndAuction:FindChild("Icon") , item, {bPrimary = true, bSelling = false, itemCompare = item:GetEquippedItemForItemType()})
 		self.wndLootList:Show(true,false)
 		self:ArrangeAuctions()
+		self:UpdateOthers(self.ActiveAuctions[#self.ActiveAuctions])
 		self.wndLootList:ToFront()
 	end
 end
@@ -523,7 +584,7 @@ function RaidOpsMM:ArrangeAuctions()
 		self.wndLootList:SetAnchorOffsets(l,t,r,b+((#self.ActiveAuctions-1)*ktAuctionHeight))
 	else
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
-		self.wndLootList:SetAnchorOffsets(l,t,r,b+212)
+		self.wndLootList:SetAnchorOffsets(l,t,r,b+ktAuctionHeight*2)
 	end
 	if self.settings.bKeepOnTop then 
 		self.wndLootList:FindChild("Auctions"):ArrangeChildrenVert(0,sortAuctionRaidOps) 
@@ -883,6 +944,7 @@ function RaidOpsMM:LogsFetched(strData)
 	if tData then
 		self.tLogs = tData
 	end
+	self:LogsPopulate()
 end
 
 function RaidOpsMM:LogsPopulate()
@@ -910,6 +972,7 @@ function RaidOpsMM:StandingsFetched(strData)
 		self.settings.lastFetch = os.time()
 		self:RefreshStandings()
 	end
+
 end
 
 function RaidOpsMM:DecodeData(strData)

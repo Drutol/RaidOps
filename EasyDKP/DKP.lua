@@ -338,6 +338,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bCountSelected == nil then self.tItems["settings"].bCountSelected = false end
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
+		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -433,6 +434,7 @@ end
 --Udno
 ---------------
 local tUndoActions = {}
+local tRedoActions = {}
 
 function DKP:UndoClose()
 	self.wndActivity:Show(false,false)
@@ -441,20 +443,81 @@ end
 function DKP:UndoInit()
 	self.wndActivity = Apollo.LoadForm(self.xmlDoc,"UndoLogs",nil,self)
 	self.wndActivity:Show(false,true)
+	self.wndActivity:FindChild("Redo"):Enable(false)
 end
 
 function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
 	if not self.tItems["settings"].bTrackUndo then return end
 	local tMembersNames = {}
+	local strComment = ""
+	if bRemoval == true or bRemoval == false then strComment = "--" else
+		if self.tItems["settings"].logs == 1 then 
+			strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			if strComment == "Comment" or strComment == "Comments Disabled" then strComment = "--" end
+		end
+	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
-	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = Base64.Encode(serpent.dump(tMembers)),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
+	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = Base64.Encode(serpent.dump(tMembers)),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment})
 	if #tUndoActions > 15 then table.remove(tUndoActions,16) end
 	self:UndoPopulate()
+	tRedoActions = {} 
+	self.wndActivity:FindChild("Redo"):Enable(false)
+end
+
+function DKP:UndoAddRevertActivity(tMembers)
+	table.insert(tRedoActions,1,{strData = Base64.Encode(serpent.dump(tMembers)) , bRemove = tUndoActions[1].bRemove , tUndoData = tUndoActions[1]})
+	self.wndActivity:FindChild("Redo"):Enable(true)
+end
+
+function DKP:UndoRedo()
+	local tMembersToRevert = serpent.load(Base64.Decode(tRedoActions[1].strData))
+
+
+	if tMembersToRevert then
+		for k,revertee in ipairs(tMembersToRevert) do
+			if tRedoActions[1].bRemove == nil then
+				for k,player in ipairs(self.tItems) do
+					if player.strName == revertee.strName then -- modifications 
+						self.tItems[k] = revertee
+						break
+					end
+				end
+			elseif tRedoActions[1].bRemove == true then --bRemove is inverted (redo)
+				for k,player in ipairs(self.tItems) do
+					if player.strName == revertee.strName then table.remove(self.tItems,k) break end
+				end
+			elseif tRedoActions[1].bRemove == false  and self:GetPlayerByIDByName(revertee.strName) == -1 then 
+				table.insert(self.tItems,revertee) -- adding player
+			end
+		end
+		self:RefreshMainItemList()
+	end	
+
+	table.insert(tUndoActions,1,tRedoActions[1].tUndoData)
+	self:UndoPopulate()
+	table.remove(tRedoActions,1)
+	if #tRedoActions == 0 then self.wndActivity:FindChild("Redo"):Enable(false) end
 end
 
 function DKP:Undo()
 	if #tUndoActions > 0 then
 		local tMembersToRevert = serpent.load(Base64.Decode(tUndoActions[1].strData))
+		
+		local tRevertMembers = {}
+		if tMembersToRevert then
+			for k,revertee in ipairs(tMembersToRevert) do
+				if tUndoActions[1].bRemove == nil or tUndoActions[1].bRemove == false then
+					local ID = self:GetPlayerByIDByName(revertee.strName)
+					if ID ~= -1 then
+						table.insert(tRevertMembers,self.tItems[ID])
+					end
+				elseif tUndoActions[1].bRemove == true then
+					table.insert(tRevertMembers,revertee)
+				end
+			end			
+		end
+		self:UndoAddRevertActivity(tRevertMembers)
+		
 		if tMembersToRevert then
 			for k,revertee in ipairs(tMembersToRevert) do
 				if tUndoActions[1].bRemove == nil then
@@ -496,7 +559,8 @@ function DKP:UndoPopulate()
 				strAffected = strAffected .. affected ..  " , "
 			end
 			grid:SetCellData(k,5,strAffected)
-			grid:SetCellData(k,6,activity.strTimestamp)	
+			if activity.strComment then grid:SetCellData(k,6,activity.strComment) else grid:SetCellData(k,6,"--")	end
+			grid:SetCellData(k,7,activity.strTimestamp)	
 		end
 		
 	end
@@ -1254,8 +1318,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				strTextLoot = strTextLoot .. tMessage.arMessageSegments[i].strText
 			end
 			local words = {}
+			local bFound = false 
 			for word in string.gmatch(strTextLoot,"%S+") do
-				if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
 				table.insert(words,word)
 			end
 			
@@ -1271,14 +1335,28 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				end
 			end
 			
+			for word in string.gmatch(string.sub(itemStr,2),"%S+") do
+				if self.tItems["settings"].strLootFiltering == "WL" then
+					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then bFound = true break end
+				elseif self.tItems["settings"].strLootFiltering == "BL" then
+					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
+				end
+			end
+			
+			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
+				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
+				if not item:IsEquippable() and not bFound then return end
+			elseif not self.tItems["settings"].FilterEquippable and self.tItems["settings"].strLootFiltering == "WL" and not bFound then
+				return
+			end
+			
+			
+			
 			
 			self:Bid2CloseOnAssign(string.sub(itemStr,2))
 			strName = string.sub(strName,2)
 			self:LLAddLog(strName:sub(1, #strName - 1),string.sub(itemStr,2))
-			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
-				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
-				if not item:IsEquippable() then return end
-			end
+
 			if strName ~= "" and itemStr ~= "" then
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
 				if self.bIsRaidSession == true and self.wndRaidOptions:FindChild("Button1"):IsChecked() == false then self:RaidProccesNewPieceOfLoot(itemStr,strName:sub(1,#strName-1)) end
@@ -1293,9 +1371,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				strTextLoot = strTextLoot .. tMessage.arMessageSegments[i].strText
 			end
 			local words = {}
-			
+			local bFound = false
 			for word in string.gmatch(strTextLoot,"%S+") do
-				if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
 				table.insert(words,word)
 			end
 			 if words[1] ~= "Der" then return end
@@ -1303,7 +1380,25 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 for k=4,#words - 3 do
 				strItem = strItem .. " " .. words[k]
 			 end
+			 
 		         	 strItem = string.sub(strItem,2)
+			 
+			for word in string.gmatch(string.sub(strItem,2),"%S+") do
+				if self.tItems["settings"].strLootFiltering == "WL" then
+					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then bFound = true break end
+				elseif self.tItems["settings"].strLootFiltering == "BL" then
+					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
+				end
+			end
+			
+			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[strItem] then
+				local item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
+				if not item:IsEquippable() and not bFound then return end
+			elseif not self.tItems["settings"].FilterEquippable and self.tItems["settings"].strLootFiltering == "WL" and not bFound then
+				return
+			end
+			 
+			 
 			 if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName,strItem) end
 			 self:HubRegisterLoot(strName,strItem)
 			 self:Bid2CloseOnAssign(strItem)
@@ -3041,6 +3136,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("CountSelected"):SetCheck(self.tItems["settings"].bCountSelected)
 	self.wndSettings:FindChild("TrackTimedUndo"):SetCheck(self.tItems["settings"].bTrackTimedAwardUndo)
 	self.wndSettings:FindChild("EnableLootLogs"):SetCheck(self.tItems["settings"].bLootLogs)
+	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	
 	
 end
@@ -3060,10 +3156,12 @@ end
 
 function DKP:SettingsPurgeDatabaseOn( wndHandler, wndControl, eMouseButton )
 		purge_database = 1
+		self.wndSettings:FindChild("PurgeAlert"):Show(true,false)
 end
 
 function DKP:SettingsPurgeDatabaseOff()
 		purge_database = 0
+		self.wndSettings:FindChild("PurgeAlert"):Show(false,false)
 end
 
 function DKP:SettingsColorIconsEnable()
@@ -3259,8 +3357,13 @@ function DKP:SettingsTimedUndoDisable()
 	self.tItems["settings"].bTrackTimedAwardUndo = false
 end
 
+function DKP:SettingsSetLootFilterMode(wndHandler,wndControl)
+	self.tItems["settings"].strLootFiltering = wndControl:GetName()
+end
 
-
+function DKP:SettingsDisableLootFilter()
+	self.tItems["settings"].strLootFiltering = "Nil"
+end
 
 function DKP:SettingsSetPrecision( wndHandler, wndControl, fNewValue, fOldValue )
 	if math.floor(fNewValue) ~= self.tItems["settings"].Precision then
@@ -3932,12 +4035,14 @@ end
 function DKP:DSGetEncodedLogs(strRequester)
 	if self.tItems["settings"].DS.shareLogs then
 		local ID = self:GetPlayerByIDByName(strRequester)
-		
 		if ID ~= -1 then
+			Print()
 			if self.tItems["settings"].DS.logs then self:DSAddLog(strRequester,"Logs") end
-			return Base64.Encode(serpent.dump(self.tItems[ID].logs))
+			local tLogs = self.tItems[ID].logs
+			return Base64.Encode(serpent.dump(tLogs))
 		end
 	end
+	return "Only Raid Members can fetch data"
 end
 
 function DKP:DSPopulateLogs()

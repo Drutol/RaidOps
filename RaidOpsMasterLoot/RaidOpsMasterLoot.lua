@@ -172,21 +172,22 @@ function RaidOpsMasterLoot:ReArr()
 end
 
 function RaidOpsMasterLoot:BidRandomLooter()
-	local MLInst = Apollo.GetAddon("MasterLoot")
-	local children = MLInst.wndMasterLoot:FindChild("LooterList"):GetChildren()
-	if children then
-		local luckyChild = children[math.random(#children)]
-		if not luckyChild:IsEnabled() then
-			Apollo.GetAddon("RaidOpsMasterLoot"):BidRandomLooter()
-			return
-		end
-		for k,child in pairs(children) do
-			child:SetCheck(false)
-		end
-		MLInst.tMasterLootSelectedLooter = luckyChild:GetData()
-		MLInst.wndMasterLoot:FindChild("Assignment"):Enable(true)
-		luckyChild:SetCheck(true)
+	local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
+	
+	local luckyChild
+	for k,child in ipairs(children) do
+		if not child:IsEnabled() or child:FindChild("CharacterName"):GetText() == "Guild Bank" then table.remove(children,k) end
 	end
+	
+	for k,child in pairs(children) do
+		child:SetCheck(false)
+	end
+	
+	luckyChild = children[math.random(#children)]
+	
+	Hook.tMasterLootSelectedLooter = luckyChild:GetData()
+	Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
+	luckyChild:SetCheck(true)
 end
 
 function RaidOpsMasterLoot:string_starts(String,Start)
@@ -428,7 +429,8 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 				else
 					tables.all = {}
 				end
-				-- Determining applicable classes.
+				
+				-- Determining applicable classes
 				local bWantEsp = true
 				local bWantWar = true
 				local bWantSpe = true
@@ -438,22 +440,41 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 				
 				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
 					local strCategory = tItem.itemDrop:GetItemCategoryName()
+
 					if string.find(strCategory,"Light") then
-						local bWantEng = false
-						local bWantWar = false
-						local bWantSta = false
-						local bWantMed = false
+						Print(strCategory)
+						bWantEng = false
+						bWantWar = false
+						bWantSta = false
+						bWantMed = false
 					elseif string.find(strCategory,"Medium") then
-						local bWantEng = false
-						local bWantWar = false
-						local bWantSpe = false
-						local bWantEsp = false
+						bWantEng = false
+						bWantWar = false
+						bWantSpe = false
+						bWantEsp = false
 					elseif string.find(strCategory,"Heavy") then
-						local bWantEsp = false
-						local bWantSpe = false
-						local bWantSta = false
-						local bWantMed = false
+						bWantEsp = false
+						bWantSpe = false
+						bWantSta = false
+						bWantMed = false
 					end
+					
+					if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+						bWantEsp = false
+						bWantWar = false
+						bWantSpe = false
+						bWantMed = false
+						bWantSta = false
+						bWantEng = false
+					end 
+					
+					if string.find(strCategory,"Psyblade") then bWantEsp = true
+					elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
+					elseif string.find(strCategory,"Pistols") then bWantSpe = true
+					elseif string.find(strCategory,"Claws") then bWantSta = true
+					elseif string.find(strCategory,"Greatsword") then bWantWar = true
+					elseif string.find(strCategory,"Resonators") then bWantMed = true
+					end 
 				end
 				
 				
@@ -461,7 +482,7 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 				for idx, unitLooter in pairs(tItem.tLooters) do
 					if DKPInstance.tItems["settings"]["ML"].bGroup then
 						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" and bWantEng then
+						if class == "Esper" and bWantEsp then
 							table.insert(tables.esp,unitLooter)
 						elseif class == "Engineer" and bWantEng then
 							table.insert(tables.eng,unitLooter)
@@ -476,7 +497,7 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 						end
 					else
 						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" and bWantEng then
+						if class == "Esper" and bWantEsp then
 							table.insert(tables.all,unitLooter)
 						elseif class == "Engineer" and bWantEng then
 							table.insert(tables.all,unitLooter)
