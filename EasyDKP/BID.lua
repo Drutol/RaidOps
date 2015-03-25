@@ -9,7 +9,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.9
+local knMemberModuleVersion = 1.91
 
 local ktClassToIcon =
 {
@@ -130,10 +130,7 @@ function DKP:BidCompleteInit()
 	bInitialized = true
 	self.wait_timer:Stop()
 	self:InitBid2()
-
-	--Hook.wndLooter:Show(true,false)
-	Hook.wndMasterLoot:Show(true,false)
-
+	self:DSInit()
 	
 	if self.ItemDatabase == nil then
 		self.ItemDatabase = {}
@@ -141,13 +138,10 @@ function DKP:BidCompleteInit()
 	self:MLSettingsRestore()
 	self.RegistredBidWinners = {}
 	self.RegisteredWinnersByName = {}
-	self.InsertedIndicators = {}
-	self.ActiveIndicators = {}
+
 	self.InsertedCountersList = {}
 	self.SelectedLooterItem = nil
 	self.SelectedMasterItem = nil
-	--self.wndInsertedLooterButton = Apollo.LoadForm(self.xmlDoc,"InsertLooterBid",Hook.wndLooter,self)
-	--self.wndInsertedLooterButton:Enable(false)
 
 	if self.tItems["settings"]["ML"].bStandardLayout then
 		self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
@@ -193,9 +187,8 @@ function DKP:BidCompleteInit()
 	if not self.tItems["settings"]["ML"].bSortByName then self.wndInsertedControls:FindChild("SortPR"):SetCheck(true) else self.wndInsertedControls:FindChild("SortName"):SetCheck(true) end
 
 	self:HookToMasterLootDisp()
-	--Hook:OnMasterLootUpdate(true)
 	self.PrevSelectedLooterItem = nil
-	self.CurrentItemChatStr = nil
+	
 	
 	
 	
@@ -203,52 +196,58 @@ function DKP:BidCompleteInit()
 	self:BidFillInSlotValues()
 	--BidValues
 	if self.tItems["BidSlots"].Enable == 1 then self.wndSettings:FindChild("ButtonSettingsForceBidMinValues"):SetCheck(true) end
-	
-	-- Anchors stuff
 
 	self:BidUpdateItemDatabase()
 	
 	-- Proper Bidding window
-	
+	self.CurrentItemChatStr = nil
 	self.wndBid = Apollo.LoadForm(self.xmlDoc2,"BiddingUI",nil,self)
 	self.wndBid:Show(false,true)
 	
+	if self.tItems["settings"].BidMin == nil then self.tItems["settings"].BidMin = 0 end
+	if self.tItems["settings"].BidCount == nil then self.tItems["settings"].BidCount = 5 end
+	if self.tItems["settings"].BidOver == nil then self.tItems["settings"].BidOver = 10 end
 	
-	if self.tItems["settings"].BidMin ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):SetText(self.tItems["settings"].BidMin) end
-	if self.tItems["settings"].BidCount ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText(self.tItems["settings"].BidCount) end
-	if self.tItems["settings"].BidOver ~= nil then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumOverBid"):FindChild("Field"):SetText(self.tItems["settings"].BidOver) end
-	if self.tItems["settings"].BidAllowOffspec == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("AllowOffspec"):SetCheck(true) end
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("FinalCount"):SetText(self.tItems["settings"].BidCount)	
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("MinBid"):SetText(self.tItems["settings"].BidMin)	
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("MinOverBid"):SetText(self.tItems["settings"].BidOver) 
+	
+	if self.tItems["settings"].BidAllowOffspec == nil then self.tItems["settings"].BidAllowOffspec = 1 end
+	if self.tItems["settings"].BidAllowOffspec == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("AllowOffspec"):SetCheck(true) end
+	
 	if self.tItems["settings"].BidSpendOneMore == nil then self.tItems["settings"].BidSpendOneMore = 0 end
-	if self.tItems["settings"].BidSpendOneMore == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("GlobalOptions"):FindChild("OneMore"):SetCheck(true) end
+	if self.tItems["settings"].BidSpendOneMore == 1 then self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("OneMore"):SetCheck(true) end
+	
 	if self.tItems["settings"].BidRollModifier == nil then self.tItems["settings"].BidRollModifier = 5 end
 	if self.tItems["settings"].BidEPGPOffspec == nil then self.tItems["settings"].BidEPGPOffspec = 5 end
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("EditBox"):SetText(self.tItems["settings"].BidRollModifier)
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("EditBox"):SetText(self.tItems["settings"].BidEPGPOffspec)
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("RollModifier"):SetText(self.tItems["settings"].BidRollModifier)
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("PRModifier"):SetText(self.tItems["settings"].BidEPGPOffspec)
 	
-	self.ChannelPrefix = "/party "
-	self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("GlobalOptions"):FindChild("PartyMode"):SetCheck(true)
+	if self.tItems["settings"].strBidChannel == nil then self.tItems["settings"].strBidChannel = "/party " end
+	if self.tItems["settings"].strBidChannel == "/party " then
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("PartyMode"):SetCheck(true)
+	else
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("GuildMode"):SetCheck(true)
+	end
 	
+	if self.tItems["settings"].strBidMode == nil then self.tItems["settings"].strBidMode = "EPGP" end
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("Mode"..self.tItems["settings"].strBidMode):SetCheck(true)
+	
+	if self.tItems["settings"].bWhisperRespond == nil then self.tItems["settings"].bWhisperRespond = true end
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("WhisperResponse"):SetCheck(self.tItems["settings"].bWhisperRespond)
 	
 	self:BidCheckConditions()
-	self:DSInit()
+	
+
 	
 	self.bIsBidding = false
-	
-	--Tests
-	--self:InsertLootChildren()
-	--self:InsertLooterChildren()
-	-- Resume
-
 	--Post Update To generate Labels for Main DKP window
 	if self:LabelGetColumnNumberForValue("Item") ~= - 1 then self:LabelUpdateList() end
 	
 	--local test = Item.GetDataFromId(41207)
 	--Print(test:GetItemCategoryName())
 	
-	
-	--Tooltip.GetItemTooltipForm(self,self.wndMain:FindChild("RaidOnly"),test,{bPrimary = true, bSelling = false})
-	
-	--self:BidInsertChildren()
+
 	Hook.wndMasterLoot:Show(false,false)
 end
 
@@ -317,19 +316,22 @@ function DKP:BidMLSortByNameDisable()
 	Hook:OnMasterLootUpdate(true)
 end
 
+function DKP:BidWhsiperRespEnable()
+	self.tItems["settings"].bWhisperRespond = true
+end
+
+function DKP:BidWhsiperRespDisable()
+	self.tItems["settings"].bWhisperRespond = false
+end
+
 
 function DKP:BidCheckConditions()
-	if self.tItems["settings"].BidMin ~= nil and self.tItems["settings"].BidCount ~= nil and self.bIsBidding == false and self.tItems["settings"].BidOver ~= nil then
-		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStart"):Enable(true)
-		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStop"):Enable(false)
+	if self.bIsBidding then
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStart"):Enable(false)
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStop"):Enable(true)
 	else
-		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStart"):Enable(false)
-		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStop"):Enable(false)
-	end
-	
-	if self.bIsBidding == true then
-		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStop"):Enable(true)
-		self.wndBid:FindChild("ControlsContainer"):FindChild("ButtonStart"):Enable(false)
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStart"):Enable(true)
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStop"):Enable(false)
 	end
 end
 
@@ -386,33 +388,6 @@ function DKP:BidUpdateItemDatabase()
 	end
 end
 
---[[function DKP:BidInsertChildren()
-	local looterChildren = Hook.wndLooter_ItemList:GetChildren()
-	for i=1,#looterChildren do
-			looterChildren[i]:AddEventHandler("MouseButtonUp", "BidLooterItemSelected", self)
-	end
-end
-function DKP:InsertLooterChildren()
-		self.InsertedCountersList = {} 
-	local masterChildren = Hook.wndMasterLoot_LooterList:GetChildren()
-	for i=1,#masterChildren do
-
-	end
-	self:BidMLSearch()
-end
-function DKP:InsertLootChildren()	
-	local masterLootChildren = Hook.wndMasterLoot_ItemList:GetChildren()
-	self.InsertedIndicators ={}
-	self.ActiveIndicators = {}
-	for i=1,#masterLootChildren do
-		masterLootChildren[i]:AddEventHandler("ButtonCheck", "BidMasterItemSelected", self)
-		masterLootChildren[i]:AddEventHandler("ButtonUncheck", "BidMasterItemUnSelected", self)
-		local indi = Apollo.LoadForm(self.xmlDoc,"InsertItemIndicator",masterLootChildren[i],self)
-		indi:Show(false,true)
-		self.InsertedIndicators[masterLootChildren[i]:FindChild("ItemName"):GetText()] = indi
-	end
-end]]
-
 function DKP:BidMLSearch(wndHandler,wndControl)
 	if self.wndInsertedSearch:GetText() ~= "Search..." then
 		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
@@ -437,35 +412,6 @@ end
 
 function DKP:BidMLSortPlayers()
 	Hook:OnMasterLootUpdate(true)
-	--[[local MLHook = Apollo.GetAddon("MasterLoot") -- mitigating an issue where the caller is differnt then DKP
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
-	DKPInstance:BidMLSearch()
-	if not DKPInstance.tItems["settings"]["ML"].bGroup and then
-		if not DKPInstance.tItems["settings"]["ML"].bArrTiles then
-			if DKPInstance.tItems["settings"].BidMLSorting == 1 then
-				if DKPInstance.tItems["settings"].BidSortAsc == 1 then
-					MLHook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPasc)
-				else
-					MLHook.wndMasterLoot_LooterList:ArrangeChildrenVert(0,sortMasterLootEasyDKPdesc)
-				end
-			else
-				MLHook.wndMasterLoot_LooterList:ArrangeChildrenVert(0)
-			end
-		else -- tiles
-			if DKPInstance.tItems["settings"].BidMLSorting == 1 then
-				if DKPInstance.tItems["settings"].BidSortAsc == 1 then
-					MLHook.wndMasterLoot_LooterList:ArrangeChildrenTiles(0,sortMasterLootEasyDKPasc)
-				else
-					MLHook.wndMasterLoot_LooterList:ArrangeChildrenTiles(0,sortMasterLootEasyDKPdesc)
-				end
-			else
-				MLHook.wndMasterLoot_LooterList:ArrangeChildrenTiles(0)
-			end
-		end
-	else -- Refresh everything
-		Hook:OnMasterLootUpdate(true)
-	end]]
-	
 end
 
 function DKP:BidLooterItemSelected(wndHandler,wndControl)
@@ -489,24 +435,8 @@ function DKP:BidMasterItemSelected()
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
 		DKPInstance.wndInsertedMasterButton:Enable(true)
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
-		--if DKPInstance.tItems["settings"]["ML"].bAllowMulti then table.insert(DKPInstance.tSelectedItems,HookML.tMasterLootSelectedItem.nLootId) end
 	end
 end
-
---[[function DKP:BidMasterItemDeselected()
-	local HookML = Apollo.GetAddon("MasterLoot")
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
-	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
-		if DKPInstance.tItems["settings"]["ML"].bAllowMulti then
-			for k,item in ipairs(DKPInstance.tSelectedItems) do
-				if item == HookML.tMasterLootSelectedItem.itemDrop:GetName() then
-					table.remove(DKPInstance.tSelectedItems,k)
-					break
-				end
-			end
-		end
-	end
-end]]
 
 function DKP:StartChatBidding(tCustomData)
 		if self.bIsBidding == false then
@@ -530,15 +460,17 @@ function DKP:StartChatBidding(tCustomData)
 					end
 				end
 			else
-				self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):SetText(tCustomData.strItem)
+				self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):SetText(tCustomData.strItem)
 				self.CurrentItemChatStr = nil
 			end
-			if self.CurrentItemChatStr == nil then self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("ButtonLink"):Enable(false)
-			else self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("ButtonLink"):Enable(true) end
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxOpen"):SetCheck(true)
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxHidden"):SetCheck(false)
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("PureRoll"):SetCheck(false)
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("ModifiedRoll"):SetCheck(false)
+			
+			if self.CurrentItemChatStr == nil then 
+				self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonLink"):Enable(false)
+			else 
+				self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonLink"):Enable(true) 
+			end
+
+			
 			
 			self.wndBid:Show(true,false)
 			self:BidCheckConditions()
@@ -550,7 +482,7 @@ end
 
 function DKP:BidSetUpWindow(tCustomData,wndControl,eMouseButton)
 	if eMouseButton == GameLib.CodeEnumInputMouse.Right then
-		self:StartChatBidding()
+		--self:StartChatBidding()
 	else
 		self:BidAddNewAuction(self.ItemDatabase[self.SelectedMasterItem].ID)
 	end
@@ -575,101 +507,84 @@ function DKP:BidDisableOffspec()
 end
 
 
-function DKP:BidSetMin( wndHandler, wndControl, eMouseButton )
-	if tonumber(self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):GetText()) == nil then
-		self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):SetText("Minimum Bid")
-		self.tItems["settings"].BidMin = nil
+function DKP:BidSetMin( wndHandler, wndControl, strText )
+	local val = tonumber(strText)
+	if val then
+		self.tItems["settings"].BidMin = val
 	else
-		self.tItems["settings"].BidMin = math.abs(tonumber(self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):GetText()))	
-		self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("MinimumBidContainer"):FindChild("Field"):SetText(self.tItems["settings"].BidMin)
+		wndControl:SetText(self.tItems["settings"].BidMin) 
 	end
-	self:BidCheckConditions()
 end
 
 function DKP:BitSetCountdown( wndHandler, wndControl, eMouseButton )
-	if tonumber(self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):GetText()) == nil then
-		self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText("Final Countdown")
+	local val = tonumber(strText)
+	if val and val < 10 and val > 0 then
+		self.tItems["settings"].BidMin = val
 	else
-		local value = math.abs(tonumber(self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):GetText()))
-		if value >= 1 and value <= 6 then
-			self.tItems["settings"].BidCount = value
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText(self.tItems["settings"].BidCount)
-		else
-			self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("FinalCountDownTimer"):FindChild("Field"):SetText("Final Countdown")
-			self.tItems["settings"].BidCount = nil
-		end
+		wndControl:SetText(self.tItems["settings"].BidMin) 
 	end
-	self:BidCheckConditions()
+end
+
+function DKP:BidSetMode(wndHandler,wndControl)
+	self.tItems["settings"].strBidMode = wndControl:GetName()
 end
 
 function DKP:BidStart(strName)
-	self.mode = "open"
-	if self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard1"):FindChild("BoxHidden"):IsChecked() == true then self.mode = "hidden" 
-	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Standard"):FindChild("BoxOpen"):IsChecked() == true  then  self.mode = "open"
-	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("PureRoll"):IsChecked() == true then self.mode = "pure"
-	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("Roll"):FindChild("ModifiedRoll"):IsChecked() == true then self.mode = "modified"
-	elseif self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("EPGP"):FindChild("BoxOpen"):IsChecked() == true then self.mode = "EPGP" end
-
-	if self.mode ~= nil then
-
-		self.CurrentBidSession = {} 
-		self.CurrentBidSession.HighestBidEver = {}
-		self.CurrentBidSession.HighestBidEver.value = 0
-		self.CurrentBidSession.HighestBidEver.name = ""
-		self.CurrentBidSession.Bidders = {}
-		self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("ItemInfoContainer"):FindChild("HeaderItem"):GetText()
-		self.CurrentBidSession.HighestOffBid = {}
-		self.CurrentBidSession.HighestOffBid.name = "" 
-		self.CurrentBidSession.HighestOffBid.value = 0
+	self.CurrentBidSession = {} 
+	self.CurrentBidSession.HighestBidEver = {}
+	self.CurrentBidSession.HighestBidEver.value = 0
+	self.CurrentBidSession.HighestBidEver.name = ""
+	self.CurrentBidSession.Bidders = {}
+	self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):GetText()
+	self.CurrentBidSession.HighestOffBid = {}
+	self.CurrentBidSession.HighestOffBid.name = "" 
+	self.CurrentBidSession.HighestOffBid.value = 0
 
 
 
-		Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
-		self.bIsBidding = true
-		self:BidCheckConditions()
-		self.bAllowOffspec = self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("AllowOffspec"):IsChecked()
-		
-		
-		if self.mode == "open" then
-				if self.CurrentItemChatStr == nil then	
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in "..self.ChannelPrefix.." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
-				else
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP]Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in " .. self.ChannelPrefix .." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
-				end
-				if self.bAllowOffspec == true then 
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' in current channel.After you change your mode you cannot change it again") 
-				end
-		elseif self.mode == "hidden" then
-				if self.CurrentItemChatStr == nil then	
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate whisper the amout of dkp to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
-				else
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate whisper the amout of dkp to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount .. ".Good Luck!")
-				end
-				if self.bAllowOffspec == true then 
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' to person in charge of bidding.After you change your mode you cannot change it again") 
-				end
-		elseif self.mode == "pure" then
-				if self.CurrentItemChatStr == nil then
-					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Type /roll in order to participate in an auction for item " .. self.CurrentBidSession.strItem ..".")
-				else
-					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".")
-				end
-		elseif self.mode == "modified" then
-				if self.CurrentItemChatStr == nil then
-					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Type /roll in order to participate in an auction for item " .. self.CurrentBidSession.strItem ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your DKP will be added to roll and the whole value will be subtracted from your account.")
-				else
-					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your DKP will be added to roll and the whole value will be subtracted from your account.")
-				end
-		elseif self.mode == "EPGP" then
-				if self.CurrentItemChatStr == nil then
-					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] If you want to participate in an auction for item " .. self.CurrentBidSession.strItem .." write !bid in /party channel , for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. ".")
-				else
-					ChatSystemLib.Command(self.ChannelPrefix .. " [EasyDKP] If you want to participate in an auction for item" .. self.CurrentItemChatStr .." write !bid in /party channel.")
-				end
-				if self.bAllowOffspec == true then 
-					ChatSystemLib.Command(self.ChannelPrefix ..  " [EasyDKP] Note: Offspec bidding is enabled ,  for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. "%.")
-				end
-		end
+	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
+	self.bIsBidding = true
+	self:BidCheckConditions()
+	
+	if self.tItems["settings"].strBidMode == "ModeOpenDKP" then
+			if self.CurrentItemChatStr == nil then	
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in "..self.ChannelPrefix.." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
+			else
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in " .. self.ChannelPrefix .." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
+			end
+			if self.bAllowOffspec == true then 
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' in current channel.After you change your mode you cannot change it again") 
+			end
+	elseif self.tItems["settings"].strBidMode == "ModeHiddenDKP" then
+			if self.CurrentItemChatStr == nil then	
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate whisper the amout of DKP to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
+			else
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate whisper the amout of DKP to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
+			end
+			if self.bAllowOffspec == true then 
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' to person in charge of bidding.After you change your mode you cannot change it again") 
+			end
+	elseif self.tItems["settings"].strBidMode == "ModePureRoll" then
+			if self.CurrentItemChatStr == nil then
+				ChatSystemLib.Command(self.ChannelPrefix .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentBidSession.strItem ..".")
+			else
+				ChatSystemLib.Command(self.ChannelPrefix .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".")
+			end
+	elseif self.tItems["settings"].strBidMode == "ModeModifiedRole" then
+			if self.CurrentItemChatStr == nil then
+				ChatSystemLib.Command(self.ChannelPrefix .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentBidSession.strItem ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your EP will be added to roll and the whole value will be subtracted from your account.")
+			else
+				ChatSystemLib.Command(self.ChannelPrefix .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your EP will be added to roll and the whole value will be subtracted from your account.")
+			end
+	elseif self.tItems["settings"].strBidMode == "ModeEPGP" then
+			if self.CurrentItemChatStr == nil then
+				ChatSystemLib.Command(self.ChannelPrefix .. " [Chat Bidding] If you want to participate in an auction for item " .. self.CurrentBidSession.strItem .." write !bid in /party channel , for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. ".")
+			else
+				ChatSystemLib.Command(self.ChannelPrefix .. " [Chat Bidding] If you want to participate in an auction for item" .. self.CurrentItemChatStr .." write !bid in /party channel.")
+			end
+			if self.bAllowOffspec == true then 
+				ChatSystemLib.Command(self.ChannelPrefix ..  " [Chat Bidding] Note: Offspec bidding is enabled ,  for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. "%.")
+			end
 	end
 end
 
@@ -687,82 +602,66 @@ function DKP:BidSetOffspecModifierForEPGP( wndHandler, wndControl, strText )
 end
 
 function DKP:BidMessage(channelCurrent, tMessage)
-	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Party and self.mode == "open" and self.ChannelPrefix == "/party " or  channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.mode == "open" and self.ChannelPrefix == "/guild " then
-		local strResult = self:BidProcessMessageDKP({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
-		if strResult == -1 then return end
+	local strResult = -1
+	local arg = {strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender}
+	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Party and self.tItems["settings"].strBidMode == "ModeOpenDKP" and self.ChannelPrefix == "/party " or  channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.tItems["settings"].strBidMode == "ModeOpenDKP" and self.ChannelPrefix == "/guild " then
+		strResult = self:BidProcessMessageDKP(arg)
+	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper and  self.tItems["settings"].strBidMode == "ModeHiddenDKP"  then
+		 strResult = self:BidProcessMessageDKP(arg)
+	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.tItems["settings"].strBidMode == "ModePureRoll" then
+		 strResult = self:BidProcessMessageRoll(arg)
+	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.tItems["settings"].strBidMode == "ModeModifiedRoll" then
+		 strResult = self:BidProcessMessageRoll(arg)
+	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Party and self.tItems["settings"].strBidMode == "ModeEPGP" and self.ChannelPrefix == "/party " or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.tItems["settings"].strBidMode == "ModeEPGP" and self.ChannelPrefix == "/guild " then
+		 strResult = self:BidProcessMessageEPGP(arg)
+	end
+	if strResult == -1 then return end
+	if not self.tItems["settings"].bWhisperRespond then
 		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
-	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper and self.mode == "hidden" then
-		local strResult = self:BidProcessMessageDKP({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
-		if strResult == -1 then return end
-		ChatSystemLib.Command("/w " .. tMessage.strSender .. " " .. strResult)
-	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.mode == "pure" then
-		local strResult = self:BidProcessMessageRoll({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
-		if strResult == -1 then return end
-		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
-	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.mode == "modified" then
-		local strResult = self:BidProcessMessageRoll({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
-		if strResult == -1 then return end
-		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
-	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Party and self.mode == "EPGP" and self.ChannelPrefix == "/party " or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.mode == "EPGP" and self.ChannelPrefix == "/guild " then
-		local strResult = self:BidProcessMessageEPGP({strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender})
-		if strResult == -1 then return end
-		ChatSystemLib.Command(self.ChannelPrefix .. strResult)
+	else
+		ChatSystemLib.Command("/w " ..  tMessage.strSender .." " .. strResult)
 	end
 end
 
 function DKP:BidProcessMessageEPGP(tData)
-	local strReturn = ""
+	local strReturn = -1
 	
 	if tData.strMsg == "!off" and self.tItems["settings"].BidAllowOffspec == 1 or tData.strMsg == "!bid" then
 		local ID = self:GetPlayerByIDByName(tData.strSender)
 		if ID ~= -1 then
 			local bAlreadyBid = false
 			local bidID
-			for i=1,#self.CurrentBidSession.Bidders do
-				if tData.strSender == self.CurrentBidSession.Bidders[i].strName then
+			for k,bidder in ipairs(self.CurrentBidSession.Bidders) do
+				if tData.strSender == bidder.strName then
 					bAlreadyBid = true
-					bidID = i
+					bidID = k
 					break
 				end
 			end
 			
 			if not bAlreadyBid then
 				local newBidder = {}
-				newBidder.HighestBid = (tData.strMsg == "!off" and tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100) or tonumber(self:EPGPGetPRByName(tData.strSender)))
+				newBidder.nBid = (tData.strMsg == "!off" and tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100) or tonumber(self:EPGPGetPRByName(tData.strSender)))
 				newBidder.strName = tData.strSender
 				newBidder.offspec = (tData.strMsg == "!off" and true or false)
-				if newBidder.HighestBid > self.CurrentBidSession.HighestBidEver.value then
-					self.CurrentBidSession.HighestBidEver.value = newBidder.HighestBid
-					self.CurrentBidSession.HighestBidEver.name = newBidder.strName
-				end
 				table.insert(self.CurrentBidSession.Bidders,newBidder)
-				strReturn = "Accepted"
-			elseif self.CurrentBidSession.Bidders[bidID].offspec == false and tData.strMsg == "!off" then
+				strReturn = "Processed"
+			elseif bidID and not self.CurrentBidSession.Bidders[bidID].offspec and tData.strMsg == "!off" then
 				self.CurrentBidSession.Bidders[bidID].offspec = true
-				self.CurrentBidSession.Bidders[bidID].HighestBid = tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100)
-				strReturn = "Accepted"
-				if self.CurrentBidSession.Bidders[bidID].HighestBid > self.CurrentBidSession.HighestBidEver.value then
-					self.CurrentBidSession.HighestBidEver.value = self.CurrentBidSession.Bidders[bidID].HighestBid
-					self.CurrentBidSession.HighestBidEver.name = self.CurrentBidSession.Bidders[bidID].strName
-				end
+				self.CurrentBidSession.Bidders[bidID].nBid = tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100)
+				strReturn = "Processed"
 			elseif bAlreadyBid and tData.strMsg ~= "!off" then
 				strReturn = "Already bid"
 			end
 			self:BidUpdateBiddersList()
-		else
-			strReturn = "No such player in Database"
 		end
-	else
-		strReturn = -1
 	end
 	
-
-
 	return strReturn
 end
 
 function DKP:BidProcessMessageRoll(tData)
-	local strReturn = ""
+	local strReturn = -1
 	
 	local words = {}
 	for word in string.gmatch(tData.strMsg,"%S+") do
@@ -770,40 +669,36 @@ function DKP:BidProcessMessageRoll(tData)
 	end
 	
 	if #words < 5 then 
-		strReturn = "Critical Error"
 		return strReturn
 	end
 	if words[5] ~= "(1-100)" then
-		strReturn = "Wrong Range"
+		strReturn = "Wrong range"
 		return strReturn
 	end
 	
 	
 		local strRoller = words[1] .. " " .. words[2]
 		local ID = self:GetPlayerByIDByName(strRoller)
-		for i=1,table.getn(self.CurrentBidSession.Bidders) do
-			if self.CurrentBidSession.Bidders[i].strName == strRoller then
+		for k,bidder in ipairs(self.CurrentBidSession.Bidders) do
+			if bidder.strName == strRoller then
 				strReturn = "Already Rolled"
 				return strReturn
 			end
 		end
+		
 		local roll = tonumber(words[4])
 		local newBidder = {}
 		newBidder.strName = strRoller
-		if self.mode == "pure" then
-			newBidder.HighestBid = roll
-		elseif self.mode == "modified" then
-			newBidder.HighestBid = roll + math.floor(math.abs(self.tItems[ID].net) * (self.tItems["settings"].BidRollModifier/100))
-			newBidder.mod = (math.floor(math.abs(self.tItems[ID].net) * (self.tItems["settings"].BidRollModifier/100)))
+		if self.tItems["settings"].strBidMode == "ModePureRoll" then
+			newBidder.nBid = roll
+		elseif self.tItems["settings"].strBidMode == "ModeModifiedRoll" then
+			newBidder.nBid = roll + math.floor(math.abs(self.tItems[ID].EP) * (self.tItems["settings"].BidRollModifier/100))
+			newBidder.mod = (math.floor(math.abs(self.tItems[ID].EP) * (self.tItems["settings"].BidRollModifier/100)))
 		end
 		newBidder.offspec = false
-		if newBidder.HighestBid > self.CurrentBidSession.HighestBidEver.value then
-			self.CurrentBidSession.HighestBidEver.value = newBidder.HighestBid
-			self.CurrentBidSession.HighestBidEver.name = newBidder.strName
-		end
 		
 		table.insert(self.CurrentBidSession.Bidders,newBidder)
-		strReturn = "Succes"
+		strReturn = "Processed"
 	self:BidUpdateBiddersList()
 	return strReturn
 end
@@ -827,9 +722,9 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 	
 	local nBidderID = 0
 	
-	for i=1,#self.CurrentBidSession.Bidders do
-		if self.CurrentBidSession.Bidders[i].strName == tData.strSender then
-			nBidderID = i
+	for k,bidder in ipairs(self.CurrentBidSession.Bidders) do
+		if bidder.strName == tData.strSender then
+			nBidderID = k
 			break
 		end
 	end
@@ -841,7 +736,7 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 		newBidder.offspec= false
 		
 		if tonumber(tData.strMsg) == nil and tData.strMsg == "!off" then
-			if self.bAllowOffspec == true then
+			if self.tItems["settings"].BidAllowOffspec == 1 then
 				newBidder.offspec = true
 				strReturn = "Offspec mode"
 			else
@@ -849,11 +744,12 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 			end
 		else
 			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > tonumber(self.tItems[self:GetPlayerByIDByName(tData.strSender)].net) then return "You don't have enough DKP." end
+			
 			local modifier = tonumber(tData.strMsg) - self.CurrentBidSession.HighestBidEver.value
 			if modifier > self.tItems["settings"].BidOver and tonumber(tData.strMsg) > self.tItems["settings"].BidMin then 
-				newBidder.HighestBid = tonumber(tData.strMsg)
-				if newBidder.HighestBid > self.CurrentBidSession.HighestBidEver.value then
-					self.CurrentBidSession.HighestBidEver.value = newBidder.HighestBid
+				newBidder.nBid = tonumber(tData.strMsg)
+				if newBidder.nBid > self.CurrentBidSession.HighestBidEver.value then
+					self.CurrentBidSession.HighestBidEver.value = newBidder.nBid
 					self.CurrentBidSession.HighestBidEver.name = newBidder.strName
 				end
 					strReturn = "Bid processed"
@@ -861,106 +757,51 @@ function DKP:BidProcessMessageDKP(tData) -- strMsg , strSender
 				if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
 					strReturn = "Failure - Minimum Bid value hasn't been reached"
 				else
-					if self.mode == "open" then
-						strReturn = "Failure - too small difference"
-					elseif self.mode == "hidden" then
-						strReturn = "Bid processed"
-					end
+					strReturn = "Failure - too small difference"
 				end
 			end
 		end
 		table.insert(self.CurrentBidSession.Bidders,newBidder)	
 	else
-		
 		if tonumber(tData.strMsg) == nil and tData.strMsg == "!off" then
-			if self.bAllowOffspec == true then
-				if self.CurrentBidSession.Bidders[nBidderID].offspec == false then -- Prevent multiple conversions
-					if self.CurrentBidSession.HighestBidEver.name == self.CurrentBidSession.Bidders[nBidderID].strName then
-						--Search for 2nd highest
-						local highest ={}
-						highest.name = ""
-						highest.value = 0
-						for i=1,table.getn(self.CurrentBidSession.Bidders) do
-							if self.CurrentBidSession.Bidders[i].HighestBid > highest.value and i ~= nBidderID then
-								highest.name = self.CurrentBidSession.Bidders[i].strName
-								highest.value = self.CurrentBidSession.Bidders[i].HighestBid
-							end
-						end
-						self.CurrentBidSession.HighestBidEver = highest
-					end
-					-- Determine whether previous bid is higher than highest bid in offspec
-					if self.CurrentBidSession.HighestOffBid.value < self.CurrentBidSession.Bidders[nBidderID].HighestBid then
-						self.CurrentBidSession.HighestOffBid.name = self.CurrentBidSession.Bidders[nBidderID].strName
-						self.CurrentBidSession.HighestOffBid.value = self.CurrentBidSession.Bidders[nBidderID].HighestBid
-					end
-				end
+			if self.tItems["settings"].BidAllowOffspec == 1 then
 				self.CurrentBidSession.Bidders[nBidderID].offspec = true
 				strReturn = "Offspec mode"
-				
 			else
 				strReturn = "Offspec is not allowed"
 			end
 		else
 			if self:GetPlayerByIDByName(tData.strSender) ~= - 1 and tonumber(tData.strMsg) > tonumber(self.tItems[self:GetPlayerByIDByName(tData.strSender)].net) then return "You don't have enough DKP." end
 			
-			if self.CurrentBidSession.Bidders[nBidderID].offspec == false then
-				local value = tonumber(tData.strMsg)
-				
-				if value < self.CurrentBidSession.Bidders[nBidderID].HighestBid then
-					strReturn = "Failure - smaller than previous bid"
-				else
-					local modifier = value - self.CurrentBidSession.HighestBidEver.value
-					if  modifier > self.tItems["settings"].BidOver and tonumber(tData.strMsg) > self.tItems["settings"].BidMin then
-						self.CurrentBidSession.Bidders[nBidderID].HighestBid = value
-						strReturn = "Bid processed"
-						if value > self.CurrentBidSession.HighestBidEver.value then
-							self.CurrentBidSession.HighestBidEver.value = self.CurrentBidSession.Bidders[nBidderID].HighestBid
-							self.CurrentBidSession.HighestBidEver.name = self.CurrentBidSession.Bidders[nBidderID].strName
-							strReturn = "Bid processed"
-						end
-					else	
-						if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
-							strReturn = "Failure - Minimum Bid value hasn't been reached"
-						else
-							if self.mode == "open" then
-								strReturn = "Failure - too small difference"
-							elseif self.mode == "hidden" then
-								strReturn = "Bid processed"
-							end
-						end
-					end
+			local modifier = tonumber(tData.strMsg) - self.CurrentBidSession.HighestBidEver.value
+			if modifier > self.tItems["settings"].BidOver and tonumber(tData.strMsg) > self.tItems["settings"].BidMin and self.CurrentBidSession.Bidders[nBidderID].nBid < tonumber(tData.strMsg) then 
+				self.CurrentBidSession.Bidders[nBidderID].nBid = tonumber(tData.strMsg)
+				if self.CurrentBidSession.Bidders[nBidderID].nBid > self.CurrentBidSession.HighestBidEver.value then
+					self.CurrentBidSession.HighestBidEver.value = self.CurrentBidSession.Bidders[nBidderID].nBid
+					self.CurrentBidSession.HighestBidEver.name = self.CurrentBidSession.Bidders[nBidderID].strName
 				end
-			else -- offspec == true
-				local value = tonumber(tData.strMsg)
-				if value < self.CurrentBidSession.Bidders[nBidderID].HighestBid then
-					strReturn = "Failure - smaller than previous bid"
+					strReturn = "Bid processed"
+			else
+				if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
+					strReturn = "Failure - Minimum Bid value hasn't been reached"
 				else
-					local modifier = value - self.CurrentBidSession.HighestOffBid.value
-					if  modifier > self.tItems["settings"].BidOver and tonumber(tData.strMsg) > self.tItems["settings"].BidMin then
-						self.CurrentBidSession.Bidders[nBidderID].HighestBid = value
-						strReturn = "Bid processed"
-						if value > self.CurrentBidSession.HighestOffBid.value then
-							self.CurrentBidSession.HighestOffBid.value = self.CurrentBidSession.Bidders[nBidderID].HighestBid
-							self.CurrentBidSession.HighestOffBid.name = self.CurrentBidSession.Bidders[nBidderID].strName
-							strReturn = "Bid processed"
-						end
-					else	
-						if tonumber(tData.strMsg) < self.tItems["settings"].BidMin then
-							strReturn = "Failure - Minimum Bid value hasn't been reached"
-						else
-							if self.mode == "open" then
-								strReturn = "Failure - too small difference"
-							elseif self.mode == "hidden" then
-								strReturn = "Bid processed"
-							end
-						end
-					end
+					strReturn = "Failure - too small difference"
 				end
 			end
 		end
 	end
 	self:BidUpdateBiddersList()
 	return strReturn
+end
+
+function DKP:BidExpandModes()
+	local l,t,r,b = self.wndBid:GetAnchorOffsets()
+	self.wndBid:SetAnchorOffsets(l,t,1553,b)
+end
+
+function DKP:BidCollapseModes()
+	local l,t,r,b = self.wndBid:GetAnchorOffsets()
+	self.wndBid:SetAnchorOffsets(l,t,953,b)
 end
 
 function compare_easyDKP_bidders(a,b)

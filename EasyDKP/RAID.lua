@@ -10,6 +10,16 @@ local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrNormalText = ApolloColor.new("ChannelAdvice")
 
 
+
+ --[[
+ Player : 
+ name -> str
+ dkpMod -> int
+ bLeft -> bool
+ tClaimedLoot -> table
+			name-> string
+			dkp -> int
+ ]]
 local tAllRaidMembersInSession = {}
 function DKP:RaidInit()
 	

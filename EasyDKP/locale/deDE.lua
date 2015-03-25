@@ -133,15 +133,15 @@ L["#wndSettings:DataSync"] = "Daten Abgleich"
 L["#wndSettings:Tooltips:AccCreation"] = "Account wird nur erstellt wenn der Gildenname identisch zur eigenen Gilde ist."
 L["#wndSettings:Tooltips:PopUPDec"] = "Wenn für Zweitbedarf verteilt."
 L["#wndSettings:Tooltips:GPTooltip"] = "Um diese Funktion zu nutzen muss das Addon EToolTip installiert und ID Display aktiviert sein."
-L["#wndSettings:Tooltips:EnableBidding"] = "Änderung wird erst nach /reloadui aktiv."
+L["#wndSettings:Tooltips:EnableBidding"] = "Änderung wird erst nach nach /reloadui."
 L["#wndSettings:Tooltips:InvErr"] = "Fehler bedeutet alles ausser Akzeptiert / Abgelehnt."
 L["#wndSettings:Tooltips:FixNames"] = "Es werden problematische Umlaute und Sonderzeichen entfernt."
 L["#wndSettings:Tooltips:Standby"] = "Liste der Spieler die vom Werteverfall ausgeschlossen sind. Sowohl DKP als auch EPGP."
-L["#wndSettings:Tooltips:FilterKey"] = "Wenn das Stichwort in der Gegenstandsbezeichnung vorkommt wird der Gegenstand bei der Zuteilung ignoriert."
 L["#wndSettings:Tooltips:Purge"] = "Lösche Datenbank beim nächsten /reloadui"
-
--- rev 139
+--rev 139
 L["#wndSettings:Mode"] = "Modus:"
 L["#wndSettings:Whitelist"] = "Positivliste"
 L["#wndSettings:Blacklist"] = "Negativliste"
+
+
 

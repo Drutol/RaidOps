@@ -124,13 +124,16 @@ L["#wndSettings:Tooltips:EnableBidding"] = "The effect will take place after UI 
 L["#wndSettings:Tooltips:InvErr"] = "Error means anything different than Accepted / Declined."
 L["#wndSettings:Tooltips:FixNames"] = "This will get rid of umlauts and other non-standard character as they may cause some problems when it comes to player identification."
 L["#wndSettings:Tooltips:Standby"] = "List of players that won't be affected by the Decay. Both DKP and EPGP."
-L["#wndSettings:Tooltips:FilterKey"] = "If certain keyword is found in item name then addon will reject the fact of item assignment."
 L["#wndSettings:Tooltips:Purge"] = "Purges Database on next /reloadui"
 
 -- rev 139
 L["#wndSettings:Mode"] = "Mode:"
 L["#wndSettings:Whitelist"] = "Whitelist"
 L["#wndSettings:Blacklist"] = "Blacklist"
+
+--rev 140
+L["#wndSettings:Tooltips:FilterKey"] = "List of words separated with    ;    used by whitelist or blacklist depending on mode."
+
 
 
 

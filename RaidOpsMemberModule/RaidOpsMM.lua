@@ -10,10 +10,10 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
-local knVersion = 1.9
+local knVersion = 1.91
  
 local kUIBody = "ff39b5d4"
-local ktAuctionHeight = 115
+local ktAuctionHeight = 119
 local nItemIDSpacing = 4
  
  local defaultSlotValues = 
@@ -61,6 +61,32 @@ local ktClassToString =
 	[GameLib.CodeEnumClass.Engineer]    	= "Engineer",
 	[GameLib.CodeEnumClass.Spellslinger]  	= "Spellslinger",
 }
+
+-- Localization stuff
+local ktLocales = {
+	[1] = "enUS",
+	[2] = "deDE",
+	[3] = "frFR",
+	[4] = "koKR",
+}
+
+local function GetLocale()
+	local strCancel = Apollo.GetString(1)
+	
+	-- German
+	if strCancel == "Abbrechen" then 
+		return ktLocales[2]
+	end
+	
+	-- French
+	if strCancel == "Annuler" then
+		return ktLocales[3]
+	end
+	
+	-- Other
+	return ktLocales[1]
+end
+local strLocale = GetLocale()
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -133,8 +159,11 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.nReportedVersion == nil then self.settings.nReportedVersion = knVersion end
 		if self.settings.bDisplayApplicable == nil then self.settings.bDisplayApplicable = false end
 		if self.settings.bOthers == nil then self.settings.bOthers = true end
+		if self.settings.bCloseAssign == nil then self.settings.bCloseAssign = true end
 		
-		if self.settings.nReportedVersion > knVersion then Print("Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
+		if self.settings.bCloseAssign then 	Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self) end
+		
+		if self.settings.nReportedVersion > knVersion then Print("[RaidOpsMM]Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
 		
 		if self.settings.enable then 
 			self:JoinGuildChannel()
@@ -144,8 +173,8 @@ function RaidOpsMM:OnDocLoaded()
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
 		if self.ResizedWndBottom then self.wndLootList:SetAnchorOffsets(l,t,r,self.ResizedWndBottom) end
 		--Sizing
-		self.wndLootList:SetSizingMaximum(564,341)
-		self.wndLootList:SetSizingMinimum(564,132)
+		self.wndLootList:SetSizingMaximum(564,349)
+		self.wndLootList:SetSizingMinimum(564,140)
 		
 		self.tMLs = {}
 		Apollo.RegisterSlashCommand("ropsmm", "OnRaidOpsMMOn", self)
@@ -214,6 +243,69 @@ function RaidOpsMM:ApplyMyPreviousChoices(forAuction)
 				auction.wnd:FindChild("GlowyThingy"):Show(false,false)
 			end
 			break
+		end
+	end
+end
+function RaidOpsMM:OnChatMessage(channelCurrent, tMessage)
+	if not self.settings.bCloseAssign then return end
+	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
+		if strLocale == "enUS" then
+			local itemStr = ""
+			local strName = ""
+			local strTextLoot = ""
+			for i=1, table.getn(tMessage.arMessageSegments) do
+				strTextLoot = strTextLoot .. tMessage.arMessageSegments[i].strText
+			end
+			local words = {}
+			local bFound = false 
+			for word in string.gmatch(strTextLoot,"%S+") do
+				table.insert(words,word)
+			end
+			
+			if words[1] ~= "The"  then return end
+	
+			local collectingItem = true
+			for i=5 , table.getn(words) do
+				if words[i] == "to" then collectingItem = false end
+				if collectingItem == true then
+					itemStr = itemStr .." ".. words[i]
+				elseif words[i] ~= "to" then
+					strName = strName .. " " .. words[i]
+				end
+			end
+			
+			local strItem = string.sub(itemStr,2)
+			
+			for k ,auction in ipairs(self.ActiveAuctions) do
+				if auction.strItem == strItem then
+					self:RemoveAuction(auction.wnd:GetData(),true)
+				end
+			end		
+		elseif strLocale == "deDE" then
+			local strItem = ""
+			local strName = ""
+			local strTextLoot = ""
+			for i=1, table.getn(tMessage.arMessageSegments) do
+				strTextLoot = strTextLoot .. tMessage.arMessageSegments[i].strText
+			end
+			local words = {}
+			local bFound = false
+			for word in string.gmatch(strTextLoot,"%S+") do
+				table.insert(words,word)
+			end
+			 if words[1] ~= "Der" then return end
+			 strName = words[#words - 2] .. " " .. words[#words - 1]
+			 for k=4,#words - 3 do
+				strItem = strItem .. " " .. words[k]
+			 end
+			 
+		         	 strItem = string.sub(strItem,2)
+			 
+			for k ,auction in ipairs(self.ActiveAuctions) do
+				if auction.strItem == strItem then
+					self:RemoveAuction(auction.wnd:GetData(),true)
+				end
+			end
 		end
 	end
 end
@@ -326,6 +418,7 @@ end
 function RaidOpsMM:RestoreSettings()
 	self.wndSettings:FindChild("ChannelName"):SetText(self.settings.strChannel)
 	self.wndSettings:FindChild("DispApplicable"):SetCheck(self.settings.bDisplayApplicable)
+	self.wndSettings:FindChild("AutoCloseDistributed"):SetCheck(self.settings.bCloseAssign)
 	if self.settings.enable then self.wndSettings:FindChild("Enable"):SetCheck(true) end
 	if self.settings.tooltip then self.wndSettings:FindChild("TooltipCost"):SetCheck(true) end
 	if self.settings.resize then self.wndSettings:FindChild("AllowResize"):SetCheck(true) end
@@ -354,7 +447,7 @@ function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 	if tMsg then
 		if tMsg.ver then 
 			self.settings.nReportedVersion = tMsg.ver
-			if self.settings.nReportedVersion > knVersion then Print("Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
+			if self.settings.nReportedVersion > knVersion then Print("[RaidOpsMM]Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
 		end
 		if tMsg.type then
 			if tMsg.type == "WantConfirmation" then
@@ -484,7 +577,7 @@ function RaidOpsMM:SetLootListPos()
 	self.wndLootList:MoveToLocation(self.wndAnchor:GetLocation())
 end
 function RaidOpsMM:AddTestAuction( wndHandler, wndControl, eMouseButton )
-	local rItem = math.random(20000,40000)
+	local rItem = math.random(1,60000)
 	self:AddAuction(rItem,1000,30,nil,false,{[1] = "Test1" , [2] = "Test2" , [3] = "Test3"},{[1] = true , [2] = true , [3] = true})
 	for k=1,math.random(20) do
 		self:RegisterMemberChoice("Player"..math.random(20),"Opt"..math.random(1,4),rItem)
@@ -527,6 +620,15 @@ end
 function RaidOpsMM:ShowOthersDisable()
 	self.settings.bOthers = false
 end
+
+function RaidOpsMM:CloseAssignEnable()
+	self.settings.bCloseAssign = true
+	Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
+end	
+
+function RaidOpsMM:CloseAssignDisable()
+	self.settings.bCloseAssign = false
+end
 ---------------------------------------------------------------------------------------------------
 -- Auction Functions
 ---------------------------------------------------------------------------------------------------
@@ -568,7 +670,7 @@ function RaidOpsMM:AddAuction(itemID,cost,duration,progress,pass,tLabels,tLabelS
 		wndAuction:SetMax(duration)
 		wndAuction:SetProgress(progress,100)
 		wndAuction:SetData(itemID)
-		table.insert(self.ActiveAuctions,{wnd = wndAuction , bActive = true , nTimeLeft = progress, nDuration = duration, bPass = pass})
+		table.insert(self.ActiveAuctions,{wnd = wndAuction , bActive = true , nTimeLeft = progress, nDuration = duration, bPass = pass , strItem = item:GetName()})
 		if self.Timer == nil then self:AuctionTimerStart() end
 		Tooltip.GetItemTooltipForm(self, wndAuction:FindChild("Icon") , item, {bPrimary = true, bSelling = false, itemCompare = item:GetEquippedItemForItemType()})
 		self.wndLootList:Show(true,false)
@@ -579,12 +681,12 @@ function RaidOpsMM:AddAuction(itemID,cost,duration,progress,pass,tLabels,tLabelS
 end
 
 function RaidOpsMM:ArrangeAuctions()
-	if self.settings.resize and #self.ActiveAuctions <= 3 then
+	if self.settings.resize and #self.ActiveAuctions < 3 then
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
-		self.wndLootList:SetAnchorOffsets(l,t,r,b+((#self.ActiveAuctions-1)*ktAuctionHeight))
+		self.wndLootList:SetAnchorOffsets(l,t,r,b+((#self.ActiveAuctions-1)*ktAuctionHeight)+10)
 	else
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
-		self.wndLootList:SetAnchorOffsets(l,t,r,b+ktAuctionHeight*2)
+		self.wndLootList:SetAnchorOffsets(l,t,r,b+(ktAuctionHeight-2)*2)
 	end
 	if self.settings.bKeepOnTop then 
 		self.wndLootList:FindChild("Auctions"):ArrangeChildrenVert(0,sortAuctionRaidOps) 
@@ -664,7 +766,7 @@ function RaidOpsMM:RemoveAuctionDirect( wndHandler, wndControl, eMouseButton )
 	end
 end
 
-function RaidOpsMM:RemoveAuction(itemID)
+function RaidOpsMM:RemoveAuction(itemID,bMany)
 	for k,auction in ipairs(self.ActiveAuctions) do
 		if auction.wnd:GetData() == itemID then
 			table.remove(self.ActiveAuctions,k)
@@ -676,7 +778,7 @@ function RaidOpsMM:RemoveAuction(itemID)
 			end
 			auction.wnd:Destroy()
 			self:ArrangeAuctions()
-			break
+			if not bMany then break end
 		end
 	end
 
@@ -1241,6 +1343,7 @@ end
 
 function RaidOpsMM:StandingsShow()
 	self.wndStandings:Show(true,false)
+	self.wndStandings:ToFront()
 	self:RefreshStandings()
 end	
 

@@ -292,6 +292,7 @@ function DKP:OnDocLoaded()
 		setButton:Enable(false)
 		addButton:Enable(false)
 		subtractButton:Enable(false)
+		self.ActiveAuctions = {}
 		if self.tItems["alts"] == nil then self.tItems["alts"] = {} end
 		if self.tItems["settings"] == nil then
 			self.tItems["settings"] = {}
@@ -359,6 +360,10 @@ function DKP:OnDocLoaded()
 		self:CloseBigPOPUP()
 		self:FLInit()
 		
+		self:OnSave(1)
+		
+		--Temp disable
+		self.wndMain:FindChild("BidCustomStart"):Enable(false)
 		
 		--self:IBDebugInit() -- Raid Summaries v2
 		--self:RSDebugInit()
@@ -424,9 +429,6 @@ function DKP:OnDocLoaded()
 			self:OnUnitCreated("Guild Bank",true)
 		end
 		
-
-		
-		
 	end
 end
 
@@ -450,11 +452,14 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
 	if not self.tItems["settings"].bTrackUndo then return end
 	local tMembersNames = {}
 	local strComment = ""
-	if bRemoval == true or bRemoval == false then strComment = "--" else
-		if self.tItems["settings"].logs == 1 then 
-			strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-			if strComment == "Comment" or strComment == "Comments Disabled" then strComment = "--" end
-		end
+	if bRemoval == true or bRemoval == false then strComment = "--" 
+	elseif strType == ktUndoActions["cetrig"] then  strComment = "--" 
+	elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
+	elseif strType == ktUndoActions["remp"] then  strComment = "--" 
+	elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
+	elseif self.tItems["settings"].logs == 1 then 
+		strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = Base64.Encode(serpent.dump(tMembers)),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment})
@@ -992,36 +997,10 @@ end
 
 function DKP:OnSave(eLevel)
 	   	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
-
 		if newImportedDatabaseGlobal ~= nil then self.tItems = newImportedDatabaseGlobal end
 		local tSave = {}
 		if purge_database == 0 then
 			
-			--Raid Settings
-			if self.wndRaidOptions:FindChild("Button"):IsChecked() == true then
-				self.tItems["settings"].RaidMsg = 1
-			else
-				self.tItems["settings"].RaidMsg = 0
-			end
-			if self.wndRaidOptions:FindChild("Button1"):IsChecked() == true then
-				self.tItems["settings"].RaidItemTrack = 1
-			else
-				self.tItems["settings"].RaidItemTrack = 0
-			end
-			if self.wndRaidTools:IsShown() == true then
-				self.tItems["settings"].RaidTools.show = 1
-			else
-				self.tItems["settings"].RaidTools.show = 0
-			end
-			
-			
-			-- Bid Resume
-			
-			if self.wndBid ~= nil and self.wndBid:FindChild("ControlsContainer"):FindChild("OptionsContainer"):FindChild("ModeOptions"):FindChild("GlobalOptions"):FindChild("OneMore"):IsChecked() == true then
-				self.tItems["settings"].BidSpendOneMore = 1
-			else
-				self.tItems["settings"].BidSpendOneMore = 0
-			end
 			
 			-- Time award awards
 			
@@ -1066,7 +1045,9 @@ function DKP:OnSave(eLevel)
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
 			tSave.wndLLLoc = self.wndLL:GetLocation():ToTable()
-			tSave.wndNBLoc = self.wndBid2:GetLocation():ToTable()
+			if self.wndBid2 then
+				tSave.wndNBLoc = self.wndBid2:GetLocation():ToTable()
+			end
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
 			for k,auction in ipairs(self.ActiveAuctions) do
@@ -1336,11 +1317,14 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			end
 			
 			for word in string.gmatch(string.sub(itemStr,2),"%S+") do
-				if self.tItems["settings"].strLootFiltering == "WL" then
-					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then bFound = true break end
-				elseif self.tItems["settings"].strLootFiltering == "BL" then
-					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
+				for fWord in string.gmatch(self.tItems["settings"].strFilteredKeywords, '([^;]+)') do
+					if self.tItems["settings"].strLootFiltering == "WL" then
+						if string.lower(fWord) == string.lower(word) then bFound = true break end
+					elseif self.tItems["settings"].strLootFiltering == "BL" then
+						if string.lower(fWord) == string.lower(word) then return end
+					end
 				end
+				if bFound then break end
 			end
 			
 			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
@@ -1381,15 +1365,22 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				strItem = strItem .. " " .. words[k]
 			 end
 			 
+			 for word in string.gmatch(string.sub(strItem,2),"%S+") do
+				for fWord in string.gmatch(self.tItems["settings"].strFilteredKeywords, '([^;]+)') do
+					if self.tItems["settings"].strLootFiltering == "WL" then
+						if string.lower(fWord) == string.lower(word) then bFound = true break end
+					elseif self.tItems["settings"].strLootFiltering == "BL" then
+						if string.lower(fWord) == string.lower(word) then return end
+					end
+				end
+				if bFound then break end
+			end
+			 
 		         	 strItem = string.sub(strItem,2)
 			 
-			for word in string.gmatch(string.sub(strItem,2),"%S+") do
-				if self.tItems["settings"].strLootFiltering == "WL" then
-					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then bFound = true break end
-				elseif self.tItems["settings"].strLootFiltering == "BL" then
-					if string.find(string.lower(self.tItems["settings"].strFilteredKeywords),string.lower(word)) then return end
-				end
-			end
+
+			
+			
 			
 			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[strItem] then
 				local item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
@@ -3713,7 +3704,7 @@ function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 			end
 		end
 	end
-	self.wndPopUp:FindChild("EditBoxDKP"):SetText(value)
+	if value then self.wndPopUp:FindChild("EditBoxDKP"):SetText(value) end
 end
 
 function DKP:PopUpWindowClose( wndHandler, wndControl )
@@ -3772,7 +3763,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 			break
 		end
 	end
-	if ID_popup == nil then 
+	if ID_popup == nil or not self.ItemDatabase[strItem] then 
 		Print ("Error processing PopUp window")
 		return
 	else
@@ -4588,7 +4579,11 @@ function DKP:CETriggerEvent(eID)
 		if event.uType == "Unit" then strMob = event.strUnit else strMob = event.bType end
 		if event.rType == "RMQ" then
 			for k,queued in ipairs(self.tItems.tQueuedPlayers) do
-				if self.tItems[queued] then table.insert(raid,self.tItems[queued].strName) end
+				if self.tItems[queued] then 
+					local bFound = false
+					for k,member in ipairs(raid) do if string.lower(member) == string.lower(self.tItems[queued].strName) then bFound = true break end end
+					if not bFound then table.insert(raid,self.tItems[queued].strName) end
+				end
 			end
 		end
 		local tMembers = {}
@@ -5459,6 +5454,7 @@ end
 
 function DKP:FLOpen()
 	self.wndFL:Show(true,false)
+	self.wndFL:FindChild("Words"):SetText(self.tItems["settings"].strFilteredKeywords)
 	self.wndFL:ToFront()
 end
 
