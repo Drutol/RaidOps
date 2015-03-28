@@ -134,6 +134,9 @@ L["#wndSettings:Blacklist"] = "Blacklist"
 --rev 140
 L["#wndSettings:Tooltips:FilterKey"] = "List of words separated with    ;    used by whitelist or blacklist depending on mode."
 
+--rev 141
+L["#wndSettings:SkipGPPopUpAssign"] = "Skip PopUp window when recipent was chosen at random"
+
 
 
 

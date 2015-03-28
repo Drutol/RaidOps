@@ -340,6 +340,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
 		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
+		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -360,10 +361,10 @@ function DKP:OnDocLoaded()
 		self:CloseBigPOPUP()
 		self:FLInit()
 		
-		self:OnSave(1)
+		--self:OnSave(1)
 		
 		--Temp disable
-		self.wndMain:FindChild("BidCustomStart"):Enable(false)
+		--self.wndMain:FindChild("BidCustomStart"):Enable(false)
 		
 		--self:IBDebugInit() -- Raid Summaries v2
 		--self:RSDebugInit()
@@ -462,6 +463,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
 		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
+	table.sort(tMembers,raidOpsSortCategories)
 	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = Base64.Encode(serpent.dump(tMembers)),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment})
 	if #tUndoActions > 15 then table.remove(tUndoActions,16) end
 	self:UndoPopulate()
@@ -3041,22 +3043,15 @@ function DKP:SettingsSetQuickDKP( wndHandler, wndControl, eMouseButton )
 	self:ControlsUpdateQuickAddButtons()
 end
 
-function DKP:SettingsSetGuildname( wndHandler, wndControl, eMouseButton )
-	local strName = self.wndSettings:FindChild("EditBoxGuldName"):GetText()
-	self.tItems["settings"].guildname = strName
+function DKP:SettingsSkipGBAssignEnable()
+	self.tItems["settings"].bPopUpRandomSkip = true
 end
 
-function DKP:SettingsCheckDKPSpelling( wndHandler, wndControl, strText)
-	if strText == "" then
-		wndControl:SetText("Input Quick DKP")
-	end
+function DKP:SettingsSkipGBAssignDisable()
+	self.tItems["settings"].bPopUpRandomSkip = false
 end
 
-function DKP:SettingsCheckGuildSpelling( wndHandler, wndControl, strText )
-	if strText == "" then
-		wndControl:SetText("! Enter your Guild's name !")
-	end
-end
+
 
 function DKP:SettingsRestore()
 	local isChecked
@@ -3127,6 +3122,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("CountSelected"):SetCheck(self.tItems["settings"].bCountSelected)
 	self.wndSettings:FindChild("TrackTimedUndo"):SetCheck(self.tItems["settings"].bTrackTimedAwardUndo)
 	self.wndSettings:FindChild("EnableLootLogs"):SetCheck(self.tItems["settings"].bLootLogs)
+	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	
 	
@@ -3751,6 +3747,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 		strName = strName .. uchar
 	end
 	
+	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then return end
 	
 	if self:GetPlayerByIDByName("Guild Bank") ~= -1 and strName == "Guild Bank" and self.tItems["settings"].bSkipGB then 
 		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
@@ -5140,6 +5137,10 @@ function DKP:LLResize()
 	self:RIRequestRearrange(self.wndLL:FindChild("List"))
 end
 
+function raidOpsSortCategories(a,b)
+	return a < b
+end
+
 function DKP:LLPopuplate()
 
 	local wndList = self.wndLL:FindChild("List")
@@ -5151,7 +5152,16 @@ function DKP:LLPopuplate()
 	end
 	wndList:DestroyChildren()
 	local tData = self:LLPrepareData()
+	
+	local categories = {}
 	for cat , items in pairs(tData) do
+		table.insert(categories,cat)
+	end
+	
+	table.sort(categories,raidOpsSortCategories)
+	
+	for k , cat in pairs(categories) do
+		local items = tData[cat]
 		if cat == "" then cat = "Miscellaneous" end
 		local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
 		wndBubble:SetData({bExpanded = false,bPopulated = false, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items})
