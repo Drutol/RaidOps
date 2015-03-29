@@ -239,16 +239,17 @@ function DKP:BidCompleteInit()
 	self:BidCheckConditions()
 	
 	self.wndBid:FindChild("Grid"):AddEventHandler("GridSelChange","BidSelectWinner",self)
-
+	
+	self.GeminiLocale:TranslateWindow(self.Locale, self.wndBid)
 	
 	self.bIsBidding = false
 	--Post Update To generate Labels for Main DKP window
 	if self:LabelGetColumnNumberForValue("Item") ~= - 1 then self:LabelUpdateList() end
 	
-	local test = Item.GetDataFromId(60434)
-	self:ExportShowPreloadedText(tohtml(test:GetDetailedInfo()))
+	--local test = Item.GetDataFromId(60434)
+	---self:ExportShowPreloadedText(tohtml(test:GetDetailedInfo()))
 	
-
+	self.tItems["settings"].strBidChannel = "/s "
 	Hook.wndMasterLoot:Show(false,false)
 end
 
@@ -322,7 +323,6 @@ function DKP:BidWhsiperRespEnable()
 end
 
 function DKP:BidWhsiperRespDisable()
-	Print("LOL")
 	self.tItems["settings"].bWhisperRespond = false
 end
 
@@ -527,51 +527,25 @@ function DKP:BidStart(strName)
 	self.CurrentBidSession = {} 
 	self.CurrentBidSession.Bidders = {}
 	self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):GetText()
-	
+	self.CurrentItemChatStr = "{Link}"
 	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
 	self.bIsBidding = true
 	self:BidCheckConditions()
 	self:BidUpdateBiddersList()
-	sefl:BidUpdateLastWinner()
+	self:BidUpdateLastWinner()
 	
 	if self.tItems["settings"].strBidMode == "ModeOpenDKP" then
-		if self.CurrentItemChatStr == nil then	
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate write the amount of DKP you want to spend on this item in "..self.tItems["settings"].strBidChannel.." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
-		else
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Bidding is now starting in open open mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate write the amount of DKP you want to spend in this item in " .. self.tItems["settings"].strBidChannel .." channel.Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
-		end
-		if self.bAllowOffspec == true then 
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' in current channel.After you change your mode you cannot change it again") 
-		end
+		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:DKPOpen"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel,tostring(self.tItems["settings"].BidMin)))
 	elseif self.tItems["settings"].strBidMode == "ModeHiddenDKP" then
-		if self.CurrentItemChatStr == nil then	
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentBidSession.strItem .. " , if you want to participate whisper the amout of DKP to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
-		else
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for " .. self.CurrentItemChatStr .. " , if you want to participate whisper the amout of DKP to : " .. GameLib:GetPlayerUnit():GetName() ..".Minimum bid is : " .. self.tItems["settings"].BidMin .. " and the final count down timer is set to : " .. self.tItems["settings"].BidCount)
-		end
-		if self.bAllowOffspec == true then 
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Note: Offspec bidding is enabled , in order to switch to offspec mode write '!off' to person in charge of bidding.After you change your mode you cannot change it again") 
-		end
+		ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  string.format(self.Locale["#biddingStrings:DKPHidden"],self.CurrentItemChatStr,GameLib.GetPlayerUnit():GetName(),tostring(self.tItems["settings"].BidMin)))
 	elseif self.tItems["settings"].strBidMode == "ModePureRoll" then
-		if self.CurrentItemChatStr == nil then
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentBidSession.strItem ..".")
-		else
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".")
-		end
+		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:roll"],self.CurrentItemChatStr))
 	elseif self.tItems["settings"].strBidMode == "ModeModifiedRoll" then
-		if self.CurrentItemChatStr == nil then
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentBidSession.strItem ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your EP will be added to roll and the whole value will be subtracted from your account.")
-		else
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [Chat Bidding] Type /roll in order to participate in an auction for item " .. self.CurrentItemChatStr ..".This is modified roll : ".. self.tItems["settings"].BidRollModifier .. "% of your EP will be added to roll and the whole value will be subtracted from your account.")
-		end
+		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:modifiedRoll"],self.CurrentItemChatStr,tostring(self.tItems["settings"].BidRollModifier)))
 	elseif self.tItems["settings"].strBidMode == "ModeEPGP" then
-		if self.CurrentItemChatStr == nil then
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [Chat Bidding] If you want to participate in an auction for item " .. self.CurrentBidSession.strItem .." write !bid in /party channel , for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. ".")
-		else
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [Chat Bidding] If you want to participate in an auction for item" .. self.CurrentItemChatStr .." write !bid in /party channel.")
-		end
-		if self.bAllowOffspec == true then 
-			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  " [Chat Bidding] Note: Offspec bidding is enabled ,  for offspec write !off ; offspec PR is decreased by " .. self.tItems["settings"].BidEPGPOffspec .. "%.")
+		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:EPGP"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel))
+		if self.tItems["settings"].BidAllowOffspec == 1 then 
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:EPGPoffspec"],tostring(self.tItems["settings"].BidEPGPOffspec)))
 		end
 	end
 end
@@ -600,7 +574,7 @@ function DKP:BidMessage(channelCurrent, tMessage)
 		 strResult = self:BidProcessMessageRoll(arg)
 	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_System and self.tItems["settings"].strBidMode == "ModeModifiedRoll" then
 		 strResult = self:BidProcessMessageRoll(arg)
-	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Say and self.tItems["settings"].strBidMode == "ModeEPGP" and self.tItems["settings"].strBidChannel == "/party " or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.tItems["settings"].strBidMode == "ModeEPGP" and self.tItems["settings"].strBidChannel == "/guild " then
+	elseif channelCurrent:GetType() == ChatSystemLib.ChatChannel_Party and self.tItems["settings"].strBidMode == "ModeEPGP" and self.tItems["settings"].strBidChannel == "/party " or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.tItems["settings"].strBidMode == "ModeEPGP" and self.tItems["settings"].strBidChannel == "/guild " then
 		strResult = self:BidProcessMessageEPGP(arg)
 	end
 	if strResult == -1 then return end
@@ -842,9 +816,9 @@ function DKP:BidPerformCountdown()
 	if self.BidCounter == self.tItems["settings"].BidCount then
 		self.BidCountdown:Stop()
 		if self.CurrentBidSession.nSelected then
-			ChatSystemLib.Command("/party [Chat Bidding] Auction ended , " .. self.CurrentBidSession.Bidders[self.CurrentBidSession.nSelected].strName .. " is the winner.")
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndWinner"],self.CurrentBidSession.Bidders[self.CurrentBidSession.nSelected].strName))
 		else
-			ChatSystemLib.Command("/party [Chat Bidding] Auction ended without any winners selected")
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. self.Locale["#biddingStrings:AuctionEnd"])
 		end
 		self.bIsBidding = false
 		self:BidCheckConditions()
@@ -906,7 +880,7 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 		 
 		if wndControl:GetText() == "Assign" then 
 			if self.bIsBidding then 
-				ChatSystemLib.Command("/party [Chat Bidding] Auction ended early , " .. selectedOne:GetData():GetName() .. " is the winner.")
+				ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndEarly"],selectedOne:GetData():GetName()))
 				self.bIsBidding = false
 				self:BidCheckConditions()
 			end
@@ -2090,7 +2064,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		msg.tLabelsState = self.tItems["settings"]["Bid2"].tLabelsState
 		msg.ver = knMemberModuleVersion
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
-		if self.tItems["settings"]["Bid2"].bNotify then ChatSystemLib.Command("/party [Network Bidding] - Auction started for " .. Item.GetDataFromId(itemID):GetChatLinkString() .."!") end
+		if self.tItems["settings"]["Bid2"].bNotify then ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. "  [Network Bidding] - Auction started for " .. Item.GetDataFromId(itemID):GetChatLinkString() .."!") end
 	end
 end
 

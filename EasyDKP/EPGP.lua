@@ -69,6 +69,7 @@ function DKP:EPGPInit()
 	self.wndEPGPItems = Apollo.LoadForm(self.xmlDoc2,"CostList",nil,self)
 	self.wndEPGPSettings:Show(false,true)
 	self.wndEPGPItems:Show(false,true)
+	self.GeminiLocale:TranslateWindow(self.Locale, self.wndEPGPSettings)
 	if self.tItems["EPGP"] == nil or self.tItems["EPGP"].SlotValues == nil then
 		self.tItems["EPGP"] = {}
 		self.tItems["EPGP"].SlotValues = defaultSlotValues
