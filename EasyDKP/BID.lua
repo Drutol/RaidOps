@@ -230,7 +230,7 @@ function DKP:BidCompleteInit()
 		self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("GuildMode"):SetCheck(true)
 	end
 	
-	if self.tItems["settings"].strBidMode == nil then self.tItems["settings"].strBidMode = "EPGP" end
+	if self.tItems["settings"].strBidMode == nil or self.tItems["settings"].strBidMode == "EPGP" then self.tItems["settings"].strBidMode = "ModeEPGP" end
 	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild(self.tItems["settings"].strBidMode):SetCheck(true)
 	
 	if self.tItems["settings"].bWhisperRespond == nil then self.tItems["settings"].bWhisperRespond = true end
@@ -249,7 +249,7 @@ function DKP:BidCompleteInit()
 	--local test = Item.GetDataFromId(60434)
 	---self:ExportShowPreloadedText(tohtml(test:GetDetailedInfo()))
 	
-	self.tItems["settings"].strBidChannel = "/s "
+	--self.tItems["settings"].strBidChannel = "/s "
 	Hook.wndMasterLoot:Show(false,false)
 end
 
@@ -527,7 +527,7 @@ function DKP:BidStart(strName)
 	self.CurrentBidSession = {} 
 	self.CurrentBidSession.Bidders = {}
 	self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):GetText()
-	self.CurrentItemChatStr = "{Link}"
+	--self.CurrentItemChatStr = "{Link}"
 	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
 	self.bIsBidding = true
 	self:BidCheckConditions()

@@ -227,8 +227,8 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("ClearQueue"):SetTooltip(self.Locale["#wndMain:Tooltips:ClearRaidQueue"])
 		--massEditControls
 		self.wndMain:FindChild("ButtonSelectRaidOnly"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:SelectRaid"])
-		self.wndMain:FindChild("ButtonDeselectAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:SelectAll"])
-		self.wndMain:FindChild("ButtonSelectAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:DeselectAll"])
+		self.wndMain:FindChild("ButtonDeselectAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:DeselectAll"])
+		self.wndMain:FindChild("ButtonSelectAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:SelectAll"])
 		self.wndMain:FindChild("ButtonInvite"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Invite"])
 		self.wndMain:FindChild("ButtonInvert"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Invert"])
 		self.wndMain:FindChild("ButtonRemoveAll"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEdit:Remove"])
@@ -274,6 +274,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("rops", "HubShow", self)
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
+		Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
@@ -433,8 +434,12 @@ function DKP:OnDocLoaded()
 	end
 end
 
+function DKP:DebugFetch()
+	self:ExportShowPreloadedText(tohtml(self:GetEncodedData("Drutol Windchaser")))
+end
+
 ---------------
---Udno
+--Undo
 ---------------
 local tUndoActions = {}
 local tRedoActions = {}
@@ -463,8 +468,8 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
 		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
-	table.sort(tMembers,raidOpsSortCategories)
-	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = Base64.Encode(serpent.dump(tMembers)),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment})
+	table.sort(tMembersNames,raidOpsSortCategories)
+	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment})
 	if #tUndoActions > 15 then table.remove(tUndoActions,16) end
 	self:UndoPopulate()
 	tRedoActions = {} 
@@ -472,12 +477,12 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
 end
 
 function DKP:UndoAddRevertActivity(tMembers)
-	table.insert(tRedoActions,1,{strData = Base64.Encode(serpent.dump(tMembers)) , bRemove = tUndoActions[1].bRemove , tUndoData = tUndoActions[1]})
+	table.insert(tRedoActions,1,{strData = serpent.dump(tMembers) , bRemove = tUndoActions[1].bRemove , tUndoData = tUndoActions[1]})
 	self.wndActivity:FindChild("Redo"):Enable(true)
 end
 
 function DKP:UndoRedo()
-	local tMembersToRevert = serpent.load(Base64.Decode(tRedoActions[1].strData))
+	local tMembersToRevert = serpent.load(tRedoActions[1].strData)
 
 
 	if tMembersToRevert then
@@ -508,7 +513,7 @@ end
 
 function DKP:Undo()
 	if #tUndoActions > 0 then
-		local tMembersToRevert = serpent.load(Base64.Decode(tUndoActions[1].strData))
+		local tMembersToRevert = serpent.load(tUndoActions[1].strData)
 		
 		local tRevertMembers = {}
 		if tMembersToRevert then
@@ -1802,6 +1807,7 @@ end
 
 function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	self.wndSelectedListItem = nil
+	selectedMembers = {}
 	self.MassEdit = true
 	self:RefreshMainItemList()
 	self.wndMain:FindChild("MassEditControls"):Show(true,true)
@@ -1892,6 +1898,7 @@ function DKP:MassEditDeselect( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
+	selectedMembers = {}
 	local children = self.wndItemList:GetChildren()
 	for k,child in ipairs(children) do
 		table.insert(selectedMembers,child)
@@ -3421,6 +3428,7 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 			tPlayer.alts = player.alts
 			tPlayer.role = player.role
 			tPlayer.offrole = player.offrole
+			tPlayer.tLLogs = player.tLLogs
 			table.insert(exportTables.tPlayers,tPlayer)
 		end
 		exportTables.tSettings = self.tItems["settings"]
@@ -3563,7 +3571,7 @@ function DKP:ExportAsFormattedHTMLEPGP()
 			if self.tItems[i].logs ~= nil then
 				formatedTable[self.tItems[i].strName]["Logs"] = {}
 				for k,logs in ipairs(self.tItems[i].logs) do
-					if string.find(logs.comment,"EP") ~= nil and string.find(logs.comment,"GP") ~= nil then 
+					if string.find(logs.strType,"EP") or string.find(logs.strType,"GP") then 
 						table.insert(formatedTable[self.tItems[i].strName]["Logs"],logs)
 					end
 				end
@@ -5019,10 +5027,27 @@ end
 -----------------------------------------------------------------------------------------------
 -- LootLogs
 -----------------------------------------------------------------------------------------------
+local ktSlots = 
+{
+	["Weapon"] = true,
+	["Shield"] = true,
+	["Head"] = true,
+	["Shoulders"] = true,
+	["Chest"] = true,
+	["Hands"] = true,
+	["Legs"] = true,
+	["Attachment"] = true,
+	["Gadget"] = true,
+	["Implant"] = true,
+	["Feet"] = true,
+	["Support"] = true,
+}
 
 function DKP:LLInit()
 	self.wndLL = Apollo.LoadForm(self.xmlDoc,"LootLogs",nil,self)
+	self.wndLLM = Apollo.LoadForm(self.xmlDoc,"LLMore",nil,self)
 	self.wndLL:Show(false,true)
+	self.wndLLM:Show(false,true)
 	
 	if self.tItems.wndLLLoc ~= nil and self.tItems.wndLLLoc.nOffsets[1] ~= 0 then 
 		self.wndLL:MoveToLocation(WindowLocation.new(self.tItems.wndLLLoc))
@@ -5033,6 +5058,24 @@ function DKP:LLInit()
 	if self.tItems["settings"].LL.strGroup == nil then self.tItems["settings"].LL.strGroup = "GroupCategory" end
 	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
 	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
+	
+	if self.tItems["settings"].LL.tSlots == nil then self.tItems["settings"].LL.tSlots = {} end
+	if self.tItems["settings"].LL.tClasses == nil then self.tItems["settings"].LL.tClasses = {} end
+	if not self.tItems["settings"].LL.tSlots["Weapon"] then self.tItems["settings"].LL.tSlots = ktSlots end
+	if not self.tItems["settings"].LL.tSlots["Weapon"] then self.tItems["settings"].LL.tSlots = ktSlots end
+	
+	for k,slot in pairs(self.tItems["settings"].LL.tSlots) do
+		local wnd = self.wndLLM:FindChild("Only"):FindChild(k)
+		if wnd then
+			wnd:SetCheck(slot)
+		end
+	end
+	
+	self.wndLLM:FindChild("SlotsTab"):AttachTab(self.wndLLM:FindChild("ClassesTab"),false)
+	self.wndLLM:FindChild("SlotsTab"):AttachTab(self.wndLLM:FindChild("QualityTab"),false)
+	self.wndLLM:FindChild("SlotsTab"):Lock(true)
+	self.wndLLM:FindChild("ClassesTab"):Lock(true)
+	self.wndLLM:FindChild("QualityTab"):Lock(true)
 	
 	self.wndLL:SetSizingMinimum(768,493)
 end
@@ -5093,14 +5136,16 @@ function DKP:LLPrepareData(ID)
 		for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
 			if self.tItems["settings"].LL.strGroup == "GroupCategory" then
 				local item = Item.GetDataFromId(entry.itemID)
-				if item then
+				if item and self:LLMeetsFilters(item) then
 					if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 					table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
 				end
 			else -- Group Date
 				local strDate = os.date("%x",entry.nDate)
 				if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-				table.insert(tGrouppedItems[strDate],entry.itemID)		
+				if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID)) then
+					table.insert(tGrouppedItems[strDate],entry.itemID)	
+				end
 			end
 		end
 	else
@@ -5109,12 +5154,14 @@ function DKP:LLPrepareData(ID)
 				if self.tItems["settings"].LL.strGroup == "GroupName" then
 					tGrouppedItems[player.strName] = {}
 					for j , entry in ipairs(player.tLLogs) do
-						table.insert(tGrouppedItems[player.strName],entry.itemID)
+						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID)) then
+							table.insert(tGrouppedItems[player.strName],entry.itemID)
+						end
 					end
 				elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
 					for j , entry in ipairs(player.tLLogs) do
 						local item = Item.GetDataFromId(entry.itemID)
-						if item then
+						if item and self:LLMeetsFilters(item) then
 							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)		
 						end
@@ -5123,7 +5170,9 @@ function DKP:LLPrepareData(ID)
 					for j , entry in ipairs(player.tLLogs) do
 						local strDate = os.date("%x",entry.nDate)
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-						table.insert(tGrouppedItems[strDate],entry.itemID)	
+						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID)) then
+							table.insert(tGrouppedItems[strDate],entry.itemID)	
+						end
 					end
 				end
 			end
@@ -5131,6 +5180,22 @@ function DKP:LLPrepareData(ID)
 	
 	end
 	return tGrouppedItems
+end
+
+function DKP:LLMeetsFilters(item)
+	if not item then return false end
+
+	return true
+	--Equippable
+	
+	--Slots
+	
+	--Item Level
+	
+	--Classes
+	
+	--Quality
+	
 end
 
 function DKP:LLResize()
@@ -5228,6 +5293,7 @@ function DKP:DFInit()
 	if self.tItems["settings"].DF.bFetchOOC == nil then self.tItems["settings"].DF.bFetchOOC = true end
 	if self.tItems["settings"].DF.strSource == nil then self.tItems["settings"].DF.strSource = "Fill with EXACT player name." end
 	if self.tItems["settings"].DF.nPeriod == nil then self.tItems["settings"].DF.nPeriod = 5 end
+	if self.tItems["settings"].DF.bSmart == nil then self.tItems["settings"].DF.bSmart = true end
 	
 	if self.tItems["settings"].DF.bSend == nil then self.tItems["settings"].DF.bSend = true end
 	if self.tItems["settings"].DF.bSendRaid == nil then self.tItems["settings"].DF.bSendRaid = false end
@@ -5242,6 +5308,7 @@ function DKP:DFInit()
 	self.wndDF:FindChild("SendEnable"):SetCheck(self.tItems["settings"].DF.bSend)
 	self.wndDF:FindChild("SendRaidOnly"):SetCheck(self.tItems["settings"].DF.bSendRaid)
 	self.wndDF:FindChild("SendOutOfCombat"):SetCheck(self.tItems["settings"].DF.bSendOOC)
+	self.wndDF:FindChild("SmartEncoding"):SetCheck(self.tItems["settings"].DF.bSmart)
 	
 	self.wndDF:FindChild("Source"):SetText(self.tItems["settings"].DF.strSource)
 	self.wndDF:FindChild("Minutes"):SetText(self.tItems["settings"].DF.nPeriod)
@@ -5316,6 +5383,14 @@ function DKP:DFSetSource(wndHandler,wndControl,strText)
 	self.tItems["settings"].DF.strSource = strText
 end
 
+function DKP:DFSmartMode()
+	self.tItems["settings"].DF.bSmart = true
+end
+
+function DKP:DFDumbMode()
+	self.tItems["settings"].DF.bSmart = false
+end
+
 function DKP:DFSetPeriod(wndHandler,wndControl,strText)
 	local val = tonumber(strText)
 	if val then
@@ -5382,8 +5457,10 @@ function DKP:DFOnSyncMessage(channel, tMsg, strSender)
 	if tMsg.type then
 		if tMsg.type == "SendMeData" then
 			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
-		elseif tMsg.type == "EncodedData" then
-			self:ProccesEncodedData(tMsg.strData)
+		elseif tMsg.type == "EncodedDataFull" then
+			self:ProccesEncodedData(tMsg.strData)		
+			elseif tMsg.type == "EncodedDataSelected" then
+			self:ProccesEncodedDataUpdate(tMsg.strData)
 		elseif tMsg.type == "Data unavailable" then
 			Print("Permission to data was denied , contact the person in charge")
 		end
@@ -5402,11 +5479,41 @@ function DKP:ProccesEncodedData(strData)
 			end
 		end
 	end
-	Print("Data received and proccessed")
+	Print("Data received and proccessed , full sync")
 	
 	self:RefreshMainItemList()
-	
+end
 
+function DKP:ProccesEncodedDataUpdate(strData)
+	local tData = serpent.load(Base64.Decode(strData))
+	
+	if tData then
+		for k,player in ipairs(tData) do
+			if self:GetPlayerByIDByName(player.strName) == -1 then
+				table.insert(self.tItems,player)
+			else
+				local ID = self:GetPlayerByIDByName(player.strName)
+				local tLogs = self.tItems[ID].logs
+				self.tItems[ID] = player
+				for k , entry in ipairs(player.logs) do
+					table.insert(tLogs,1,entry)
+				end
+			end
+		end
+	end
+	Print("Data received and proccessed , update")
+	self:RefreshMainItemList()
+end
+local tFetchers = {} -- heavy stuff
+
+local function ArePlayerTablesDifferent(p1,p2)
+	if tonumber(p1.EP) ~= tonumber(p2.EP) then return true
+	elseif p1.strName ~= p2.strName then return true
+	elseif p1.GP ~= p2.GP then return true
+	elseif #p1.logs ~= #p2.logs then	return true
+	elseif p1.net ~= p2.net then return true
+	elseif p1.tot ~= p2.tot then return true
+	else return false end
 end
 
 function DKP:GetEncodedData(strRequester)
@@ -5416,22 +5523,56 @@ function DKP:GetEncodedData(strRequester)
 		tData.type = "Data unavailable"
 		self:DFAddLog(strRequester,false)
 	else
-		tData.type = "EncodedData"
-		local tPlayers = {}
-		for k,player in ipairs(self.tItems) do
-			table.insert(tPlayers,player)
+		tData.type = "EncodedDataFull"
+		if not tFetchers[strRequester] or not self.tItems["settings"].DF.bSmart then
+			local tPlayers = {}
+			for k,player in ipairs(self.tItems) do
+				table.insert(tPlayers,player)
+			end
+			tData.strData = Base64.Encode(serpent.dump(tPlayers))
+			if self.tItems["settings"].DF.bSmart then tFetchers[strRequester] = serpent.load(serpent.dump(tPlayers)) end
+		elseif self.tItems["settings"].DF.bSmart then
+			tData.type = "EncodedDataSelected"
+			local tPlayers = {}
+			for k , playerSource in ipairs(self.tItems) do
+				local bFound = false
+				for k ,playerSent in ipairs(tFetchers[strRequester]) do
+					if playerSource.strName == playerSent.strName then
+						bFound = true
+						if ArePlayerTablesDifferent(playerSource,playerSent) then
+							local tLogs = {}
+							for k=1 , #playerSource.logs - #playerSent.logs do
+								table.insert(tLogs,playerSource.logs[k])
+							end
+							table.insert(tPlayers,playerSource)
+							tPlayers[#tPlayers].logs = tLogs
+							break
+						end
+					end
+				end
+				if not bFound then
+					table.insert(tPlayers,playerSource)
+				end
+			end
+			local tPlayersSource = {}
+			for k,player in ipairs(self.tItems) do
+				table.insert(tPlayersSource,player)
+			end
+			tData.strData = Base64.Encode(serpent.dump(tPlayers))
+			tFetchers[strRequester] = serpent.load(serpent.dump(tPlayersSource))
 		end
-		tData.strData = Base64.Encode(serpent.dump(tPlayers))
 		self:DFAddLog(strRequester,true)
 	end
 	return tData
 end
+
 
 function DKP:DFAddLog(strPlayer,bSucces)
 	table.insert(self.tItems["settings"].DF.tLogs,1,{strRequester = strPlayer,strState = bSucces and "{Yes}" or "{No}",strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
 	if #self.tItems["settings"].DF.tLogs > 20 then table.remove(self.tItems["settings"].DF.tLogs,21) end
 	if self.wndDF:IsShown() then self:DFPopulate() end
 end
+
 
 
 function DKP:DFFetchDataTimed()
