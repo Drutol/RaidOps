@@ -515,6 +515,8 @@ function DKP:EPGPGetQualityStringByID(ID)
 	elseif ID == 4 then return "Blue"
 	elseif ID == 3 then return "Green"
 	elseif ID == 2 then return "White"
+	elseif ID == 1 then return "Gray"
+	elseif ID == 7 then return "Pink"
 	end
 end
 

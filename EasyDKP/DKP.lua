@@ -5043,11 +5043,50 @@ local ktSlots =
 	["Support"] = true,
 }
 
+local ktClasses =
+{
+	["Medic"]       	= true,
+	["Esper"]       	= true,
+	["Warrior"]     	= true,
+	["Stalker"]     	= true,
+	["Engineer"]    	= true,
+	["Spellslinger"]  	= true,
+}
+
+local ktQual = 
+{
+	["Gray"] = true,
+	["White"] = true,
+	["Green"] = true,
+	["Blue"] = true,
+	["Purple"] = true,
+	["Orange"] = true,
+	["Pink"] = true,
+}
+local ktTabsSettings = 
+{
+	["Slots"] =
+	{
+		bEnable = true,
+		strRelation = "AND",
+	},	
+	["Classes"] =
+	{
+		bEnable = true,
+		strRelation = "AND",
+	},	
+	["Quality"] =
+	{
+		bEnable = true,
+		strRelation = "AND",
+	},
+}
+
 function DKP:LLInit()
 	self.wndLL = Apollo.LoadForm(self.xmlDoc,"LootLogs",nil,self)
 	self.wndLLM = Apollo.LoadForm(self.xmlDoc,"LLMore",nil,self)
 	self.wndLL:Show(false,true)
-	self.wndLLM:Show(false,true)
+	--self.wndLLM:Show(false,true)
 	
 	if self.tItems.wndLLLoc ~= nil and self.tItems.wndLLLoc.nOffsets[1] ~= 0 then 
 		self.wndLL:MoveToLocation(WindowLocation.new(self.tItems.wndLLLoc))
@@ -5059,15 +5098,37 @@ function DKP:LLInit()
 	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
 	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
 	
-	if self.tItems["settings"].LL.tSlots == nil then self.tItems["settings"].LL.tSlots = {} end
-	if self.tItems["settings"].LL.tClasses == nil then self.tItems["settings"].LL.tClasses = {} end
-	if not self.tItems["settings"].LL.tSlots["Weapon"] then self.tItems["settings"].LL.tSlots = ktSlots end
-	if not self.tItems["settings"].LL.tSlots["Weapon"] then self.tItems["settings"].LL.tSlots = ktSlots end
+	if self.tItems["settings"].LL.tSlots["Weapon"] == nil then self.tItems["settings"].LL.tSlots = ktSlots end
+	if self.tItems["settings"].LL.tClasses["Esper"] == nil then self.tItems["settings"].LL.tClasses = ktClasses end
+	if self.tItems["settings"].LL.tQual["Gray"] == nil then self.tItems["settings"].LL.tQual = ktQual end
+	if self.tItems["settings"].LL.tTabsSettings == nil then self.tItems["settings"].LL.tTabsSettings = ktTabsSettings end
 	
 	for k,slot in pairs(self.tItems["settings"].LL.tSlots) do
-		local wnd = self.wndLLM:FindChild("Only"):FindChild(k)
+		local wnd = self.wndLLM:FindChild("Only"):FindChild("SlotsTab"):FindChild(k)
 		if wnd then
 			wnd:SetCheck(slot)
+		end
+	end	
+	for k,class in pairs(self.tItems["settings"].LL.tClasses) do
+		local wnd = self.wndLLM:FindChild("Only"):FindChild("ClassesTab"):FindChild(k)
+		if wnd then
+			wnd:SetCheck(class)
+		end
+	end	
+	for k,qual in pairs(self.tItems["settings"].LL.tQual) do
+		local wnd = self.wndLLM:FindChild("Only"):FindChild("QualityTab"):FindChild(k)
+		if wnd then
+			wnd:SetCheck(qual)
+		end
+	end
+	for k,tab in pairs(self.tItems["settings"].LL.tTabsSettings) do
+		local wnd = self.wndLLM:FindChild("Settings"):FindChild("EnableTabs"):FindChild(k)
+		if wnd then
+			wnd:SetCheck(tab.bEnable)
+		end
+		wnd = self.wndLLM:FindChild("Settings"):FindChild("TabsRelations"):FindChild(k)
+		if wnd then
+			wnd:FindChild(tab.strRelation):SetCheck(true)
 		end
 	end
 	
@@ -5080,10 +5141,40 @@ function DKP:LLInit()
 	self.wndLL:SetSizingMinimum(768,493)
 end
 
+function DKP:LLFilterAddClass(wndHandler,wndControl)
+	self.tItems["settings"].LL.tClasses[wndControl:GetName()] = true
+end
+
+function DKP:LLFilterRemClass(wndHandler,wndControl)
+	self.tItems["settings"].LL.tClasses[wndControl:GetName()] = false
+end
+
+function DKP:LLFilterAddSlot(wndHandler,wndControl)
+	self.tItems["settings"].LL.tSlots[wndControl:GetName()] = true
+end
+
+function DKP:LLFilterRemSlot(wndHandler,wndControl)
+	self.tItems["settings"].LL.tSlots[wndControl:GetName()] = false
+end
+
+function DKP:LLFilterAddQuality(wndHandler,wndControl)
+	self.tItems["settings"].LL.tQual[wndControl:GetName()] = true
+end
+
+function DKP:LLFilterRemQuality(wndHandler,wndControl)
+	self.tItems["settings"].LL.tQual[wndControl:GetName()] = false
+end
+
 function DKP:LLGroupModeChanged(wndHandler,wndControl)
 	self.tItems["settings"].LL.strGroup = wndControl:GetName()
 	self:LLPopuplate()
 end
+
+function DKP:LLFilterTabRelationChanged(wndHandler,wndControl)
+
+end
+
+
 
 function DKP:LLAddLog(strPlayer,strItem)
 	if not self.tItems["settings"].bLootLogs then return end
