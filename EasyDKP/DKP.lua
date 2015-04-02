@@ -1420,6 +1420,23 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			end
 		end
 	end
+	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_NPCSay and GroupLib.InRaid() then
+		local strText = ""
+		for i=1, table.getn(tMessage.arMessageSegments) do
+			strTextTrade = strTextTrade .. tMessage.arMessageSegments[i].strText
+		end
+		if strText == "No! The convergence will be your doom!" then --Noxmind
+			local tBosses = {}
+			for k,event in ipairs(self.tItems["CE"]) do 
+				if event.uType ~= "Unit" then table.insert(tBosses,{bType = event.bType,ID = k}) end
+			end
+			for k,boss in ipairs(tBosses) do
+				if boss.bType ~= "Phageborn Convergence" then
+					self:CETriggerEvent(boss.ID)
+				end
+			end
+		end
+	end
 	if self.tItems["settings"].whisp == 1 then
 		if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
 			local senderStr = tMessage.strSender
@@ -5086,7 +5103,7 @@ function DKP:LLInit()
 	self.wndLL = Apollo.LoadForm(self.xmlDoc,"LootLogs",nil,self)
 	self.wndLLM = Apollo.LoadForm(self.xmlDoc,"LLMore",nil,self)
 	self.wndLL:Show(false,true)
-	--self.wndLLM:Show(false,true)
+	self.wndLLM:Show(false,true)
 	
 	if self.tItems.wndLLLoc ~= nil and self.tItems.wndLLLoc.nOffsets[1] ~= 0 then 
 		self.wndLL:MoveToLocation(WindowLocation.new(self.tItems.wndLLLoc))
@@ -5098,10 +5115,20 @@ function DKP:LLInit()
 	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
 	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
 	
+	if self.tItems["settings"].LL.tSlots == nil then self.tItems["settings"].LL.tSlots = {} end
+	if self.tItems["settings"].LL.tClasses == nil then self.tItems["settings"].LL.tClasses = {} end
+	if self.tItems["settings"].LL.tQual == nil then self.tItems["settings"].LL.tQual = {} end
+	
 	if self.tItems["settings"].LL.tSlots["Weapon"] == nil then self.tItems["settings"].LL.tSlots = ktSlots end
 	if self.tItems["settings"].LL.tClasses["Esper"] == nil then self.tItems["settings"].LL.tClasses = ktClasses end
 	if self.tItems["settings"].LL.tQual["Gray"] == nil then self.tItems["settings"].LL.tQual = ktQual end
 	if self.tItems["settings"].LL.tTabsSettings == nil then self.tItems["settings"].LL.tTabsSettings = ktTabsSettings end
+	
+	if self.tItems["settings"].LL.bEquippable == nil then self.tItems["settings"].LL.bEquippable = false end
+	if self.tItems["settings"].LL.nLevel == nil then self.tItems["settings"].LL.nLevel = 1 end
+	
+	self.wndLLM:FindChild("Only"):FindChild("Equip"):SetCheck(self.tItems["settings"].LL.bEquippable)
+	self.wndLLM:FindChild("Only"):FindChild("MinLvl"):SetText(self.tItems["settings"].LL.nLevel)
 	
 	for k,slot in pairs(self.tItems["settings"].LL.tSlots) do
 		local wnd = self.wndLLM:FindChild("Only"):FindChild("SlotsTab"):FindChild(k)
@@ -5139,6 +5166,32 @@ function DKP:LLInit()
 	self.wndLLM:FindChild("QualityTab"):Lock(true)
 	
 	self.wndLL:SetSizingMinimum(768,493)
+end
+
+function DKP:LLSetMinLevel(wndHandler,wndControl,strText)
+	local value = tonumber(strText)
+	if value and value > 0 then
+		self.tItems["settings"].LL.nLevel = value
+	else
+		wndControl:SetText(self.tItems["settings"].LL.nLevel)
+	end
+end
+
+function DKP:LLEquippableOnlyEnable()
+	self.tItems["settings"].LL.bEquippable = true
+end
+
+function DKP:LLEquippableOnlyDisable()
+	self.tItems["settings"].LL.bEquippable = false
+end
+
+function DKP:LLMShow()
+	self.wndLLM:Show(true,false)
+	self.wndLLM:ToFront()
+end
+
+function DKP:LLMHide()
+	self.wndLLM:Show(false,false)
 end
 
 function DKP:LLFilterAddClass(wndHandler,wndControl)
@@ -5257,6 +5310,7 @@ function DKP:LLPrepareData(ID)
 							table.insert(tGrouppedItems[player.strName],entry.itemID)
 						end
 					end
+					if #tGrouppedItems[player.strName] == 0 then tGrouppedItems[player.strName] = nil end
 				elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
 					for j , entry in ipairs(player.tLLogs) do
 						local item = Item.GetDataFromId(entry.itemID)
@@ -5307,7 +5361,7 @@ function DKP:LLMeetsFilters(item,player)
 	
 	
 	--Equippable
-
+	if self.tItems["settings"].LL.bEquippable and not item:IsEquippable() then return false end
 	--Slots
 	if not bMeetSlot then
 		local strSlot
@@ -5322,7 +5376,7 @@ function DKP:LLMeetsFilters(item,player)
 		if bMeetSlot == nil then bMeetSlot = false end
 	end
 	--Item Level
-	
+	if item:GetDetailedInfo().tPrimary.nEffectiveLevel < self.tItems["settings"].LL.nLevel then return false end
 	--Classes
 	if not bMeetClass then
 		bMeetClass = self.tItems["settings"].LL.tClasses[player.class]
@@ -5369,6 +5423,14 @@ end
 
 function raidOpsSortCategories(a,b)
 	return a < b
+end
+
+function DKP:LLSearch(wndHandler,wndControl,strText)
+	for k , bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
+		for k ,tile in ipairs(bubble:FindChild("ItemGrid"):GetChildren()) do
+			if strText ~= "" and self:string_starts(tile:GetData():GetName(),strText) then tile:FindChild("SearchFlash"):Show(true) else tile:FindChild("SearchFlash"):Show(false) end
+		end
+	end
 end
 
 function DKP:LLPopuplate()

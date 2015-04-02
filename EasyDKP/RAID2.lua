@@ -123,7 +123,11 @@ function DKP:IBPopulate(wndBubble)
 		end
 	end
 	
-	if nUniqueLoot > 2 then -- splitting to 2 rows
+	if nUniqueLoot <= 3 then -- splitting to 2 rows
+		local nWidth = (#tLoot * knItemTileWidth) / 2.5 -- 2 rows = 1/2 width
+		wndBubble:GetData().nWidthMod = nWidth
+		wndBubble:GetData().nHeightMod = knBubbleMaxHeight/1.5
+	elseif nUniqueLoot > 3 then
 		local nWidth = (#tLoot * knItemTileWidth) / 2.5 -- 2 rows = 1/2 width
 		wndBubble:GetData().nWidthMod = nWidth
 		wndBubble:GetData().nHeightMod = knBubbleMaxHeight

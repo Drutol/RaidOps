@@ -248,7 +248,7 @@ function DKP:BidCompleteInit()
 	
 	--local test = Item.GetDataFromId(60434)
 	---self:ExportShowPreloadedText(tohtml(test:GetDetailedInfo()))
-	
+	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
 	--self.tItems["settings"].strBidChannel = "/s "
 	Hook.wndMasterLoot:Show(false,false)
 end
@@ -361,7 +361,7 @@ function DKP:BidRandomLooter()
 	end
 	
 	luckyChild = children[math.random(#children)]
-	prevLuckyChild = luckyChild:GetData():GetName()
+	prevLuckyChild = luckyChild:FindChild("CharacterName"):GetText()
 	Hook.tMasterLootSelectedLooter = luckyChild:GetData()
 	Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
 	luckyChild:SetCheck(true)
@@ -443,6 +443,7 @@ end
 
 function DKP:StartChatBidding(tCustomData)
 	if self.bIsBidding == false then
+		self.wndBid:FindChild("Grid"):DeleteAll()
 		if tCustomData == nil then
 			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):SetText(self.SelectedMasterItem)
 			if self.ItemDatabase[self.SelectedMasterItem] ~= nil then
@@ -464,6 +465,7 @@ function DKP:StartChatBidding(tCustomData)
 		end
 		self.wndBid:Show(true,false)
 		self:BidCheckConditions()
+		self:BidUpdateLastWinner()
 	else
 		self.wndBid:Show(true,false)
 	end
@@ -524,16 +526,16 @@ function DKP:BidSetMode(wndHandler,wndControl)
 end
 
 function DKP:BidStart(strName)
-	self.CurrentBidSession = {} 
+	self.CurrentBidSession = nil
+	self.CurrentBidSession = {}
 	self.CurrentBidSession.Bidders = {}
 	self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):GetText()
 	--self.CurrentItemChatStr = "{Link}"
-	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
 	self.bIsBidding = true
 	self:BidCheckConditions()
 	self:BidUpdateBiddersList()
 	self:BidUpdateLastWinner()
-	
+	Print(#self.CurrentBidSession.Bidders)
 	if self.tItems["settings"].strBidMode == "ModeOpenDKP" then
 		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:DKPOpen"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel,tostring(self.tItems["settings"].BidMin)))
 	elseif self.tItems["settings"].strBidMode == "ModeHiddenDKP" then
@@ -564,6 +566,7 @@ function DKP:BidSetOffspecModifierForEPGP( wndHandler, wndControl, strText )
 end
 
 function DKP:BidMessage(channelCurrent, tMessage)
+	if not self.bIsBidding then return end
 	local strResult = -1
 	local arg = {strMsg = tMessage.arMessageSegments[1].strText,strSender = tMessage.strSender}
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Party and self.tItems["settings"].strBidMode == "ModeOpenDKP" and self.tItems["settings"].strBidChannel == "/party " or  channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild and self.tItems["settings"].strBidMode == "ModeOpenDKP" and self.tItems["settings"].strBidChannel == "/guild " then
@@ -612,7 +615,7 @@ function DKP:BidProcessMessageEPGP(tData)
 				self.CurrentBidSession.Bidders[bidID].offspec = true
 				self.CurrentBidSession.Bidders[bidID].nBid = tonumber(self:EPGPGetPRByName(tData.strSender)) * ((100-self.tItems["settings"].BidEPGPOffspec)/100)
 				strReturn = "Processed"
-			elseif bAlreadyBid and tData.strMsg ~= "!off" then
+			elseif bidID and tData.strMsg ~= "!off" then
 				strReturn = "Bid removed"	
 				self.CurrentBidSession.Bidders[bidID] = nil
 				if self.CurrentBidSession.nSelected == bidID then self.CurrentBidSession.nSelected = nil end
@@ -783,6 +786,7 @@ function compare_easyDKP_bidders(a,b)
 end
 
 function DKP:BidUpdateBiddersList()
+	if not self.bIsBidding then return end
 	local grid = self.wndBid:FindChild("MainFrame"):FindChild("Grid")
 	grid:DeleteAll()
 	
@@ -815,11 +819,14 @@ function DKP:BidPerformCountdown()
 	self.BidCounter = self.BidCounter + 1
 	if self.BidCounter == self.tItems["settings"].BidCount then
 		self.BidCountdown:Stop()
+		Apollo.RemoveEventHandler("BidPerformCountdown",self)
+		
 		if self.CurrentBidSession.nSelected then
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndWinner"],self.CurrentBidSession.Bidders[self.CurrentBidSession.nSelected].strName))
 		else
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. self.Locale["#biddingStrings:AuctionEnd"])
 		end
+		self.CurrentBidSession = {}
 		self.bIsBidding = false
 		self:BidCheckConditions()
 	else
@@ -873,6 +880,7 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 				break
 			end
 		end
+		if not selectedOne or not selectedItem then return end
 		if wndControl:GetText() == "Select" then Hook.wndMasterLoot:FindChild("Assignment"):Enable(true) end
 		Hook.tMasterLootSelectedLooter = selectedOne:GetData()
 		Hook.tMasterLootSelectedItem = selectedItem
@@ -895,7 +903,7 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 end
 
 function DKP:BidUpdateLastWinner()
-	if self.tItems["settings"].tLastChatWinner == nil and #self.tItems["settings"].tLastChatWinner > 1 then return end
+	if self.tItems["settings"].tLastChatWinner == nil or #self.tItems["settings"].tLastChatWinner > 1 then return end
 	local wnd = self.wndBid:FindChild("ControlsContainer"):FindChild("LastWinner")
 	wnd:FindChild("LastWinnerStr"):SetText(self.tItems["settings"].tLastChatWinner.strWinner)
 	
