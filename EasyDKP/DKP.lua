@@ -5171,7 +5171,15 @@ function DKP:LLGroupModeChanged(wndHandler,wndControl)
 end
 
 function DKP:LLFilterTabRelationChanged(wndHandler,wndControl)
+	self.tItems["settings"].LL.tTabsSettings[wndControl:GetParent():GetName()].strRelation = wndControl:GetName()
+end
 
+function DKP:LLFilterEnableTab(wndHandler,wndControl)
+	self.tItems["settings"].LL.tTabsSettings[wndControl:GetName()].bEnable = true
+end
+
+function DKP:LLFilterDisableTab(wndHandler,wndControl)
+	self.tItems["settings"].LL.tTabsSettings[wndControl:GetName()].bEnable = false
 end
 
 
@@ -5227,14 +5235,14 @@ function DKP:LLPrepareData(ID)
 		for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
 			if self.tItems["settings"].LL.strGroup == "GroupCategory" then
 				local item = Item.GetDataFromId(entry.itemID)
-				if item and self:LLMeetsFilters(item) then
+				if item and self:LLMeetsFilters(item,self.tItems[self.wndLL:GetData()]) then
 					if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 					table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
 				end
 			else -- Group Date
 				local strDate = os.date("%x",entry.nDate)
 				if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-				if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID)) then
+				if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[self.wndLL:GetData()]) then
 					table.insert(tGrouppedItems[strDate],entry.itemID)	
 				end
 			end
@@ -5245,14 +5253,14 @@ function DKP:LLPrepareData(ID)
 				if self.tItems["settings"].LL.strGroup == "GroupName" then
 					tGrouppedItems[player.strName] = {}
 					for j , entry in ipairs(player.tLLogs) do
-						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID)) then
+						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
 							table.insert(tGrouppedItems[player.strName],entry.itemID)
 						end
 					end
 				elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
 					for j , entry in ipairs(player.tLLogs) do
 						local item = Item.GetDataFromId(entry.itemID)
-						if item and self:LLMeetsFilters(item) then
+						if item and self:LLMeetsFilters(item,player) then
 							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)		
 						end
@@ -5261,7 +5269,7 @@ function DKP:LLPrepareData(ID)
 					for j , entry in ipairs(player.tLLogs) do
 						local strDate = os.date("%x",entry.nDate)
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID)) then
+						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
 							table.insert(tGrouppedItems[strDate],entry.itemID)	
 						end
 					end
@@ -5273,20 +5281,86 @@ function DKP:LLPrepareData(ID)
 	return tGrouppedItems
 end
 
-function DKP:LLMeetsFilters(item)
-	if not item then return false end
-
-	return true
+function DKP:LLMeetsFilters(item,player)
+	if not item or not player then return false end
+	-- Booleans setup
+	local bMeetSlot
+	if self.tItems["settings"].LL.tTabsSettings["Slots"].bEnable then
+		bMeetSlot = false
+	else
+		bMeetSlot = true
+	end
+	
+	local bMeetClass
+	if self.tItems["settings"].LL.tTabsSettings["Classes"].bEnable then
+		bMeetClass = false
+	else
+		bMeetClass = true
+	end	
+	
+	local bMeetQual
+	if self.tItems["settings"].LL.tTabsSettings["Quality"].bEnable then
+		bMeetQual = false
+	else
+		bMeetQual = true
+	end
+	
+	
 	--Equippable
-	
+
 	--Slots
-	
+	if not bMeetSlot then
+		local strSlot
+		if item:GetSlotName() == "" then
+			strSlot = self:EPGPGetSlotStringByID(item:GetSlot())
+		else
+			strSlot = self:EPGPGetSlotStringByID(item:GetSlotName())
+		end
+
+		bMeetSlot = self.tItems["settings"].LL.tSlots[strSlot]
+		
+		if bMeetSlot == nil then bMeetSlot = false end
+	end
 	--Item Level
 	
 	--Classes
-	
+	if not bMeetClass then
+		bMeetClass = self.tItems["settings"].LL.tClasses[player.class]
+
+		
+		if bMeetClass == nil then bMeetClass = false end
+	end
 	--Quality
+	if not bMeetQual then
+		local strQual = self:EPGPGetQualityStringByID(item:GetItemQuality())
+		
+		bMeetQual = self.tItems["settings"].LL.tQual[strQual]
+		
+		if bMeetQual == nil then bMeetQual = false end
+	end
+	--AND/OR
 	
+	local strSlotRelation = self.tItems["settings"].LL.tTabsSettings["Slots"].strRelation
+	local strClassRelation = self.tItems["settings"].LL.tTabsSettings["Classes"].strRelation
+	local strQualRelation = self.tItems["settings"].LL.tTabsSettings["Quality"].strRelation
+	
+	if strSlotRelation == "OR" and bMeetSlot then return true end
+	if strClassRelation == "OR" and bMeetClass then return true end
+	if strQualRelation == "OR" and bMeetQual then return true end
+	
+	if strSlotRelation == "AND" then
+		if not bMeetSlot then return false end
+	end
+	if strClassRelation == "AND" then
+		if not bMeetClass then return false end
+	end
+	if strQualRelation == "AND" then
+		if not bMeetQual then return false end
+	end
+	
+	if not bMeetClass and not bMeetSlot and not bMeetQual then return false end
+	
+	return true
 end
 
 function DKP:LLResize()
@@ -5298,7 +5372,6 @@ function raidOpsSortCategories(a,b)
 end
 
 function DKP:LLPopuplate()
-
 	local wndList = self.wndLL:FindChild("List")
 	local tExpandedBubbles = {}
 	for k , bubble in ipairs(wndList:GetChildren()) do

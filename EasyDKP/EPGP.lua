@@ -102,7 +102,7 @@ function DKP:EPGPInit()
 	self:EPGPAddValuesToMembers()
 	self:EPGPChangeUI()
 	
-	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
+	Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
 end
