@@ -16,7 +16,11 @@ local knBubbleDefHeight = 43
 local knBubbleMaxWidth = 600
 local knBubbleMaxHeight = 210
 
-local knItemTileWidth = 65
+local knItemTileWidth = 76
+local knItemTileHeight = 76
+local knItemTileHorzSpacing = 10
+local knItemTileVertSpacing = 10
+local knItemTilePerRow = 4
  
 local knBubbleHorzSpacing = 3
 local knBubbleVertSpacing = 3
@@ -81,6 +85,8 @@ function DKP:IBExpand(wndHandler,wndControl)
 	wndControl:GetParent():GetData().bExpanded = true
 	self:IBEResize(wndControl:GetParent())
 	self:RIRequestRearrange(wndControl:GetParent():GetParent())
+	wndControl:GetParent():FindChild("Expand"):SetCheck(true)
+	wndControl:GetParent():GetData().bSearchOpen = false
 	
 end
 
@@ -88,6 +94,7 @@ function DKP:IBECollapse(wndHandler,wndControl)
 	wndControl:GetParent():GetData().bExpanded = false
 	self:IBEResize(wndControl:GetParent())
 	self:RIRequestRearrange(wndControl:GetParent():GetParent())
+	wndControl:GetParent():FindChild("Expand"):SetCheck(false)
 end
 
 function DKP:IBEResize(wndBubble)
@@ -102,7 +109,7 @@ end
 
 function DKP:IBPopulate(wndBubble)
 
-	if wndBubble:GetData().bPopulated then return end -- Buuble is already filled -> no need to do this again
+	if wndBubble:GetData().bPopulated then return end -- Bubble is already filled -> no need to do this again
 
 	local tLoot
 	if wndBubble:GetData().tCustomData == nil then
@@ -123,18 +130,19 @@ function DKP:IBPopulate(wndBubble)
 		end
 	end
 	
-	if nUniqueLoot <= 3 then -- splitting to 2 rows
-		local nWidth = (#tLoot * knItemTileWidth) / 2.5 -- 2 rows = 1/2 width
-		wndBubble:GetData().nWidthMod = nWidth
-		wndBubble:GetData().nHeightMod = knBubbleMaxHeight/1.5
-	elseif nUniqueLoot > 3 then
-		local nWidth = (#tLoot * knItemTileWidth) / 2.5 -- 2 rows = 1/2 width
-		wndBubble:GetData().nWidthMod = nWidth
-		wndBubble:GetData().nHeightMod = knBubbleMaxHeight
-	else
-		wndBubble:GetData().nHeightMod = knBubbleMaxHeight/1.5
+	local nWidth = 0
+	local nHeight = 120
+	local bAddingWidth = true
+	for k=1,nUniqueLoot do
+		if bAddingWidth then nWidth = nWidth + knItemTileWidth + knItemTileHorzSpacing end
+		if k%knItemTilePerRow == 0 then 
+			bAddingWidth = false
+		end
+		if not bAddingWidth and k%knItemTilePerRow == 0 then nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing end
 	end
 	
+	wndBubble:GetData().nWidthMod = (nWidth - knBubbleDefWidth) > 0 and nWidth - knBubbleDefWidth or 0
+	wndBubble:GetData().nHeightMod =  nHeight
 	tIDCounter = {}
 	
 	for k,nItemID in ipairs(tLoot) do
@@ -146,7 +154,17 @@ function DKP:IBPopulate(wndBubble)
 			else
 				local wndTile = Apollo.LoadForm(self.xmlDoc3,"BubbleItemTile",wndBubbleGrid,self)
 				tIDCounter[tItemPiece:GetName()] = {nCount = 1,wnd = wndTile}
-				
+				local ID = tItemPiece:GetItemId()
+				local strTooltip = ""
+				for k , tooltip in ipairs(wndBubble:GetData().tItemTooltips) do
+					if ID == tooltip.ID and not string.find(strTooltip,tooltip.strInfo) then
+						strTooltip = strTooltip .. tooltip.strInfo .. "\n"
+					end
+				end
+				if strTooltip ~= "" then
+					wndTile:FindChild("Tooltip"):SetTooltip(strTooltip)
+					wndTile:FindChild("Tooltip"):Show(true)
+				end
 
 				wndTile:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQuality(tItemPiece:GetItemQuality()))
 				wndTile:FindChild("ItemFrame"):FindChild("ItemIcon"):SetSprite(tItemPiece:GetIcon())

@@ -5283,6 +5283,7 @@ end
 
 function DKP:LLPrepareData(ID)
 	local tGrouppedItems = {}
+	local tWinnersDictionary
 	if self.wndLL:GetData() ~= "AllMode" then
 		if self.tItems[self.wndLL:GetData()].tLLogs == nil then return {} end
 		for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
@@ -5301,13 +5302,16 @@ function DKP:LLPrepareData(ID)
 			end
 		end
 	else
+		tWinnersDictionary = {}
 		for k , player in ipairs(self.tItems) do
 			if player.tLLogs then
+				tWinnersDictionary[player.strName] = {}
 				if self.tItems["settings"].LL.strGroup == "GroupName" then
 					tGrouppedItems[player.strName] = {}
 					for j , entry in ipairs(player.tLLogs) do
 						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
 							table.insert(tGrouppedItems[player.strName],entry.itemID)
+							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName})
 						end
 					end
 					if #tGrouppedItems[player.strName] == 0 then tGrouppedItems[player.strName] = nil end
@@ -5316,7 +5320,8 @@ function DKP:LLPrepareData(ID)
 						local item = Item.GetDataFromId(entry.itemID)
 						if item and self:LLMeetsFilters(item,player) then
 							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
-							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)		
+							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)
+							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName})						
 						end
 					end
 				else
@@ -5324,7 +5329,8 @@ function DKP:LLPrepareData(ID)
 						local strDate = os.date("%x",entry.nDate)
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
-							table.insert(tGrouppedItems[strDate],entry.itemID)	
+							table.insert(tGrouppedItems[strDate],entry.itemID)
+							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName})						
 						end
 					end
 				end
@@ -5332,7 +5338,7 @@ function DKP:LLPrepareData(ID)
 		end
 	
 	end
-	return tGrouppedItems
+	return tGrouppedItems , tWinnersDictionary
 end
 
 function DKP:LLMeetsFilters(item,player)
@@ -5427,9 +5433,27 @@ end
 
 function DKP:LLSearch(wndHandler,wndControl,strText)
 	for k , bubble in ipairs(self.wndLL:FindChild("List"):GetChildren()) do
+		if not bubble:GetData().bPopulated then self:IBPopulate(bubble) end
+		local bFoundEntries = false
 		for k ,tile in ipairs(bubble:FindChild("ItemGrid"):GetChildren()) do
-			if strText ~= "" and self:string_starts(tile:GetData():GetName(),strText) then tile:FindChild("SearchFlash"):Show(true) else tile:FindChild("SearchFlash"):Show(false) end
+			if strText ~= "" and self:string_starts(tile:GetData():GetName(),strText) then 
+				if not bubble:GetData().bExpanded then 
+					self:IBExpand(nil,bubble:FindChild("Header"))
+					bubble:GetData().bSearchOpen = true
+				end
+				bFoundEntries = true
+				tile:FindChild("SearchFlash"):Show(true)  
+			else 
+				tile:FindChild("SearchFlash"):Show(false) 
+			end
+				
+			if not bFoundEntries and bubble:GetData().bSearchOpen then 
+				self:IBECollapse(nil,bubble:FindChild("Header"))
+				bubble:GetData().bSearchOpen = false
+			end
+		
 		end
+
 	end
 end
 
@@ -5442,8 +5466,7 @@ function DKP:LLPopuplate()
 		end
 	end
 	wndList:DestroyChildren()
-	local tData = self:LLPrepareData()
-	
+	local tData , tWinnersDictionary = self:LLPrepareData()
 	local categories = {}
 	for cat , items in pairs(tData) do
 		table.insert(categories,cat)
@@ -5453,24 +5476,23 @@ function DKP:LLPopuplate()
 	
 	for k , cat in pairs(categories) do
 		local items = tData[cat]
-		if cat == "" then cat = "Miscellaneous" end
-		local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
-		wndBubble:SetData({bExpanded = false,bPopulated = false, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items})
-		wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
-		
-		for k , prevBubble in ipairs(tExpandedBubbles) do
-			if prevBubble == cat then 
-				self:IBExpand(nil,wndBubble:FindChild("Header")) 
-				wndBubble:FindChild("Expand"):SetCheck(true)
-				break 
+		if #items > 0 then
+			if cat == "" then cat = "Miscellaneous" end
+			local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
+			wndBubble:SetData({bExpanded = false,bPopulated = false,bSearchOpen = false, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items,tItemTooltips = tWinnersDictionary})
+			wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
+			
+			for k , prevBubble in ipairs(tExpandedBubbles) do
+				if prevBubble == cat then 
+					self:IBExpand(nil,wndBubble:FindChild("Header")) 
+					wndBubble:FindChild("Expand"):SetCheck(true)
+					break 
+				end
 			end
 		end
-		
 	end
 	
 	self:RIRequestRearrange(wndList)
-	
-	
 end
 
 function DKP:LLBubblesExpand()
