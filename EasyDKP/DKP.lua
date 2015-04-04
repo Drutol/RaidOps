@@ -550,7 +550,7 @@ end
 function DKP:UndoShowActions()
 	if not self.wndActivity:IsShown() then 
 		local tCursor = Apollo.GetMouse()
-		self.wndActivity:Move(tCursor.x - 100, tCursor.y - 400, self.wndActivity:GetWidth(), self.wndActivity:GetHeight())
+		self.wndActivity:Move(tCursor.x - 400, tCursor.y - 400, self.wndActivity:GetWidth(), self.wndActivity:GetHeight())
 	end
 	
 	self.wndActivity:Show(true,false)
@@ -2406,6 +2406,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	for j,tab in ipairs(tables) do
 		table.sort(tab,easyDKPSortPlayerbyLabelNotWnd)
 		local added = false
+		local nCounter = 1
 		for k,player in ipairs(tab) do
 			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
@@ -2420,9 +2421,10 @@ function DKP:RefreshMainItemListAndGroupByClass()
 							self:UpdateItem(player,k,added)
 							
 							if self.tItems["settings"].bDisplayCounter then
-								player.wnd:FindChild("Counter"):SetText(k..".")
+								player.wnd:FindChild("Counter"):SetText(nCounter..".")
 								player.wnd:FindChild("Counter"):Show(true)
 							end
+							nCounter = nCounter + 1 
 							player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
 							added = true
 						end
@@ -2815,6 +2817,7 @@ function DKP:SettingsLogsDisable( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].logs = 0
 	self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comments Disabled")
 	self.wndMain:FindChild("Controls"):FindChild("EditBox"):Enable(false)
+	self:EnableActionButtons()
 end
 
 function DKP:SettingsWhisperDisable( wndHandler, wndControl, eMouseButton )
@@ -3713,6 +3716,7 @@ end
 
 function DKP:DSShow()
 	self.wndDS:Show(true,false)
+	self.wndDS:ToFront()
 	self:DSPopulateLogs()
 end
 
@@ -3900,7 +3904,7 @@ end
 
 function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 	if wndControl ~= wndHandler then return end
-	if eMouseButton == GameLib.CodeEnumInputMouse.Right and self:LabelGetColumnNumberForValue("Name") > 0 then 
+	if eMouseButton == GameLib.CodeEnumInputMouse.Right and self:LabelGetColumnNumberForValue("Name") > 0 and wndControl:IsMouseTarget() then 
 		local tCursor = Apollo.GetMouse()
 		self.wndContext:Move(tCursor.x, tCursor.y, self.wndContext:GetWidth(), self.wndContext:GetHeight())
 		self.wndContext:Show(true,false)
