@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------------------------
 -- Client Lua Script for EasyDKP
--- Copyright (c) Piotr Szymczak 2014	 dogier140@poczta.fm.
+-- Copyright (c) Piotr Szymczak 2015	 dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
 
 local DKP = Apollo.GetAddon("EasyDKP")
@@ -66,9 +66,7 @@ local nItemIDSpacing = 4
 
 function DKP:EPGPInit()
 	self.wndEPGPSettings = Apollo.LoadForm(self.xmlDoc2,"RDKP/EPGP",nil,self)
-	self.wndEPGPItems = Apollo.LoadForm(self.xmlDoc2,"CostList",nil,self)
 	self.wndEPGPSettings:Show(false,true)
-	self.wndEPGPItems:Show(false,true)
 	self.GeminiLocale:TranslateWindow(self.Locale, self.wndEPGPSettings)
 	if self.tItems["EPGP"] == nil or self.tItems["EPGP"].SlotValues == nil then
 		self.tItems["EPGP"] = {}
@@ -99,7 +97,6 @@ function DKP:EPGPInit()
 	self.wndEPGPSettings:FindChild("DecayPrecision"):SetCheck(self.tItems["EPGP"].bDecayPrec)
 	
 	self:EPGPFillInSettings()
-	self:EPGPAddValuesToMembers()
 	self:EPGPChangeUI()
 	
 	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
@@ -312,15 +309,6 @@ function DKP:EPGPChangeUI()
 	end
 end
 
-function DKP:EPGPAddValuesToMembers()
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil then
-			if self.tItems[i].EP == nil then self.tItems[i].EP = self.tItems["EPGP"].MinEP end
-			if self.tItems[i].GP ==nil then self.tItems[i].GP = self.tItems["EPGP"].BaseGP end
-		end
-	end
-end
-
 function DKP:EPGPReset()
 	for i=1,table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil then
@@ -433,79 +421,10 @@ function DKP:EPGPStopListeningForItem( wndHandler, wndControl, eMouseButton )
 	self.tItems["EPGP"].ForceItemSave = 0
 end
 
-local selectedItems ={}
-function DKP:EPGPCostListClose( wndHandler, wndControl, eMouseButton )
-	self.wndEPGPItems:Show(false,false)
-end
-
-function DKP:EPGPCostListShow( wndHandler, wndControl, eMouseButton )
-	self.wndEPGPItems:Show(true,false)
-	self:EPGPCostListPopulate()
-	self.wndEPGPItems:ToFront()
-end
-
-function DKP:EPGPAddItemtoQueue( wndHandler, wndControl, eMouseButton )
-	table.insert(selectedItems,wndControl)
-	if #selectedItems >= 6 then
-		selectedItems[1]:SetCheck(false)
-		table.remove(selectedItems,1)
-	end
-end
-
-function DKP:EPGPRemoveITemFromQueue( wndHandler, wndControl, eMouseButton )
-	for i=1,#selectedItems do
-		if selectedItems[i] == wndControl then
-			table.remove(selectedItems,i)
-			break
-		end
-	end
-end
 
 
-function DKP:EPGPPostToChannel( wndHandler, wndControl, eMouseButton )
-	for k,item in ipairs(selectedItems) do
-		ChatSystemLib.Command(self.AnnouncePrefix .. self.ItemDatabase[item:FindChild("ItemName"):GetText()].strChat .. "  GP: " .. item:FindChild("Cost"):GetText()) 
-	end
-	self:EPGPDeselectAll()
-end
 
-function DKP:EPGPRemoveSelected( wndHandler, wndControl, eMouseButton )
-	for k,item in ipairs(selectedItems) do
-		self.ItemDatabase[item:FindChild("ItemName"):GetText()] = nil
-		item:Destroy()
-	end
-	self:EPGPCostListPopulate()
-	
-end
 
-function DKP:EPGPDeselectAll()
-	for k,item in ipairs(selectedItems) do
-		item:SetCheck(false)
-	end
-	selectedItems = {}
-end
-
-function DKP:EPGPCostListPopulate()
-	selectedItems = {}
-	if self.ItemDatabase == nil then 
-		return 
-	end
-	self.wndEPGPItems:FindChild("ItemList"):DestroyChildren()
-	for k,item in pairs(self.ItemDatabase) do
-		local wnd = Apollo.LoadForm(self.xmlDoc2,"ItemCost",self.wndEPGPItems:FindChild("ItemList"),self)
-		wnd:FindChild("ItemIcon"):SetSprite(item.sprite)
-		wnd:FindChild("ItemName"):SetText(item.strItem)
-		Tooltip.GetItemTooltipForm(self, wnd:FindChild("ItemIcon") , Item.GetDataFromId(item.ID), {bPrimary = true, bSelling = false})
-		
-		if item.quality == 6 then
-			wnd:FindChild("ItemFrame"):SetSprite("CRB_Tooltips:sprTooltip_SquareFrame_Orange")
-		elseif item.quality == 5 then
-			wnd:FindChild("ItemFrame"):SetSprite("CRB_Tooltips:sprTooltip_SquareFrame_Purple")
-		end
-		wnd:FindChild("Cost"):SetText(self:EPGPGetItemCostByName(item.strItem))
-	end
-	self.wndEPGPItems:FindChild("ItemList"):ArrangeChildrenVert()
-end
 
 function DKP:EPGPGetQualityStringByID(ID)
 	if ID == 5 then return "Purple"
@@ -669,20 +588,6 @@ function DKP:EPGPGetItemCostByID(itemID)
 end
 
 
-function DKP:EPGPCostListChannelChanged( wndHandler, wndControl, eMouseButton )
-	if wndControl:GetText() == "   /guild" then
-		self.AnnouncePrefix = "/guild " 
-	else
-		self.AnnouncePrefix = "/party " 
-	end 
-end
-
-function DKP:EPGPCostListCheckChannel( wndHandler, wndControl, eMouseButton )
-	if not wndControl:GetParent():FindChild("ChannelParty1"):IsChecked() and not wndControl:GetParent():FindChild("ChannelParty"):IsChecked() then
-		self.AnnouncePrefix = "/party "
-		self.wndEPGPItems:FindChild("ChannelParty"):SetCheck(true)
-	end
-end
 
 function DKP:EPGPGetPRByName(strName)
 	local ID = self:GetPlayerByIDByName(strName)

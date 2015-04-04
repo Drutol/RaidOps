@@ -126,7 +126,6 @@ function DKP:BidCompleteInit()
 		return
 	end
 	
-
 	bInitialized = true
 	self.wait_timer:Stop()
 	self:InitBid2()
@@ -165,8 +164,6 @@ function DKP:BidCompleteInit()
 		self.wndInsertedSearch:SetAnchorOffsets(-122,238,-40,282)
 	end
 	Hook.wndMasterLoot:SetSizingMinimum(800, 310)
-	self.wndSlotValues = Apollo.LoadForm(self.xmlDoc2,"ItemValues",nil,self)
-	self.wndSlotValues:Show(false,true)
 	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-325,63)
 	--Asc/Desc
 	if self.tItems["settings"].BidSortAsc == nil then self.tItems["settings"].BidSortAsc = 1 end
@@ -189,13 +186,6 @@ function DKP:BidCompleteInit()
 	self:HookToMasterLootDisp()
 	self.PrevSelectedLooterItem = nil
 	
-	
-	
-	
-	if self.tItems["BidSlots"] == nil then self.tItems["BidSlots"] = defaultSlotValues end
-	self:BidFillInSlotValues()
-	--BidValues
-	if self.tItems["BidSlots"].Enable == 1 then self.wndSettings:FindChild("ButtonSettingsForceBidMinValues"):SetCheck(true) end
 
 	self:BidUpdateItemDatabase()
 	
@@ -253,22 +243,6 @@ function DKP:BidCompleteInit()
 	Hook.wndMasterLoot:Show(false,false)
 end
 
-
-function DKP:BidFillInSlotValues()
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Weapon"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Shield"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Head"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Shoulders"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Chest"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Hands"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Legs"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Feet"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Attachment"])
-	self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Support"])
-          self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Gadget"])
-          self.wndSlotValues:FindChild("ItemCost"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.tItems["BidSlots"]["Implant"])
-end
-
 function DKP:BidFixedPriceChanged(wndHandler,wndControl,strText)
 	if tonumber(strText) ~= nil then
 		self.tItems["BidSlots"][wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
@@ -287,26 +261,10 @@ function DKP:ReArr()
 	end
 end
 
-function DKP:BidFixedMinShow()
-	self.wndSlotValues:Show(true,false)
-	self.wndSlotValues:ToFront()
-end
-
-function DKP:BidFixedMinClose()
-	self.wndSlotValues:Show(false,false)
-end
-
 function DKP:BidSelectedChannelChanged( wndHandler, wndControl, eMouseButton )
 	if wndControl:GetText() == "   Party" then self.tItems["settings"].strBidChannel = "/party " end
 	if wndControl:GetText() == "   Guild" then self.tItems["settings"].strBidChannel = "/guild " end
 end
-
---[[function DKP:BidSelectedChannelCheck( wndHandler, wndControl, eMouseButton )
-	if wndControl:GetParent():FindChild("GuildMode"):IsChecked() == false and wndControl:GetParent():FindChild("PartyMode"):IsChecked() == false then
-		wndControl:GetParent():FindChild("PartyMode"):SetCheck(true)
-		self.tItems["settings"].strBidChannel = "/party "
-	end
-end]]
 
 function DKP:BidMLSortByNameEnable()
 	self.tItems["settings"]["ML"].bSortByName = true
@@ -966,637 +924,17 @@ end
 
 
 ---------------------------------------------------------------------------------------------------
--- TradingUI Functions
+-- Network Bidding Functions
 ---------------------------------------------------------------------------------------------------
-
-function DKP:TradeInit()
-	self.wndTrade = Apollo.LoadForm(self.xmlDoc,"TradingUI",nil,self)
-	self.wndTrade:Show(false,true)
-	self:TradeRestore()
-	if self.tItems["trades"] == nil then
-		self.tItems["trades"] = {}
-	end
-	self.wndTrades = {}
-	self.wndTradeList = self.wndTrade:FindChild("MainFrame"):FindChild("TransactionList")
-	--self.wndTradeList:SetSizingMinimum(920, 369)
-	--self.wndTradeList:SetSizingMaximum(920, 500)
-end
-
-function DKP:TradeRestore()
-	if self.tItems["settings"].TradePeriod == nil then
-		self.tItems["settings"].TradePeriod = "w"
-	end
-	
-	if self.tItems["settings"].TradeEnable == nil then
-		self.tItems["settings"].TradeEnable = 0
-	end
-	if self.tItems["settings"].TradeCap ~= nil then
-		self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("Cap"):SetText(self.tItems["settings"].TradeCap)
-	end
-	
-		if self.tItems["settings"].TradePeriod == "w" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Weekly"):SetCheck(true)
-		elseif self.tItems["settings"].TradePeriod == "m" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Monthly"):SetCheck(true)
-		elseif self.tItems["settings"].TradePeriod == "d" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Daily"):SetCheck(true)
-		elseif self.tItems["settings"].TradePeriod == "n" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Never"):SetCheck(true)
-		end
-	
-	if self.tItems["settings"].TradeMasterConf == nil then self.tItems["settings"].TradeMasterConf = 1 end 
-	if self.tItems["settings"].TradeMasterConf == 1 then
-		self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("Second"):SetCheck(true)
-	end	
-	
-	if self.tItems["settings"].ConnectedCap == nil then self.tItems["settings"].ConnectedCap = 1 end 
-	if self.tItems["settings"].ConnectedCap == 1 then
-		self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("Connect"):SetCheck(true)
-	end	
-	
-	if self.tItems["settings"].TradeEnable == 1 then
-		self.wndTrade:FindChild("ControlsContainer"):FindChild("Enable"):SetCheck(true)
-	end
-	self:TradeUpdateTimer()
-	self:TradeUpdateHelp()
-end
-
-function DKP:TradeCapPeriodResetChanged( wndHandler, wndControl, eMouseButton )
-	if wndControl:GetText() == "Weekly" then
-		self.tItems["settings"].TradePeriod = "w"
-	elseif wndControl:GetText() == "Monthly" then
-		self.tItems["settings"].TradePeriod = "m"
-	elseif wndControl:GetText() == "Daily" then
-		self.tItems["settings"].TradePeriod = "d"
-	elseif wndControl:GetText() == "Never" then
-		self.tItems["settings"].TradePeriod = "n"
-	end
-	self:TradeUpdateTimer()
-end
-
-function DKP:TradeCheckPeriod( wndHandler, wndControl, eMouseButton )
-	if self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Daily"):IsChecked() == false and self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Weekly"):IsChecked() == false and self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Monthly"):IsChecked() == false and self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Never"):IsChecked() == false then
-		if self.tItems["settings"].TradePeriod == "w" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Weekly"):SetCheck(true)
-		elseif self.tItems["settings"].TradePeriod == "m" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Monthly"):SetCheck(true)
-		elseif self.tItems["settings"].TradePeriod == "d" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Daily"):SetCheck(true)
-		elseif self.tItems["settings"].TradePeriod == "n" then
-			self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("ResetPeriod"):FindChild("Never"):SetCheck(true)
-		end
-	end
-	self:TradeUpdateTimer()
-end
-
-function DKP:TradeEnable( wndHandler, wndControl, eMouseButton )
-	if self.tItems["settings"].TradeCap ~= nil then
-		self.tItems["settings"].TradeEnable = 1
-		self:TradeApplyCap()
-		self:TradeUpdateTimer()
-	else
-		wndControl:SetCheck(false)
-		Print("Set Cap value first")
-	end
-end
-
-function DKP:TradeDisable( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].TradeEnable = 0
-	self:TradeRemoveCap()
-	self:TradeUpdateTimer()
-end
-
-function DKP:TradeResetCap( wndHandler, wndControl, eMouseButton )
-	self:TradeApplyCap()
-end
-
-function DKP:TradeClose( wndHandler, wndControl, eMouseButton )
-	self.wndTrade:Show(false,false)
-end
-
-
-function DKP:TradeShow( wndHandler, wndControl, eMouseButton )
-	self.wndTrade:Show(true,false)
-	self:TradePopulateTrades()
-	self.wndTrade:ToFront()
-end
-
-
-function DKP:TradeChangeCapValue( wndHandler, wndControl, strText )
-	if tonumber(strText) ~= nil then
-		self.tItems["settings"].TradeCap = math.abs(tonumber(strText))
-	elseif strText == "INF" then
-		self.tItems["settings"].TradeCap = "inf"
-		self:TradeRemoveCap()
-	else
-		wndControl:SetText("Cap")
-		self.tItems["settings"].TradeCap = nil
-	end
-end
-
-function DKP:TradeApplyCap()
-	if self.tItems["settings"].TradeEnable == 1 and self.tItems["settings"].TradeCap ~= nil and self.tItems["settings"].TradeCap ~= "inf" then
-		for i=1,table.maxn(self.tItems) do
-			if self.tItems[i] ~= nil then
-				self.tItems[i].TradeCap = self.tItems["settings"].TradeCap
-			end
-		end
-	end
-end
-
-function DKP:TradeRemoveCap()
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i]~=nil then
-			self.tItems[i].TradeCap = nil
-		end
-	end
-end
-
-function DKP:TradeUpdateTimer()
-	if self.tItems["settings"].TradeEnable == 1 and self.tItems["settings"].TradePeriod ~= "n" then 
-		if self.tItems["settings"].TradeStart == nil and self.tItems["settings"].TradePeriod ~= "n" then
-			self.tItems["settings"].TradeStart = os.time()
-		end
-		
-		local diff = os.difftime(os.time() - self.tItems["settings"].TradeStart)
-		diff = os.date("*t",diff)
-		if self.tItems["settings"].TradePeriod == "w" then
-			if diff.day >= 6 and diff.day < 7 then
-				self.TradeTimerVar = ApolloTimer.Create(60, true, "TradeTimer", self)
-				Apollo.RegisterTimerHandler(60, "TradeTimer", self)
-			elseif diff.day >= 7 then
-				self:TradeApplyCap()
-				self.tItems["settings"].TradeStart = nil
-				self:TradeUpdateTimer()
-			end
-		elseif self.tItems["settings"].TradePeriod == "m" then
-			if diff.day >= 29 and diff.day < 30 then
-				self.TradeTimerVar = ApolloTimer.Create(60, true, "TradeTimer", self)
-				Apollo.RegisterTimerHandler(60, "TradeTimer", self)
-			elseif diff.day >= 30 then
-				self:TradeApplyCap()
-				self.tItems["settings"].TradeStart = nil
-				self:TradeUpdateTimer()
-			end
-		elseif self.tItems["settings"].TradePeriod == "d" then
-			if diff.day >= 1 and diff.day < 2 then	
-				self.TradeTimerVar = ApolloTimer.Create(60, true, "TradeTimer", self)
-				Apollo.RegisterTimerHandler(60, "TradeTimer", self)
-			elseif diff.day >= 2 then
-				self:TradeApplyCap()
-				self.tItems["settings"].TradeStart = nil
-				self:TradeUpdateTimer()
-			end
-		end
-	else
-		if self.TradeTimerVar ~= nil then
-			self.TradeTimerVar:Stop()
-		end
-	end
-	self:TradeUpdateHelp()
-end
-
-function DKP:TradeUpdateHelp()
-	local tooltip = "Next Cap Reset"
-	
-	if self.tItems["settings"].TradeEnable == 1 and self.tItems["settings"].TradeStart ~= nil and self.tItems["settings"].TradeCap ~= nil then
-		local diff = os.difftime(os.time() - self.tItems["settings"].TradeStart)
-		diff = os.date("*t",diff)
-		local daysLeft
-		if self.tItems["settings"].TradePeriod == "w" then
-			if diff.day == 6 then
-				tooltip = tooltip .. " in " .. tostring(24 - diff.hour) .. "Hours."
-			else
-				daysLeft = 7 - diff.day
-				tooltip = tooltip .. " in " .. daysLeft .. "days."
-			end
-		elseif self.tItems["settings"].TradePeriod == "m" then
-			if diff.day == 29 then
-				tooltip = tooltip .. " in " .. tostring(24 - diff.hour) .. "Hours"
-			else
-				daysLeft = 30 - diff.day
-				tooltip = tooltip .. " in " .. daysLeft .. "days."
-			end
-		elseif self.tItems["settings"].TradePeriod == "n" then
-			tooltip = "Never"
-		elseif self.tItems["settings"].TradePeriod == "d" then
-				tooltip = tooltip .. " in " .. tostring(24 - diff.hour) .. "Hours"
-		end
-	else
-		tooltip = "Disabled"
-	end
-	
-	
-	self.wndTrade:FindChild("ControlsContainer"):FindChild("Settings"):FindChild("Help"):SetTooltip(tooltip)
-end
-
-function DKP:TradeTimer()
-	local diff = os.difftime(os.time() - self.tItems["settings"].TradeStart)
-		diff = os.date("*t",diff)
-	if self.tItems["settings"].TradePeriod == "w" then
-		if diff.day >= 7 then
-			self:Decay()
-			self.tItems["settings"].TradeStart = nil
-			self:TradeUpdateTimer()
-			self.TradeTimerVar:Stop()
-		end
-	elseif self.tItems["settings"].TradePeriod == "m" then
-		if diff.day >= 30 then
-			self:Decay()
-			self.tItems["settings"].TradeStart = nil
-			self:TradeUpdateTimer()
-			self.TradeTimerVar:Stop()
-		end	
-	elseif self.tItems["settings"].TradePeriod == "d" then
-		if diff.day >= 2 then
-			self:Decay()
-			self.tItems["settings"].TradeStart = nil
-			self:TradeUpdateTimer()
-			self.TradeTimerVar:Stop()
-		end	
-	end
-end
-
-function DKP:TradeProcessMessage(tWords,strSender) -- [1] - !trade - [2]-- From - [3] -- from [4]-to [5]-to  [6] -Amount ||  Decline/Accept
-	if #tWords < 6 then return end
-	
-	if tonumber(tWords[6]) ~= nil then
-		local fullSender = tWords[2] .. " " .. tWords[3]
-		local fullRecipent = tWords[4] .. " " .. tWords[5]
-		local fromID = self:GetPlayerByIDByName(fullSender)
-		local toID = self:GetPlayerByIDByName(fullRecipent)
-		if fromID == -1 or toID == -1 then return end
-		if string.lower(fullSender) ~= string.lower(strSender) then return end
-		local strResult = self:TradeRegisterNewTrade(fromID,toID,tonumber(tWords[6]))
-		
-		if strResult == "Trade Submitted" then
-			ChatSystemLib.Command("/w " .. self.tItems[fromID].strName .. " Trade Submitted")
-			ChatSystemLib.Command("/w " .. self.tItems[toID].strName .. " You have new pending trade")
-		else
-			ChatSystemLib.Command("/w " .. self.tItems[fromID].strName .. " " .. strResult)
-		end
-	elseif string.lower(tWords[6]) == "accept" then
-		--match request with specific trade
-		local fullSender = tWords[2] .. " " .. tWords[3]
-		local fullRecipent = tWords[4] .. " " .. tWords[5]
-		local reqID = nil
-
-		-- authentication
-		if string.lower(fullRecipent) ~= string.lower(strSender) then return end
-		
-		for i=1,table.maxn(self.tItems["trades"]) do
-			if self.tItems["trades"][i] ~= nil then
-				if string.lower(self.tItems["trades"][i].strSender) == string.lower(fullSender) and string.lower(self.tItems["trades"][i].strRecipent) == string.lower(fullRecipent) then
-					if self.tItems["trades"][i].status.recipent == "Pending" then
-						reqID = i
-						break
-					end
-				end
-			end
-		end
-		
-
-		
-		if reqID ~= nil then
-			self.tItems["trades"][reqID].status.recipent = "OK"
-			self:TradeCheckTrade(reqID)
-			ChatSystemLib.Command("/w " .. fullSender .. " Your Trade has been accepted by recipent")
-			ChatSystemLib.Command("/w " .. fullRecipent .. " You have accepted this trade")
-			if self.wndTrade:IsShown() == true then
-				self:TradePopulateTrades()
-			end
-		else
-			ChatSystemLib.Command("/w " .. fullRecipent .. " Cannot find trade you want to accept")
-		end
-	
-	elseif string.lower(tWords[6]) == "decline" then
-		--match request with specific trade
-		local fullSender = tWords[2] .. " " .. tWords[3]
-		local fullRecipent = tWords[4] .. " " .. tWords[5]
-		local reqID = nil
-		
-		if string.lower(fullRecipent) ~= string.lower(strSender) then return end
-		
-		for i=1,table.maxn(self.tItems["trades"]) do
-			if self.tItems["trades"][i] ~= nil then
-				if string.lower(self.tItems["trades"][i].strSender) == string.lower(fullSender) and string.lower(self.tItems["trades"][i].strRecipent) == string.lower(fullRecipent) then
-					if self.tItems["trades"][i].status.recipent == "Pending" then
-						reqID = i
-						break
-					end
-				end
-			end
-		end
-		if reqID ~= nil then
-			self.tItems["trades"][reqID].status.recipent = "Rejected"
-			self:TradeCheckTrade(reqID)
-			ChatSystemLib.Command("/w " .. fullSender .. " Your Trade has been rejected by recipent")
-			ChatSystemLib.Command("/w " .. fullRecipent .. " You have rejected this trade")
-			if self.wndTrade:IsShown() == true then
-				self:TradePopulateTrades()
-			end
-		else
-			ChatSystemLib.Command("/w " .. fullRecipent .. " Cannot find trade you want to reject")
-		end
-	end
-	self:TradePopulateTrades()
-
-end
-
-function DKP:TradeCheckTrade(ofID)
-	if self.tItems["trades"][ofID].done == nil then
-		if self.tItems["trades"][ofID].status.recipent == "OK" and self.tItems["trades"][ofID].status.master == "OK" or self.tItems["trades"][ofID].status.recipent == "OK" and self.tItems["trades"][ofID].masterConf == 0 then
-			self.tItems["trades"][ofID].done = true
-			self:Trade(ofID)
-		elseif self.tItems["trades"][ofID].status.recipent == "Rejected" or self.tItems["trades"][ofID].status.master == "Rejected" then
-			self.tItems["trades"][ofID].done = false
-			ChatSystemLib.Command("/w " .. self.tItems["trades"][ofID].strSender .. " Your Trade has been rejected")
-			if self.tItems["trades"][ofID].status.recipent == "OK" then
-				ChatSystemLib.Command("/w " .. self.tItems["trades"][ofID].strRecipent .. " Your Trade has been rejected")
-			end	
-		end
-	end
-	
-end
-
-function DKP:Trade(ofID)
-	local fromID = self:GetPlayerByIDByName(self.tItems["trades"][ofID].strSender)
-	local toID = self:GetPlayerByIDByName(self.tItems["trades"][ofID].strRecipent)
-	
-	self.tItems[fromID].net = self.tItems[fromID].net - self.tItems["trades"][ofID].value
-	self.tItems[fromID].tot = self.tItems[fromID].tot - self.tItems["trades"][ofID].value
-	self.tItems[fromID].TradeCap = self.tItems[fromID].TradeCap - self.tItems["trades"][ofID].value
-	self.tItems[toID].net = self.tItems[toID].net + self.tItems["trades"][ofID].value
-	self.tItems[toID].tot = self.tItems[toID].tot + self.tItems["trades"][ofID].value
-	if self.tItems["settings"].ConnectedCap == 1 then
-		self.tItems[toID].TradeCap = self.tItems[toID].TradeCap - self.tItems["trades"][ofID].value
-	end
-	
-	ChatSystemLib.Command("/w " .. self.tItems["trades"][ofID].strSender .. "Your trade has been completed")
-	ChatSystemLib.Command("/w " .. self.tItems["trades"][ofID].strRecipent .. "Your trade has been completed")
-
-end
-
-function DKP:TradeRegisterNewTrade(fromID,toID,value)
-	local strReturn = ""
-	
-	if self.tItems[fromID] ~= nil and self.tItems[toID] ~= nil then
-		-- check cap
-		if self.tItems["settings"].TradeCap ~= "inf" then
-			local modifier = self.tItems[fromID].TradeCap - value
-			if modifier < 0 then
-				strReturn = "Your have already used your cap"
-				return strReturn
-			end
-		end
-		-- check whether sender has DKP at allowed
-		modifier = self.tItems[fromID].net - value
-		if modifier < 0 then 
-			strReturn = "You don't have enough DKP"
-			return strReturn
-		end
-		-- if enabled check whether recipent have enough cap
-		
-		if self.tItems["settings"].ConnectedCap == 1 and self.tItems["settings"].TradeCap ~= "inf" then
-			modifier = self.tItems[toID].TradeCap - value
-			if modifier < 0 then
-				strReturn = "Recipent's cap is too low"
-				return strReturn
-			end
-		end
-		-- search whether there's another trade with this player
-		local isAnotherTrade = false
-		for i=1,table.maxn(self.tItems["trades"]) do
-			if self.tItems["trades"][i] ~= nil then
-				if self.tItems["trades"][i].strSender == self.tItems[fromID].strName and self.tItems["trades"][i].strRecipent == self.tItems[i].strName then
-					if self.tItems["trades"][i].status.recipent == "Pending" or  self.tItems["trades"][i].status.master == "Pending" then
-						isAnotherTrade = true
-						break
-					end
-				end
-			end
-		end
-		
-		if isAnotherTrade == true then
-			strReturn = "You already have pending trade with this player"
-			return strReturn
-		end
-		
-		
-		-- Passed
-		local trade = {}
-		trade.strSender = self.tItems[fromID].strName
-		trade.strRecipent = self.tItems[toID].strName
-		local tradeDate = os.date("*t",os.time())
-		trade.tradeDate = tradeDate.day .. "/" .. tradeDate.month .. "/" .. tradeDate.year
-		trade.status = {}
-		trade.status.recipent = "Pending"
-		trade.value = value
-		trade.masterConf = self.tItems["settings"].TradeMasterConf
-		if self.tItems["settings"].TradeMasterConf == 1 then
-			trade.status.master = "Pending"
-		else
-			trade.status.master = "OK"
-		end
-		
-		table.insert(self.tItems["trades"],trade)
-		
-		strReturn = "Trade Submitted"
-		
-	else
-		strReturn = "Critical Error"
-	end
-	
-
-	return strReturn
-end
-
-function DKP:TradePopulateTrades()
-	if self.wndTrade:IsShown() == false then return end
-	for i=1,#self.wndTrades do
-		self.wndTrades[i]:Destroy()
-	end
-	self.wndTrades ={}
-	local pendingTrades = {}
-	local completedTrades = {}
-	local rejectedTrades = {}
-	for i=1,table.maxn(self.tItems["trades"]) do
-		if self.tItems["trades"][i] ~= nil then
-			if self.tItems["trades"][i].status.recipent == "Pending" and self.tItems["trades"][i].status.master == "Pending" then
-				table.insert(pendingTrades,i)
-			elseif self.tItems["trades"][i].status.recipent == "Pending" and self.tItems["trades"][i].status.master == "OK" then
-				table.insert(pendingTrades,i)
-			elseif self.tItems["trades"][i].status.recipent == "OK" and self.tItems["trades"][i].status.master == "Pending" then
-				table.insert(pendingTrades,i)
-			elseif self.tItems["trades"][i].status.recipent == "OK" and self.tItems["trades"][i].status.master == "OK" or self.tItems["trades"][i].status.recipent == "OK" and self.tItems["trades"][i].masterConf == 0 then
-				table.insert(completedTrades,i)		
-			elseif self.tItems["trades"][i].status.recipent == "Rejected" or self.tItems["trades"][i].status.master == "Rejected" then
-				table.insert(rejectedTrades,i)
-			end
-		end
-	end
-	local wndSep3 = Apollo.LoadForm(self.xmlDoc,"TradeSeparator",self.wndTradeList,self)
-	wndSep3:FindChild("Msg"):SetText("Pending Trades")
-	table.insert(self.wndTrades,wndSep3)
-	for i=1,#pendingTrades do
-		local wnd = Apollo.LoadForm(self.xmlDoc,"TradeItem",self.wndTradeList,self)
-		wnd:FindChild("Sender"):SetText(self.tItems["trades"][pendingTrades[i]].strSender)
-		wnd:FindChild("Recipent"):SetText(self.tItems["trades"][pendingTrades[i]].strRecipent)
-		wnd:FindChild("Value"):SetText(self.tItems["trades"][pendingTrades[i]].value)
-		wnd:FindChild("Rem"):Show(false,true)
-		if self.tItems["trades"][pendingTrades[i]].status.recipent == "OK" then
-			wnd:FindChild("RecipentAccept"):SetSprite("BK3:btnMetal_CheckboxPressed") 
-		end
-		if self.tItems["trades"][pendingTrades[i]].status.master == "OK" then
-			wnd:FindChild("MasterAccept"):SetSprite("BK3:btnMetal_CheckboxPressed") -- TODO
-		end
-		if self.tItems["trades"][pendingTrades[i]].masterConf == 0 then
-			wnd:FindChild("MasterAccept"):Show(false,true)
-			wnd:FindChild("AcceptButton"):Show(false,true)
-			wnd:FindChild("DeclineButton"):Show(false,true)
-			wnd:FindChild("Rem"):Show(true,true)
-		end
-		wnd:FindChild("Date"):SetText(self.tItems["trades"][pendingTrades[i]].tradeDate)
-		table.insert(self.wndTrades,wnd)
-	end
-	local wndSep1 = Apollo.LoadForm(self.xmlDoc,"TradeSeparator",self.wndTradeList,self)
-	wndSep1:FindChild("Msg"):SetText("Completed Trades")
-	table.insert(self.wndTrades,wndSep1)
-	for i=1,#completedTrades do
-		local wnd = Apollo.LoadForm(self.xmlDoc,"TradeItem",self.wndTradeList,self)
-		wnd:FindChild("Sender"):SetText(self.tItems["trades"][completedTrades[i]].strSender)
-		wnd:FindChild("Recipent"):SetText(self.tItems["trades"][completedTrades[i]].strRecipent)
-		wnd:FindChild("Date"):SetText(self.tItems["trades"][completedTrades[i]].tradeDate)
-		wnd:FindChild("Value"):SetText(self.tItems["trades"][completedTrades[i]].value)
-		if self.tItems["trades"][completedTrades[i]].masterConf == 1 then
-			wnd:FindChild("MasterAccept"):SetSprite("BK3:btnMetal_CheckboxPressed")
-		else
-			wnd:FindChild("MasterAccept"):Show(false,true)
-		end
-		wnd:FindChild("RecipentAccept"):SetSprite("BK3:btnMetal_CheckboxPressed") 		
-		wnd:FindChild("AcceptButton"):Show(false,true)
-		wnd:FindChild("DeclineButton"):Show(false,true)
-		table.insert(self.wndTrades,wnd)
-	end
-	local wndSep2 = Apollo.LoadForm(self.xmlDoc,"TradeSeparator",self.wndTradeList,self)
-	wndSep2:FindChild("Msg"):SetText("Rejected Trades")
-	table.insert(self.wndTrades,wndSep2)
-	for i=1,#rejectedTrades do
-		local wnd = Apollo.LoadForm(self.xmlDoc,"TradeItem",self.wndTradeList,self)
-		wnd:FindChild("Sender"):SetText(self.tItems["trades"][rejectedTrades[i]].strSender)
-		wnd:FindChild("Recipent"):SetText(self.tItems["trades"][rejectedTrades[i]].strRecipent)
-		wnd:FindChild("Date"):SetText(self.tItems["trades"][rejectedTrades[i]].tradeDate)
-		wnd:FindChild("Value"):SetText(self.tItems["trades"][rejectedTrades[i]].value)
-		wnd:FindChild("AcceptButton"):Show(false,true)
-		wnd:FindChild("DeclineButton"):Show(false,true)
-		wnd:FindChild("RecipentAccept"):SetSprite("BK3:btnHolo_ClearNormal")
-		wnd:FindChild("MasterAccept"):SetSprite("BK3:btnHolo_ClearNormal")
-		if self.tItems["trades"][rejectedTrades[i]].status.recipent == "OK" then
-			wnd:FindChild("RecipentAccept"):SetSprite("BK3:btnMetal_CheckboxPressed") 
-		elseif self.tItems["trades"][rejectedTrades[i]].status.recipent == "Pending" then
-			wnd:FindChild("RecipentAccept"):SetSprite("BK3:btnMetal_CheckboxNormal") 
-		end
-		if self.tItems["trades"][rejectedTrades[i]].masterConf == 1 then
-			if self.tItems["trades"][rejectedTrades[i]].status.master == "OK" then
-				wnd:FindChild("MasterAccept"):SetSprite("BK3:btnMetal_CheckboxPressed")
-				wnd:FindChild("MasterAccept"):Show(true,false)-- TODO
-			end
-		else
-			wnd:FindChild("MasterAccept"):Show(false,true)
-		end
-		table.insert(self.wndTrades,wnd)
-	end
-	self.wndTradeList:ArrangeChildrenVert()
-
-end
-
-function DKP:TradeConnectCap( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].ConnectedCap = 1
-end
-
-function DKP:TradeDisconnectCap( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].ConnectedCap = 0
-end
-
-function DKP:TradeEnableMasterAccept( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].TradeMasterConf = 1
-end
-
-function DKP:TradeDisableMasterAccept( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].TradeMasterConf = 0
-end
-
-
-function DKP:TradeMasterAccept( wndHandler, wndControl, eMouseButton )
-	local value
-	local sender
-	local recipent
-	
-	value = tonumber(wndControl:GetParent():FindChild("Value"):GetText())
-	sender = wndControl:GetParent():FindChild("Sender"):GetText()
-	recipent = wndControl:GetParent():FindChild("Recipent"):GetText()
-	
-	local tradeID
-	
-	for i=1,table.maxn(self.tItems["trades"]) do
-		if self.tItems["trades"][i] ~= nil then
-			if self.tItems["trades"][i].strRecipent == recipent and self.tItems["trades"][i].strSender == sender and self.tItems["trades"][i].value == value and  self.tItems["trades"][i].status.master == "Pending"  then
-				tradeID = i
-				break
-			end
-		end
-	end
-	if tradeID ~= nil  then
-		if wndControl:GetText() == "Ok" then
-			self.tItems["trades"][tradeID].status.master = "OK"
-		else
-			self.tItems["trades"][tradeID].status.master = "Rejected"
-		end
-		self:TradeCheckTrade(tradeID)
-		self:TradePopulateTrades()
-	end
-
-end
-
-function DKP:TradeRemove( wndHandler, wndControl, eMouseButton )
-	local value
-	local sender
-	local recipent
-
-	
-	value = tonumber(wndControl:GetParent():FindChild("Value"):GetText())
-	sender = wndControl:GetParent():FindChild("Sender"):GetText()
-	recipent = wndControl:GetParent():FindChild("Recipent"):GetText()
-	
-	
-	local tradeID
-	
-	for i=1,table.maxn(self.tItems["trades"]) do
-		if self.tItems["trades"][i] ~= nil then
-			if self.tItems["trades"][i].strRecipent == recipent and self.tItems["trades"][i].strSender == sender and self.tItems["trades"][i].value == value then
-				tradeID = i
-				break
-			end
-		end
-	end
-	if tradeID ~= nil  then
-		self.tItems["trades"][tradeID] = nil
-		self:TradePopulateTrades()
-	end
-end
-
--- Bidding v2
 
 function DKP:InitBid2()
 	self.wndBid2 = Apollo.LoadForm(self.xmlDoc2,"BiddingManagerv2",nil,self)
 	self.wndBid2Settings = Apollo.LoadForm(self.xmlDoc2,"BiddingManagerSettings",nil,self)
-	self.wndBid2Responses = Apollo.LoadForm(self.xmlDoc2,"BiddingCheckResponses",nil,self)
 	self.wndBid2Whitelist = Apollo.LoadForm(self.xmlDoc2,"WhiteList",nil,self)
 	self.wndMLResponses = Apollo.LoadForm(self.xmlDoc2,"Responses",nil,self)
 	
 	self.wndBid2:Show(false,true)
 	self.wndBid2Settings:Show(false,true)
-	self.wndBid2Responses:Show(false,true)
 	self.wndBid2Whitelist:Show(false,true)
 	self.wndMLResponses:Show(false,true)
 	
@@ -1858,9 +1196,6 @@ function DKP:Bid2SendUpdateInfo(auction)
 	end
 end
 
-function DKP:BidRegisterCheckResponse(strPlayer)
-	self.wndBid2Responses:FindChild("List"):SetText(self.wndBid2Responses:FindChild("List"):GetText() .. "\n" .. strPlayer)
-end
 
 function DKP:Bid2RestoreFetchedAuctionFromID(itemID,progress,biddersCount,votersCount)
 	if self.timeoutAuctionsTimer then self.timeoutAuctionsTimer:Stop() end
@@ -1933,15 +1268,6 @@ function DKP:Bid2GetRandomML()
 		self:Bid2StartAuctionFetchTimeout()
 		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ArUaML"}) -- expecting to get (1) response
 	end
-end
-
-function DKP:BidReqestConfirmation()
-	self.wndBid2Responses:Show(true,false)
-	self.wndBid2Responses:ToFront()
-	self.wndBid2Responses:FindChild("List"):SetText("")
-	local msg = {}
-	msg.type = "WantConfirmation"
-	self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
 end
 
 function DKP:BidRegisterChoice(strSender,option,item,currItem)
@@ -2350,10 +1676,6 @@ function DKP:Bid2GetItemCostPackage()
 	arr.QualityValues = self.tItems["EPGP"].QualityValues
 	arr.CustomModifier = self.tItems["EPGP"].FormulaModifier
 	return arr
-end
-
-function DKP:BidCloseResponses()
-	self.wndBid2Responses:Show(false,false)
 end
 
 function DKP:Bid2Close()
@@ -3521,9 +2843,5 @@ function DKP:BidCustomLabelRestore(wndControl,wndHandler)
 	for k,labelState in ipairs(self.tItems["settings"]["Bid2"].tLabelsState) do
 		self.wndBid2Settings:FindChild("CustomLabels"):FindChild("EnableLabel"..k):SetCheck(labelState)
 	end
-end
-
-function DKP:lll(wndControl,wndHandler)
-
 end
 
