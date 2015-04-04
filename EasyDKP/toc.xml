@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Drutol@Jabbit" APIVersion="9" Name="EasyDKP" Description="">
+<Addon Author="Drutol@Jabbit" APIVersion="10" Name="EasyDKP" Description="">
     <Script Name="libs/GeminiHook-1.0.lua"/>
     <Script Name="libs/Base64.lua"/>
     <Script Name="libs/Serpent.lua"/>
