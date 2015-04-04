@@ -102,14 +102,12 @@ function DKP:EPGPInit()
 	self:EPGPAddValuesToMembers()
 	self:EPGPChangeUI()
 	
-	Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
+	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
 end
 
 function DKP:OnLootedItem(item)
-
-
 	self.ItemDatabase[item:GetName()] = {}
 	self.ItemDatabase[item:GetName()].ID = item:GetItemId()
 	self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()

@@ -18,9 +18,10 @@ local knBubbleMaxHeight = 210
 
 local knItemTileWidth = 76
 local knItemTileHeight = 76
-local knItemTileHorzSpacing = 10
-local knItemTileVertSpacing = 10
-local knItemTilePerRow = 4
+local knItemTileHorzSpacing = 8
+local knItemTileVertSpacing = 8
+local knItemTilePerRow = 3
+local knItemTileRows = 3
  
 local knBubbleHorzSpacing = 3
 local knBubbleVertSpacing = 3
@@ -130,15 +131,23 @@ function DKP:IBPopulate(wndBubble)
 		end
 	end
 	
+	if wndBubble:GetData().nItems == nil then wndBubble:GetData().nItems = knItemTilePerRow end
+	if wndBubble:GetData().nRows == nil then wndBubble:GetData().nRows = knItemTileRows end
+	
 	local nWidth = 0
 	local nHeight = 120
 	local bAddingWidth = true
+	local nRows = 1
 	for k=1,nUniqueLoot do
 		if bAddingWidth then nWidth = nWidth + knItemTileWidth + knItemTileHorzSpacing end
-		if k%knItemTilePerRow == 0 then 
+		if k%(wndBubble:GetData().nItems+1) == 0 then 
 			bAddingWidth = false
 		end
-		if not bAddingWidth and k%knItemTilePerRow == 0 then nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing end
+		if not bAddingWidth and k%(wndBubble:GetData().nItems+1) == 0 then 
+			nRows = nRows + 1
+			if nRows > wndBubble:GetData().nRows then break end
+			nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing 		
+		end
 	end
 	
 	wndBubble:GetData().nWidthMod = (nWidth - knBubbleDefWidth) > 0 and nWidth - knBubbleDefWidth or 0

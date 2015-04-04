@@ -362,6 +362,9 @@ function DKP:OnDocLoaded()
 		self:CloseBigPOPUP()
 		self:FLInit()
 		
+		
+	--	Print(type(GameLib.CodeEnumClass))
+		
 		--self:OnSave(1)
 		
 		--Temp disable
@@ -435,7 +438,7 @@ function DKP:OnDocLoaded()
 end
 
 function DKP:DebugFetch()
-	self:ExportShowPreloadedText(tohtml(self:GetEncodedData("Drutol Windchaser")))
+	for k,enum in pairs(ICCommLib.CodeEnumICCommChannelType) do Print(k .. " : " .. enum) end
 end
 
 ---------------
@@ -5126,6 +5129,8 @@ function DKP:LLInit()
 	
 	if self.tItems["settings"].LL.bEquippable == nil then self.tItems["settings"].LL.bEquippable = false end
 	if self.tItems["settings"].LL.nLevel == nil then self.tItems["settings"].LL.nLevel = 1 end
+	if self.tItems["settings"].LL.nMaxRows == nil then self.tItems["settings"].LL.nMaxRows = 3 end
+	if self.tItems["settings"].LL.nMaxItems == nil then self.tItems["settings"].LL.nMaxItems = 3 end
 	
 	self.wndLLM:FindChild("Only"):FindChild("Equip"):SetCheck(self.tItems["settings"].LL.bEquippable)
 	self.wndLLM:FindChild("Only"):FindChild("MinLvl"):SetText(self.tItems["settings"].LL.nLevel)
@@ -5164,7 +5169,8 @@ function DKP:LLInit()
 	self.wndLLM:FindChild("SlotsTab"):Lock(true)
 	self.wndLLM:FindChild("ClassesTab"):Lock(true)
 	self.wndLLM:FindChild("QualityTab"):Lock(true)
-	
+	self.wndLLM:FindChild("MaxItems"):SetValue(self.tItems["settings"].LL.nMaxItems)
+	self.wndLLM:FindChild("MaxRows"):SetValue(self.tItems["settings"].LL.nMaxRows)
 	self.wndLL:SetSizingMinimum(768,493)
 end
 
@@ -5442,9 +5448,14 @@ function DKP:LLSearch(wndHandler,wndControl,strText)
 					bubble:GetData().bSearchOpen = true
 				end
 				bFoundEntries = true
-				tile:FindChild("SearchFlash"):Show(true)  
-			else 
+				tile:FindChild("SearchFlash"):Show(true)
+				tile:FindChild("ShadowOverlay"):Show(false)
+			elseif strText ~= "" and not self:string_starts(tile:GetData():GetName(),strText) then
 				tile:FindChild("SearchFlash"):Show(false) 
+				tile:FindChild("ShadowOverlay"):Show(true)
+			else
+				tile:FindChild("SearchFlash"):Show(false) 
+				tile:FindChild("ShadowOverlay"):Show(false)
 			end
 				
 			if not bFoundEntries and bubble:GetData().bSearchOpen then 
@@ -5456,6 +5467,19 @@ function DKP:LLSearch(wndHandler,wndControl,strText)
 
 	end
 end
+
+function DKP:LLSetMaxRows( wndHandler, wndControl, fNewValue, fOldValue )
+	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxRows then
+		self.tItems["settings"].LL.nMaxRows = math.floor(fNewValue)
+	end
+end
+
+function DKP:LLSetMaxItems( wndHandler, wndControl, fNewValue, fOldValue )
+	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxItems then
+		self.tItems["settings"].LL.nMaxItems = math.floor(fNewValue)
+	end
+end
+
 
 function DKP:LLPopuplate()
 	local wndList = self.wndLL:FindChild("List")
@@ -5479,7 +5503,7 @@ function DKP:LLPopuplate()
 		if #items > 0 then
 			if cat == "" then cat = "Miscellaneous" end
 			local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
-			wndBubble:SetData({bExpanded = false,bPopulated = false,bSearchOpen = false, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items,tItemTooltips = tWinnersDictionary})
+			wndBubble:SetData({bExpanded = false,bPopulated = false,bSearchOpen = false,nItems = self.tItems["settings"].LL.nMaxItems,nRows = self.tItems["settings"].LL.nMaxRows, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items,tItemTooltips = tWinnersDictionary})
 			wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
 			
 			for k , prevBubble in ipairs(tExpandedBubbles) do
@@ -5698,13 +5722,18 @@ end
 -- Syncing
 
 function DKP:DFJoinSyncChannel( wndHandler, wndControl, eMouseButton )
-	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel","DFOnSyncMessage",self)
+	self.sChannel = ICCommLib.JoinChannel("MyChannelName",ICCommLib.CodeEnumICCommChannelType.Global)
+	--self.sChannel:SetReceivedMessageFunction("DFOnSyncMessage",self)
 end
 
-function DKP:DFOnSyncMessage(channel, tMsg, strSender)
-	if tMsg.type then
+function DKP:DFTest(icccom,eResult)
+
+end
+
+function DKP:DFOnSyncMessage(channel, tMsg, idMessage)
+	if tMsg.type and tMsg.strSender then
 		if tMsg.type == "SendMeData" then
-			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
+			self.sChannel:SendPrivateMessage({[1] = tMsg.strSender},self:GetEncodedData(tMsg.strSender))
 		elseif tMsg.type == "EncodedDataFull" then
 			self:ProccesEncodedData(tMsg.strData)		
 			elseif tMsg.type == "EncodedDataSelected" then

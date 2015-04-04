@@ -472,10 +472,7 @@ function DKP:HubSettingsRestore()
 	
 	self.wndHubSettings:FindChild("OnlyEquip"):FindChild("Value"):SetCheck(self.tItems["settings"].HubOnlyEqippable)
 	self.wndHubSettings:FindChild("iLvlTreshold"):FindChild("Value"):SetText(self.tItems["settings"].HubItemLevelTreshold)
-	
-	self.wndHubSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n /sum - For Raid Summaries \n /rops - For RaidOps windo \n")
 
-	
 end
 
 function DKP:HubSettingsClose()
