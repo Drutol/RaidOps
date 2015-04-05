@@ -7,7 +7,7 @@ L["#wndMain:Save"] = "Save (/reloadui)"
 L["#wndMain:AuctionStart"] = "Start" 
 L["#wndMain:CustomAuction"] = "Custom Auction" 
 L["#wndMain:ShowOnly"] = "Show Only" 
-L["#wndMain:Hub"] = "Hub" 
+L["#wndMain:Hub"] = "Network Bidding" 
 L["#wndMain:Trading"] = "Trading" 
 --wndMain:Labels
 L["#wndMain:LabelNumber"] = "Label No." 

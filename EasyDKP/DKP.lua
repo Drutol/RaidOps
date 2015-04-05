@@ -2328,12 +2328,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 			end
 		elseif self.wndSelectedListItem then
-			if self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")) ~= nil then
-				selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
-			end
+			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 		end
 	end
-	
 	selectedMembers = {}
 	self.wndItemList:DestroyChildren()
 	local esp = {}
@@ -2419,7 +2416,26 @@ function DKP:RefreshMainItemListAndGroupByClass()
 							end
 							
 							self:UpdateItem(player,k,added)
-							
+							if not self.MassEdit then
+								if player.strName == selectedPlayer then
+									self.wndSelectedListItem = player.wnd
+									player.wnd:SetCheck(true)	
+								end
+							else
+								local found = false
+								
+								for k,prevPlayer in ipairs(selectedPlayer) do
+									if prevPlayer == player.strName then
+										found = true
+										break
+									end
+								end
+								if found then
+									table.insert(selectedMembers,player.wnd)
+									player.wnd:SetCheck(true)
+								end
+								
+							end
 							if self.tItems["settings"].bDisplayCounter then
 								player.wnd:FindChild("Counter"):SetText(nCounter..".")
 								player.wnd:FindChild("Counter"):Show(true)

@@ -1786,6 +1786,7 @@ function DKP:Bid2SelectBidderAtRandom(wndHandler,wndControl)
 					table.insert(tBidders,bidder.strName)
 				end
 			end
+			if #tBidders == 0 then return end
 			
 			local luckyBidder = tBidders[math.random(#tBidders)]
 			
