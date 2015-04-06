@@ -116,6 +116,14 @@ local ktUndoActions =
 	["raward"] = "{Raid Award}",
 
 }
+-- Changelog
+local strChangelog = 
+[===[
+---RaidOps version 2.0 revision 144 Beta Release Cadidate 1 ---
+{06/04/2015}
+Initial Release
+ ]===]
+
 -- Localization stuff
 local ktLocales = {
 	[1] = "enUS",
@@ -198,6 +206,8 @@ function DKP:OnDocLoaded()
 		self.wndExport = Apollo.LoadForm(self.xmlDoc, "Export" , nil , self)
 		self.wndPopUp = Apollo.LoadForm(self.xmlDoc, "MasterLootPopUp" , nil ,self)
 		self.wndStandby = Apollo.LoadForm(self.xmlDoc2, "StandbyList" , nil , self)
+		self.wndCredits = Apollo.LoadForm(self.xmlDoc2, "Thanks" , nil , self)
+		self.wndChangelog = Apollo.LoadForm(self.xmlDoc2, "Changelog" , nil , self)
 		
 		
 		--Localisation
@@ -267,6 +277,8 @@ function DKP:OnDocLoaded()
 		self.wndExport:Show(false , true)
 		self.wndPopUp:Show(false, true)
 		self.wndStandby:Show(false,true)
+		self.wndCredits:Show(false,true)
+		self.wndChangelog:Show(false,true)
 		self.wndMain:FindChild("MassEditControls"):Show(false,true)
 		Apollo.RegisterSlashCommand("dkp", "OnDKPOn", self)
 		Apollo.RegisterSlashCommand("sum", "RaidShowMainWindow", self)
@@ -383,7 +395,7 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("Decay"):Show(false)
 		self:DecayRestore()
 		self:ControlsUpdateQuickAddButtons()
-
+		self.wndChangelog:FindChild("Log"):SetText(strChangelog)
 		
 		if self.tItems["settings"].BidEnable == 1 then self:BidBeginInit()
 		else
@@ -405,6 +417,24 @@ end
 
 function DKP:DebugFetch()
 	self:ExportShowPreloadedText(tohtml(self:GetEncodedData("Drutol Windchaser")))
+end
+
+function DKP:ChangelogShow()
+	self.wndChangelog:Show(true,false)
+	self.wndChangelog:ToFront()
+end
+
+function DKP:ChangelogHide()
+	self.wndChangelog:Show(false,false)
+end
+
+function DKP:CreditsShow()
+	self.wndCredits:Show(true,false)
+	self.wndCredits:ToFront()
+end
+
+function DKP:CreditsHide()
+	self.wndCredits:Show(false,false)
 end
 
 ---------------
@@ -1787,6 +1817,13 @@ function DKP:MassEditInvite()
 		end
 	end
 	self:InviteOpen(invitedIDs)
+end
+
+function DKP:MassEditLL()
+	if #selectedMembers == 0 then return end
+	local tIDs = {}
+	for k , wnd in ipairs(selectedMembers) do table.insert(tIDs,wnd:GetData()) end
+	self:LLOpen(tIDs)
 end
 
 function DKP:MassEditInviteContinue()
@@ -3953,7 +3990,7 @@ function DKP:ConLogs()
 end
 
 function DKP:ConLootLogs()
-	self:LLOpen(self.wndContext:GetData())
+	self:LLOpen({[1] = self.wndContext:GetData()})
 end
 
 function DKP:ConStandbyEnable()
@@ -5003,14 +5040,24 @@ function DKP:LLAddLog(strPlayer,strItem)
 	if self.wndLL:IsShown() then self:LLPopuplate() end
 end
 
-function DKP:LLOpen(ID)
-	if self.tItems[ID] == nil then return end
+function DKP:LLOpen(tIDs)
+	for k , ID in ipairs(tIDs) do
+		if not self.tItems[ID] then table.remove(tIDs) end
+	end
 	
-	self.wndLL:SetData(ID)
+	self.wndLL:SetData(tIDs)
 	self.wndLL:Show(true,false)
-	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText(self.tItems[ID].strName)
-	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(false)
-	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
+	if #tIDs == 1 then
+		self.wndLL:FindChild("Controls"):FindChild("Player"):SetText(self.tItems[tIDs[1]].strName)
+		self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(false)
+		if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
+	else
+		self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Multiple Entries")
+		local strTooltip = ""
+		for k , ID in ipairs(tIDs) do strTooltip = strTooltip .. self.tItems[ID].strName .. "\n" end
+		self.wndLL:FindChild("Controls"):FindChild("Player"):SetTooltip(strTooltip)
+		self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(true)
+	end
 	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
 	self:LLPopuplate()
 end
@@ -5027,28 +5074,40 @@ function DKP:LLClose()
 	self.wndLL:Show(false,false)
 end
 
-function DKP:LLPrepareData(ID)
+function DKP:LLPrepareData()
 	local tGrouppedItems = {}
-	local tWinnersDictionary
+	local tWinnersDictionary = {}
 	if self.wndLL:GetData() ~= "AllMode" then
-		if self.tItems[self.wndLL:GetData()].tLLogs == nil then return {} end
-		for k , entry in ipairs(self.tItems[self.wndLL:GetData()].tLLogs) do
-			if self.tItems["settings"].LL.strGroup == "GroupCategory" then
-				local item = Item.GetDataFromId(entry.itemID)
-				if item and self:LLMeetsFilters(item,self.tItems[self.wndLL:GetData()]) then
-					if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
-					table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
-				end
-			else -- Group Date
-				local strDate = os.date("%x",entry.nDate)
-				if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-				if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[self.wndLL:GetData()]) then
-					table.insert(tGrouppedItems[strDate],entry.itemID)	
+		for k , ID in ipairs(self.wndLL:GetData()) do 
+			if self.tItems[ID].tLLogs ~= nil then
+				tWinnersDictionary[self.tItems[ID].strName] = {}
+				for k , entry in ipairs(self.tItems[ID].tLLogs) do
+					if self.tItems["settings"].LL.strGroup == "GroupName" then
+						tGrouppedItems[self.tItems[ID].strName] = {}
+						for j , entry in ipairs(self.tItems[ID].tLLogs) do
+							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID]) then
+								table.insert(tGrouppedItems[self.tItems[ID].strName],entry.itemID)
+								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = self.tItems[ID].strName})
+							end
+						end
+						if #tGrouppedItems[self.tItems[ID].strName] == 0 then tGrouppedItems[self.tItems[ID].strName] = nil end	
+					elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
+						local item = Item.GetDataFromId(entry.itemID)
+						if item and self:LLMeetsFilters(item,self.tItems[ID]) then
+							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
+						end
+					else -- Group Date
+						local strDate = os.date("%x",entry.nDate)
+						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID]) then
+							table.insert(tGrouppedItems[strDate],entry.itemID)	
+						end
+					end
 				end
 			end
 		end
 	else
-		tWinnersDictionary = {}
 		for k , player in ipairs(self.tItems) do
 			if player.tLLogs then
 				tWinnersDictionary[player.strName] = {}
@@ -5084,6 +5143,7 @@ function DKP:LLPrepareData(ID)
 		end
 	
 	end
+	if #self.wndLL:GetData() == 1 then tWinnersDictionary = nil end
 	return tGrouppedItems , tWinnersDictionary
 end
 
