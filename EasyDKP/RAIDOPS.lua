@@ -144,7 +144,7 @@ function DKP:HubPopulateNews()
 		wnd:FindChild("Recipent"):SetText(news.looter)
 		table.insert(self.wndListedNews,wnd)
 		counter = counter + 1
-		if counter >= self.tItems["settings"].HubNewsCount then break end
+		if counter >= 10 then break end
 	end
 	self.wndNews:ArrangeChildrenVert(0)
 end
@@ -205,6 +205,8 @@ end
 
 function DKP:AttendanceShow()
 	self.wndAttendance:Show(true,false)
+	self.wndAttendance:ToFront()
+	self:AttendancePopulate()
 end
 
 function DKP:AttendanceGoHub()
@@ -252,7 +254,7 @@ function DKP:AttendancePopulate()
 	for k=0,table.maxn(self.tItems["Raids"]) do -- adding cell data
 		if self.tItems["Raids"][k] ~= nil then
 			if self.AttendanceExpectedRaid == nil or self.AttendanceExpectedRaid == self.tItems["Raids"][k].Raid then
-				if self.tItems["settings"].HubCallRaidBy == "Date" then grid:SetColumnText(k+1," "..self.tItems["Raids"][k].date.strDate) else grid:SetColumnText(k+1," "..self.tItems["Raids"][k].name) end
+				if false then grid:SetColumnText(k+1," "..self.tItems["Raids"][k].date.strDate) else grid:SetColumnText(k+1," "..self.tItems["Raids"][k].name) end
 				for i=0,table.maxn(self.tItems) do 
 					if self.tItems[i] ~= nil then
 						if addedPlayers[self.tItems[i].strName] == nil then

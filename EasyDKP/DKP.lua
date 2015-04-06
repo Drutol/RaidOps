@@ -285,6 +285,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("rops", "HubShow", self)
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
+		Apollo.RegisterSlashCommand("att", "AttendanceShow", self)
 		--Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
@@ -2966,11 +2967,13 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n" ..
-									 " /sum - For Raid Summaries (old module - will be replaced) \n" ..
 									 " /rops - For RaidOps Hub window \n" ..
 									 " /ropsml - For Master Looter Settings window \n" ..
-									 " /nb - For Network Bidding window \n")
-	
+									 " /nb - For Network Bidding window \n" ..
+									 " Old modules - waiting for rewrite \n" ..
+									 " /sum - For Raid Summaries \n" ..
+									 " /att - For Attendance \n")
+									 
 end
 
 function DKP:SettingsEnablePlayerCollection( wndHandler, wndControl, eMouseButton )
@@ -3694,7 +3697,7 @@ function DKP:StandbyListAdd( wndHandler, wndControl, strText )
 end
 
 function DKP:StandbyListRemove( wndHandler, wndControl, eMouseButton,strText )
-	if strText == nil then 
+	if type(strText) == "boolean" then 
 		for k,item in ipairs(selectedStandby) do
 			self.tItems["Standby"][string.lower(item)] = nil
 		end
@@ -4116,6 +4119,24 @@ function DKP:AltsAddMerge()
 	self:AltsPopulate()
 end
 
+function DKP:AltsDictionaryShow()
+	self.wndAltsDict:Show(true,false)
+	self.wndAltsDict:ToFront()
+	
+	local strAlts = ""
+	for alt , owner in pairs(self.tItems["alts"]) do
+		if self.tItems[owner] then
+			strAlts = strAlts .. self.tItems[owner].strName .. " : " .. alt .. "\n"
+		end
+	end	
+	self.wndAltsDict:FindChild("List"):SetText(strAlts)
+	
+end
+
+function DKP:AltsDictionaryHide()
+	self.wndAltsDict:Show(false,false)
+end
+
 function DKP:AltsAddConvert()
 	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	
@@ -4135,7 +4156,9 @@ end
 
 function DKP:AltsInit()
 	self.wndAlts = Apollo.LoadForm(self.xmlDoc,"Alts",nil,self)
+	self.wndAltsDict = Apollo.LoadForm(self.xmlDoc2,"AltsDictionary",nil,self)
 	self.wndAlts:Show(false,true)
+	self.wndAltsDict:Show(false,true)
 	self.wndAlts:FindChild("Art"):SetOpacity(.5)
 end
 
