@@ -938,7 +938,7 @@ function DKP:InitBid2()
 	self.wndBid2Whitelist:Show(false,true)
 	self.wndMLResponses:Show(false,true)
 	
-	self.wndBid2:SetSizingMinimum(1017,627)
+	self.wndBid2:SetSizingMinimum(1241,832)
 	
 	if self.tItems.wndNBLoc ~= nil and self.tItems.wndNBLoc.nOffsets[1] ~= 0 then 
 		self.wndBid2:MoveToLocation(WindowLocation.new(self.tItems.wndNBLoc))
@@ -1329,8 +1329,8 @@ function DKP:Bid2ArrangeResponses(auction)
 	table.sort(passes,easyDKpsortBid2Bidders)
 	table.sort(slights,easyDKpsortBid2Bidders)
 	table.sort(greeds,easyDKpsortBid2Bidders)
-	
-	auction.wnd:FindChild("Responses"):DestroyChildren()
+	for k , wnd in ipairs(auction.wnd:FindChild("ResponsesFrame"):GetChildren()) do Print(wnd:GetName()) end
+	auction.wnd:FindChild("ResponsesFrame"):FindChild("Responses"):DestroyChildren()
 	for k,bidder in ipairs(needs) do
 		local ID = self:GetPlayerByIDByName(bidder.strName)
 		local wnd = Apollo.LoadForm(self.xmlDoc2,"CharacterButtonBidderResponse",auction.wnd:FindChild("Responses"),self)
@@ -1528,15 +1528,15 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,nDuration,bReceived,tLabel
 		if progress == nil then progress = 0 end
 		local targetWnd
 		if #self.ActiveAuctions == 0 then
-			if self.wndBid2:FindChild("Auctions") then
-				targetWnd = self.wndBid2:FindChild("Auctions")
+			if self.wndBid2:FindChild("Frame"):FindChild("Auctions") then
+				targetWnd = self.wndBid2:FindChild("Frame"):FindChild("Auctions")
 			else
-				targetWnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2,self)
+				targetWnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2:FindChild("Frame"),self)
 				targetWnd:SetName("Auctions")
 			end
 		else
-			targetWnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2,self)
-			self.wndBid2:FindChild("Auctions"):AttachTab(targetWnd,false)
+			targetWnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2:FindChild("Frame"),self)
+			self.wndBid2:FindChild("Frame"):FindChild("Auctions"):AttachTab(targetWnd,false)
 			targetWnd:Lock(true)
 		end
 		if targetWnd:FindChild("LoadingOverlay"):IsShown() then
@@ -1550,7 +1550,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,nDuration,bReceived,tLabel
 			self:BidCustomLabelsUpdate(true)
 		end
 		if bMaster == nil then 
-				if #Hook.wndMasterLoot_ItemList:GetChildren() == 0 then bMaster = false else bMaster = true end
+			if #Hook.wndMasterLoot_ItemList:GetChildren() == 0 then bMaster = false else bMaster = true end
 		end
 		targetWnd:FindChild("Icon"):SetSprite(item:GetIcon())
 		targetWnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))

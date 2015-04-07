@@ -3,7 +3,10 @@
 -- Copyright (c) Piotr Szymczak 2015 	dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
  
+
+require "Apollo"
 require "Window"
+
 -----------------------------------------------------------------------------------------------
 -- DKP Module Definition
 -----------------------------------------------------------------------------------------------
@@ -119,6 +122,10 @@ local ktUndoActions =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.0 revision 145 Beta Release Cadidate 2 ---
+{xx/04/2015}
+Changed visual representation of Network Bidding window.
+Colored icons in roster window are now bigger.
 ---RaidOps version 2.0 revision 144 Beta Release Cadidate 1 ---
 {06/04/2015}
 Initial Release
@@ -311,7 +318,7 @@ function DKP:OnDocLoaded()
 			self.tItems["settings"].guildname = nil
 			self.tItems["settings"].dkp = 200 -- mass add
 			self.tItems["settings"].default_dkp = 500
-			self.tItems["settings"].collect_new = 1
+			self.tItems["settings"].collect_new = 0
 			self.tItems["settings"].forceCheck = 0
 			self.tItems["settings"].lowercase = 0
 			self.tItems["settings"].BidEnable = 1
@@ -375,6 +382,7 @@ function DKP:OnDocLoaded()
 		self:CEInit()
 		self:RaidInit()
 		-- Colors
+		
 		
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
 		
@@ -2186,7 +2194,14 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		end
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
 	end
-	if playerItem.class then playerItem.wnd:FindChild("ClassIcon"):SetSprite(ktStringToIcon[playerItem.class]) else playerItem.wnd:FindChild("ClassIcon"):Show(false,false) end
+	local wndClassIcon = self.tItems["settings"].bColorIcons and playerItem.wnd:FindChild("ClassIconBigger") or playerItem.wnd:FindChild("ClassIcon")
+	if playerItem.class then 
+		wndClassIcon:SetSprite(ktStringToIcon[playerItem.class])
+		wndClassIcon:Show(true,false)
+	else 
+		playerItem.wnd:FindChild("ClassIcon"):Show(false,false) 
+		playerItem.wnd:FindChild("ClassIconBigger"):Show(false,false) 
+	end
 	if self.tItems["settings"].bDisplayRoles and playerItem.role then playerItem.wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[playerItem.role]) else playerItem.wnd:FindChild("RoleIcon"):Show(false) end
 	if playerItem.alt then
 		playerItem.wnd:FindChild("Alt"):SetTooltip("Playing as : " .. playerItem.alt)
