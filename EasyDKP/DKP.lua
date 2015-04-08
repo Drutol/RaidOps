@@ -119,13 +119,31 @@ local ktUndoActions =
 	["raward"] = "{Raid Award}",
 
 }
+local ktQual = 
+{
+	["Gray"] = true,
+	["White"] = true,
+	["Green"] = true,
+	["Blue"] = true,
+	["Purple"] = true,
+	["Orange"] = true,
+	["Pink"] = true,
+}
+
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.0 revision 145 Beta Release Cadidate 2 ---
-{xx/04/2015}
-Changed visual representation of Network Bidding window.
+---RaidOps version 2.0 revision 145 Beta ---
+{08/04/2015}
+
+Changed visual representation of Network Bidding window. [Final UI]
 Colored icons in roster window are now bigger.
+Added /chatbid command for chat bidding window.
+Fixed error when addon would try to close non-existant Network Bidding auction.
+From now on Network Bidding button in both Hub and and Main window will enable upon Network Bidding's init.
+Added item level filter to item filtering.
+Added item quality filter to item filtering.
+
 ---RaidOps version 2.0 revision 144 Beta Release Cadidate 1 ---
 {06/04/2015}
 Initial Release
@@ -179,14 +197,6 @@ function DKP:Init()
 	}
 	self.tItems = {}
 	self.tItems["purged"] = nil
-	self.SyncChannel = nil
-	self.PrivateSyncChannel = nil
-	server = nil
-	client = nil
-	detailedEntryID = 0
-	self.detailItemList = nil
-	self.tAlts = {}
-	self.tLogs = {}
 	purge_database = 0
 	Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
@@ -293,6 +303,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
 		Apollo.RegisterSlashCommand("att", "AttendanceShow", self)
+		Apollo.RegisterSlashCommand("chatbid", "BidOpen", self)
 		--Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
@@ -358,6 +369,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
 		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
 		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
+		if self.tItems["settings"].nMinIlvl == nil then self.tItems["settings"].nMinIlvl = 1 end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
@@ -381,6 +393,7 @@ function DKP:OnDocLoaded()
 		self:UndoInit()
 		self:CEInit()
 		self:RaidInit()
+		self:FQInit()
 		-- Colors
 		
 		
@@ -420,6 +433,8 @@ function DKP:OnDocLoaded()
 		if self:GetPlayerByIDByName("Guild Bank") == -1 then
 			self:OnUnitCreated("Guild Bank",true)
 		end
+		self.wndMain:FindChild("ButtonNB"):Enable(false)
+		self.wndHub:FindChild("NetworkBidding"):Enable(false)
 		
 	end
 end
@@ -1279,6 +1294,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			end
 			local words = {}
 			local bFound = false 
+			local bMeetLevel = false
+			local bMeetQual = false
 			for word in string.gmatch(strTextLoot,"%S+") do
 				table.insert(words,word)
 			end
@@ -1306,10 +1323,12 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if bFound then break end
 			end
 			
-			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[string.sub(itemStr,2)] then
+			if self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
-				if not item:IsEquippable() and not bFound then return end
-			elseif not self.tItems["settings"].FilterEquippable and self.tItems["settings"].strLootFiltering == "WL" and not bFound then
+				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
+				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
+				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then return end
+			elseif self.tItems["settings"].strLootFiltering == "WL" and not bFound then
 				return
 			end
 			
@@ -2980,11 +2999,13 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("TrackTimedUndo"):SetCheck(self.tItems["settings"].bTrackTimedAwardUndo)
 	self.wndSettings:FindChild("EnableLootLogs"):SetCheck(self.tItems["settings"].bLootLogs)
 	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
+	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n" ..
 									 " /rops - For RaidOps Hub window \n" ..
 									 " /ropsml - For Master Looter Settings window \n" ..
 									 " /nb - For Network Bidding window \n" ..
+									 " /chatbid - For Chat Bidding window \n" ..
 									 " Old modules - waiting for rewrite \n" ..
 									 " /sum - For Raid Summaries \n" ..
 									 " /att - For Attendance \n")
@@ -3036,6 +3057,15 @@ end
 function DKP:SettingsDisplayRolesDisable()
 	self.tItems["settings"].bDisplayRoles = false
 	self:RefreshMainItemList()
+end
+
+function DKP:SettingsSetMinIlvl(wndHandler,wndControl,strText)
+	local value = tonumber(strText)
+	if value and value > 0 then
+		self.tItems["settings"].nMinIlvl = value
+	else
+		wndControl:SetText(self.tItems["settings"].nMinIlvl)
+	end
 end
 
 function DKP:SettingsSaveUndoEnable()
@@ -4892,17 +4922,6 @@ local ktClasses =
 	["Engineer"]    	= true,
 	["Spellslinger"]  	= true,
 }
-
-local ktQual = 
-{
-	["Gray"] = true,
-	["White"] = true,
-	["Green"] = true,
-	["Blue"] = true,
-	["Purple"] = true,
-	["Orange"] = true,
-	["Pink"] = true,
-}
 local ktTabsSettings = 
 {
 	["Slots"] =
@@ -5696,7 +5715,7 @@ function DKP:DFFetchData()
 end
 
 -----------------------------------------------------------------------------------------------
--- DKP Instance
+-- Loot Filtering
 -----------------------------------------------------------------------------------------------
 
 function DKP:FLInit()
@@ -5721,6 +5740,34 @@ end
 
 function DKP:FLHide()
 	self.wndFL:Show(false,false)
+end
+
+function DKP:FQInit()
+	self.wndFQ = Apollo.LoadForm(self.xmlDoc,"FilterQual",nil,self)
+	self.wndFQ:Show(false,true)
+	
+	if self.tItems["settings"].tFilterQual == nil then self.tItems["settings"].tFilterQual = ktQual end
+	
+	for k , wnd in ipairs(self.wndFQ:GetChildren()) do
+		if self.tItems["settings"].tFilterQual[wnd:GetName()] then wnd:SetCheck(self.tItems["settings"].tFilterQual[wnd:GetName()]) end
+	end
+end
+
+function DKP:FQShow()
+	self.wndFQ:Show(true,false)
+	self.wndFQ:ToFront()
+end
+
+function DKP:FQHide()
+	self.wndFQ:Show(false,false)
+end
+
+function DKP:FQEnableQuality(wndHandler,wndControl)
+	self.tItems["settings"].tFilterQual[wndControl:GetName()] = true
+end
+
+function DKP:FQDisableQuality(wndHandler,wndControl)
+	self.tItems["settings"].tFilterQual[wndControl:GetName()] = false
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

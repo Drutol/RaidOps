@@ -875,16 +875,13 @@ end
 
 function DKP:BidClose()
 	self.wndBid:Show(false,false)
-	if self.bIsBidding == true then
-		Print("In order to show this window again type /dkpbid")
-	end
 end
 
 function DKP:BidOpen()
 	if self.bIsBidding == true then
 		self.wndBid:Show(true,false)
 	else
-		Print("You can enable this window only during bidding")
+		Print("There's no bidding currently.")
 	end
 end
 
@@ -955,6 +952,7 @@ function DKP:InitBid2()
 	self.wndBid2:FindChild("Auctions"):FindChild("Assign"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
+	self.wndBid2:FindChild("Auctions"):FindChild("Random"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt1"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt2"):Enable(false)
 	self.wndBid2:FindChild("Auctions"):FindChild("Controls"):FindChild("Opt3"):Enable(false)
@@ -993,10 +991,13 @@ function DKP:InitBid2()
 	
 	self:BidCustomLabelRestore()
 	self:BidCustomLabelsUpdate()
-	--Print("[Network Bidding] - Restoring Auctions")
+	
+	self.wndMain:FindChild("ButtonNB"):Enable(true)
+	self.wndHub:FindChild("NetworkBidding"):Enable(true)
 end
 
 function DKP:Bid2ShowNetworkBidding()
+	if not self.wndBid2 then return end
 	self.wndBid2:Show(true,false)
 	self.wndBid2:ToFront()
 end
@@ -1329,7 +1330,6 @@ function DKP:Bid2ArrangeResponses(auction)
 	table.sort(passes,easyDKpsortBid2Bidders)
 	table.sort(slights,easyDKpsortBid2Bidders)
 	table.sort(greeds,easyDKpsortBid2Bidders)
-	for k , wnd in ipairs(auction.wnd:FindChild("ResponsesFrame"):GetChildren()) do Print(wnd:GetName()) end
 	auction.wnd:FindChild("ResponsesFrame"):FindChild("Responses"):DestroyChildren()
 	for k,bidder in ipairs(needs) do
 		local ID = self:GetPlayerByIDByName(bidder.strName)
@@ -1464,7 +1464,7 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 		end
 	end
 	if self.wndBid2:FindChild("Auctions") == nil and #self.ActiveAuctions == 0 then
-		local wnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2,self)
+		local wnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2:FindChild("Frame"),self)
 		wnd:SetName("Auctions")
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Status"):SetText("No Active Auctions")
@@ -1547,13 +1547,14 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,nDuration,bReceived,tLabel
 			targetWnd:FindChild("Auctions"):FindChild("Assign"):Enable(true)
 			targetWnd:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(true)
 			targetWnd:FindChild("Auctions"):FindChild("ShowVotes"):Enable(true)
+			targetWnd:FindChild("Auctions"):FindChild("Random"):Enable(true)
 			self:BidCustomLabelsUpdate(true)
 		end
 		if bMaster == nil then 
 			if #Hook.wndMasterLoot_ItemList:GetChildren() == 0 then bMaster = false else bMaster = true end
 		end
-		targetWnd:FindChild("Icon"):SetSprite(item:GetIcon())
-		targetWnd:FindChild("Icon"):FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+		targetWnd:FindChild("Frame"):FindChild("Icon"):SetSprite(item:GetIcon())
+		targetWnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 		targetWnd:FindChild("ItemName"):SetText(item:GetName())
 		targetWnd:FindChild("ItemCost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
 		targetWnd:SetData(itemID)
@@ -1728,7 +1729,7 @@ function DKP:BidAssignActionChanged(wndHandler,wndControl)
 end
 
 function DKP:Bid2LooterSelected(wndHandler,wndControl)
-	self:Bid2PopulatePlayerInfo(wndControl:GetData(),wndControl:GetParent():GetParent():FindChild("Info"))
+	self:Bid2PopulatePlayerInfo(wndControl:GetData(),wndControl:GetParent():GetParent():GetParent():FindChild("Info"))
 	self.Bid2SelectedPlayerName = wndControl:GetData().strName
 	self.Bid2SelectedPlayerTile = wndControl
 end
@@ -1799,7 +1800,7 @@ function DKP:Bid2SelectBidderAtRandom(wndHandler,wndControl)
 				end
 			end
 			
-			self:Bid2PopulatePlayerInfo(luckyBidder:GetData(),luckyBidder:GetParent():GetParent():FindChild("Info"))
+			self:Bid2PopulatePlayerInfo(luckyBidder:GetData(),luckyBidder:GetParent():GetParent():GetParent():FindChild("Info"))
 			self.Bid2SelectedPlayerName = luckyBidder:GetData().strName
 			self.Bid2SelectedPlayerTile = luckyBidder
 			
@@ -1822,6 +1823,7 @@ end
 
 function DKP:Bid2AddTestAuction()
 	self:BidAddNewAuction(math.random(20000,40000),true)
+	self.ActiveAuctions[#self.ActiveAuctions].wnd:FindChild("Assign"):Enable(false)
 end
 
 function DKP:Bid2RegisterVote(strName,itemID,strAssistant)
@@ -2018,7 +2020,7 @@ function DKP:Bid2CloseOnAssign(strItem)
 	end
 	
 	if self.wndBid2:FindChild("Auctions") == nil and #self.ActiveAuctions == 0 then
-		local wnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2,self)
+		local wnd = Apollo.LoadForm(self.xmlDoc2,"AuctionItem",self.wndBid2:FindChild("Frame"),self)
 		wnd:SetName("Auctions")
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):Show(true,false)
 		self.wndBid2:FindChild("Auctions"):FindChild("LoadingOverlay"):FindChild("Status"):SetText("No Active Auctions")
@@ -2029,7 +2031,7 @@ function DKP:Bid2CloseOnAssign(strItem)
 		self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
 		self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
 		self:BidCustomLabelsUpdate(false)
-	else
+	elseif #self.ActiveAuctions > 0 then
 		self.ActiveAuctions[1].wnd:SetName("Auctions")
 	end
 end

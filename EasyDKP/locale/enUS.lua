@@ -199,6 +199,10 @@ L["#wndEPGPSettings:GPMin"] = "Don't allow GP to drop below 1."
 L["#wndEPGPSettings:RoundDecay"] = "Use rounded values for Decay."
 L["#wndEPGPSettings:Reset"] = "Reset"
 
+--rev 145
+L["#wndSettings:MinIlvl"] = "Minimum Item Level"
+L["#wndSettings:FilteredQual"] = "Filter Item Qualities"
+
 
 
 
