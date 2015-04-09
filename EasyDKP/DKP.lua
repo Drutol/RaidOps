@@ -133,6 +133,17 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.0 revision 146 Beta ---
+{xx/04/2015}
+
+Fixed Chat bidding's final countdown value setting.
+Fixed bug that prevented from assigning items after chat bidding auction's end.
+Adjusted size of Recent Activity columns.
+Possible fix for disappearing class icons.
+Fixed issues with Mass Edit bars not displaying bigger icons.
+Separated mainspec and offspec bids in Chat bidding.
+Added option to display mych shorter messages in Chat bidding.
+
 ---RaidOps version 2.0 revision 145 Beta ---
 {08/04/2015}
 
@@ -143,6 +154,9 @@ Fixed error when addon would try to close non-existant Network Bidding auction.
 From now on Network Bidding button in both Hub and and Main window will enable upon Network Bidding's init.
 Added item level filter to item filtering.
 Added item quality filter to item filtering.
+Fixed error on Convergence fight.
+Comments will be no longer filled in Recent Activity on Custom Event trigger.
+
 
 ---RaidOps version 2.0 revision 144 Beta Release Cadidate 1 ---
 {06/04/2015}
@@ -395,14 +409,12 @@ function DKP:OnDocLoaded()
 		self:RaidInit()
 		self:FQInit()
 		-- Colors
-		
-		
+	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
 		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
 		self.wndMain:FindChild("ShowTank"):SetCheck(true)
-		--self.wndMain:FindChild("MassEditControls"):FindChild("Invite"):Enable(false)
 		
 		-- Bidding
 		
@@ -482,7 +494,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
 	local tMembersNames = {}
 	local strComment = ""
 	if bRemoval == true or bRemoval == false then strComment = "--" 
-	elseif strType == ktUndoActions["cetrig"] then  strComment = "--" 
+	elseif self:string_starts(strType,"Award for") then  strComment = "--" 
 	elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
 	elseif strType == ktUndoActions["remp"] then  strComment = "--" 
 	elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
@@ -1363,7 +1375,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				strItem = strItem .. " " .. words[k]
 			 end
 			 
-			 for word in string.gmatch(string.sub(strItem,2),"%S+") do
+			for word in string.gmatch(string.sub(itemStr,2),"%S+") do
 				for fWord in string.gmatch(self.tItems["settings"].strFilteredKeywords, '([^;]+)') do
 					if self.tItems["settings"].strLootFiltering == "WL" then
 						if string.lower(fWord) == string.lower(word) then bFound = true break end
@@ -1372,6 +1384,15 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					end
 				end
 				if bFound then break end
+			end
+			
+			if self.ItemDatabase[string.sub(itemStr,2)] then
+				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
+				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
+				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
+				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then return end
+			elseif self.tItems["settings"].strLootFiltering == "WL" and not bFound then
+				return
 			end
 			 
 		         	 strItem = string.sub(strItem,2)
@@ -1394,27 +1415,10 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 self:LLAddLog(strName,strItem)
 		end
 	end
-	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
-		if self.tItems["settings"].TradeEnable == 1 then 
-			local strTextTrade = ""
-			local senderStr = tMessage.strSender
-			for i=1, table.getn(tMessage.arMessageSegments) do
-				strTextTrade = strTextTrade .. tMessage.arMessageSegments[i].strText
-			end
-			local words = {}
-			for word in string.gmatch(strTextTrade,"%S+") do
-				table.insert(words,word)
-			end
-			if #words < 6 --[[or (words[2] .. " " .. words[3]) ~= tMessage.strSender]] then return end
-			if words[1] == "!trade" then
-				self:TradeProcessMessage(words,senderStr)
-			end
-		end
-	end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_NPCSay and GroupLib.InRaid() then
 		local strText = ""
 		for i=1, table.getn(tMessage.arMessageSegments) do
-			strTextTrade = strTextTrade .. tMessage.arMessageSegments[i].strText
+			strText = strText .. tMessage.arMessageSegments[i].strText
 		end
 		if strText == "No! The convergence will be your doom!" then --Noxmind
 			local tBosses = {}
