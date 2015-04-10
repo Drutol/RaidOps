@@ -506,16 +506,28 @@ function DKP:BidStart(strName)
 	self:BidUpdateBiddersList()
 	self:BidUpdateLastWinner()
 	if self.tItems["settings"].strBidMode == "ModeOpenDKP" then
-		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:DKPOpen"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel,tostring(self.tItems["settings"].BidMin)))
+		if not self.tItems["settings"].bShortMsg then
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:DKPOpen"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel,tostring(self.tItems["settings"].BidMin)))
+		else
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:short:DKPOpen"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel))
+		end
 	elseif self.tItems["settings"].strBidMode == "ModeHiddenDKP" then
-		ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  string.format(self.Locale["#biddingStrings:DKPHidden"],self.CurrentItemChatStr,GameLib.GetPlayerUnit():GetName(),tostring(self.tItems["settings"].BidMin)))
+		if not self.tItems["settings"].bShortMsg then
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  string.format(self.Locale["#biddingStrings:DKPHidden"],self.CurrentItemChatStr,GameLib.GetPlayerUnit():GetName(),tostring(self.tItems["settings"].BidMin)))
+		else
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel ..  string.format(self.Locale["#biddingStrings:short:DKPHidden"],self.CurrentItemChatStr,GameLib.GetPlayerUnit():GetName()))
+		end
 	elseif self.tItems["settings"].strBidMode == "ModePureRoll" then
 		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:roll"],self.CurrentItemChatStr))
 	elseif self.tItems["settings"].strBidMode == "ModeModifiedRoll" then
 		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:modifiedRoll"],self.CurrentItemChatStr,tostring(self.tItems["settings"].BidRollModifier)))
 	elseif self.tItems["settings"].strBidMode == "ModeEPGP" then
-		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:EPGP"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel))
-		if self.tItems["settings"].BidAllowOffspec == 1 then 
+		if not self.tItems["settings"].bShortMsg then
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:EPGP"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel))
+		else
+			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:short:EPGP"],self.CurrentItemChatStr))
+		end
+		if self.tItems["settings"].BidAllowOffspec == 1 and not self.tItems["settings"].bShortMsg then 
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:EPGPoffspec"],tostring(self.tItems["settings"].BidEPGPOffspec)))
 		end
 	end

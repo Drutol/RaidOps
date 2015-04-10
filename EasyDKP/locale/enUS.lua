@@ -164,15 +164,15 @@ L["#wndBid:Modes:DKPSettings"] = "DKP Bidding Settings:"
 L["#wndBid:Modes:WhispRespond"] = "Respond in whispers."
 
 --BidStrings
-L["#biddingStrings:DKPOpen"] = " [Chat Bidding] Bidding is now starting in open open mode.You are bidding for %s , if you want to participate write the amount of DKP you want to spend in this item in %s channel.Minimum bid is : %s"
-L["#biddingStrings:DKPHidden"] = " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for %s , if you want to participate whisper the amout of DKP to : %s .Minimum bid is : %s"
-L["#biddingStrings:roll"] = " [Chat Bidding] Type /roll in order to participate in an auction for item %s."
-L["#biddingStrings:modifiedRoll"] = " [Chat Bidding] Type /roll in order to participate in an auction for item %s.This is modified roll : %s percent of your EP will be added to roll."
-L["#biddingStrings:EPGP"] = " [Chat Bidding] If you want to participate in an auction for item %s write !bid in %s channel.Type !bid again to remove your bid."
-L["#biddingStrings:EPGPoffspec"] = " [Chat Bidding] Note: Offspec bidding is enabled ,  for offspec write !off . Offspec PR is decreased by %s percent.Type !off to remove offspec flag"
-L["#biddingStrings:AuctionEndWinner"] = " [Chat Bidding] Auction ended , %s is the winner."
-L["#biddingStrings:AuctionEnd"] = " [Chat Bidding] Auction ended without winner."
-L["#biddingStrings:AuctionEndEarly"] = " [Chat Bidding] Auction ended early , %s is the winner."
+L["#biddingStrings:short:DKPOpen"] = " [Chat Bidding] Bidding is now starting in open open mode.You are bidding for %s , if you want to participate write the amount of DKP you want to spend in this item in %s channel.Minimum bid is : %s"
+L["#biddingStrings:short:DKPHidden"] = " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for %s , if you want to participate whisper the amout of DKP to : %s .Minimum bid is : %s"
+L["#biddingStrings:short:roll"] = " [Chat Bidding] Type /roll in order to participate in an auction for item %s."
+L["#biddingStrings:short:modifiedRoll"] = " [Chat Bidding] Type /roll in order to participate in an auction for item %s.This is modified roll : %s percent of your EP will be added to roll."
+L["#biddingStrings:short:EPGP"] = " [Chat Bidding] If you want to participate in an auction for item %s write !bid in %s channel.Type !bid again to remove your bid."
+L["#biddingStrings:short:EPGPoffspec"] = " [Chat Bidding] Note: Offspec bidding is enabled ,  for offspec write !off . Offspec PR is decreased by %s percent.Type !off to remove offspec flag"
+L["#biddingStrings:short:AuctionEndWinner"] = " [Chat Bidding] Auction ended , %s is the winner."
+L["#biddingStrings:short:AuctionEnd"] = " [Chat Bidding] Auction ended without winner."
+L["#biddingStrings:short:AuctionEndEarly"] = " [Chat Bidding] Auction ended early , %s is the winner."
 
 --EPGPSettings
 
@@ -202,6 +202,15 @@ L["#wndEPGPSettings:Reset"] = "Reset"
 --rev 145
 L["#wndSettings:MinIlvl"] = "Minimum Item Level"
 L["#wndSettings:FilteredQual"] = "Filter Item Qualities"
+
+--rev 146
+L["#wndBid:Mainspec"] = "Mainspec"
+L["#wndBid:Offspec"] = "Offspec"
+L["#wndBid:ShortMsg"] = "Short Messages"
+
+L["#biddingStrings:short:DKPOpen"] = " [Chat Bidding] You are bidding for %s , Write the amount of DKP you want to spend on this item in %s channel"
+L["#biddingStrings:short:DKPHidden"] = " [Chat Bidding] You are bidding for %s , if you want to participate whisper the amout of DKP to : %s ."
+L["#biddingStrings:short:EPGP"] = " [Chat Bidding] Item : %s , type !bid or !off to place your bet!"
 
 
 

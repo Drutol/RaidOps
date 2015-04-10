@@ -143,6 +143,7 @@ Possible fix for disappearing class icons.
 Fixed issues with Mass Edit bars not displaying bigger icons.
 Separated mainspec and offspec bids in Chat bidding.
 Added option to display mych shorter messages in Chat bidding.
+Added option to request full DB sync instead of an update.
 
 ---RaidOps version 2.0 revision 145 Beta ---
 {08/04/2015}
@@ -5581,7 +5582,7 @@ function DKP:DFTimerTick()
 end
 
 -- Syncing
-
+local tFetchers = {} -- heavy stuff
 function DKP:DFJoinSyncChannel( wndHandler, wndControl, eMouseButton )
 	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel","DFOnSyncMessage",self)
 end
@@ -5589,6 +5590,9 @@ end
 function DKP:DFOnSyncMessage(channel, tMsg, strSender)
 	if tMsg.type then
 		if tMsg.type == "SendMeData" then
+			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
+		elseif tMsg.type == "SendMeFullData" then
+			tFetchers[strSender] = nil 
 			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
 		elseif tMsg.type == "EncodedDataFull" then
 			self:ProccesEncodedData(tMsg.strData)		
@@ -5637,7 +5641,7 @@ function DKP:ProccesEncodedDataUpdate(strData)
 	Print("Data received and proccessed , update")
 	self:RefreshMainItemList()
 end
-local tFetchers = {} -- heavy stuff
+
 
 local function ArePlayerTablesDifferent(p1,p2)
 	if tonumber(p1.EP) ~= tonumber(p2.EP) then return true
@@ -5699,14 +5703,11 @@ function DKP:GetEncodedData(strRequester)
 	return tData
 end
 
-
 function DKP:DFAddLog(strPlayer,bSucces)
 	table.insert(self.tItems["settings"].DF.tLogs,1,{strRequester = strPlayer,strState = bSucces and "{Yes}" or "{No}",strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
 	if #self.tItems["settings"].DF.tLogs > 20 then table.remove(self.tItems["settings"].DF.tLogs,21) end
 	if self.wndDF:IsShown() then self:DFPopulate() end
 end
-
-
 
 function DKP:DFFetchDataTimed()
 	local myUnit = GameLib.GetPlayerUnit()
@@ -5716,6 +5717,10 @@ end
 
 function DKP:DFFetchData()
 	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
+end
+
+function DKP:DFFetchFullData()
+	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeFullData"}) end
 end
 
 -----------------------------------------------------------------------------------------------

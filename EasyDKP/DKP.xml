@@ -1571,6 +1571,9 @@
             <Event Name="ButtonCheck" Function="DFSmartMode"/>
             <Event Name="ButtonUncheck" Function="DFDumbMode"/>
         </Control>
+        <Control Class="Button" Base="zonemap:btnWorldMap_Zone1" Font="DefaultButton" ButtonType="PushButton" RadioGroup="" LAnchorPoint="0" LAnchorOffset="349" TAnchorPoint="0" TAnchorOffset="221" RAnchorPoint="0" RAnchorOffset="396" BAnchorPoint="0" BAnchorOffset="263" DT_VCENTER="1" DT_CENTER="1" BGColor="UI_BtnBGDefault" TextColor="UI_BtnTextDefault" NormalTextColor="UI_BtnTextDefault" PressedTextColor="UI_BtnTextDefault" FlybyTextColor="UI_BtnTextDefault" PressedFlybyTextColor="UI_BtnTextDefault" DisabledTextColor="UI_BtnTextDefault" TooltipType="OnCursor" Name="FullFetch" TooltipColor="" Text="" TextId="CRB_X" Tooltip="Requests full Database sync." TooltipId="">
+            <Event Name="ButtonSignal" Function="DFFetchFullData"/>
+        </Control>
     </Form>
     <Form Class="Window" LAnchorPoint="0" LAnchorOffset="400" TAnchorPoint="0" TAnchorOffset="342" RAnchorPoint="0" RAnchorOffset="805" BAnchorPoint="0" BAnchorOffset="632" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Holo_List" TooltipType="OnCursor" Name="FilteredItems" Border="1" Picture="1" SwallowMouseClicks="1" Moveable="1" Escapable="1" Overlapped="1" TooltipColor="" UseTemplateBG="1" Tooltip="">
         <Control Class="EditBox" LAnchorPoint="0" LAnchorOffset="6" TAnchorPoint="0" TAnchorOffset="52" RAnchorPoint="0" RAnchorOffset="308" BAnchorPoint="0" BAnchorOffset="193" RelativeToClient="1" Font="Default" Text="" BGColor="UI_WindowBGDefault" TextColor="UI_WindowTextDefault" Template="Holo_InputBox" TooltipType="OnCursor" Name="Words" TooltipColor="" UseTemplateBG="1" Border="1" MultiLine="1">
