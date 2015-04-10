@@ -106,6 +106,7 @@ function DKP:IBEResize(wndBubble)
 		wndBubble:SetAnchorOffsets(l,t,l+knBubbleDefWidth,t+knBubbleDefHeight)
 	end
 	wndBubble:FindChild("ItemGridFrame"):FindChild("ItemGrid"):ArrangeChildrenTiles(0,raidOpsSortBubble)
+
 end
 
 function DKP:IBPopulate(wndBubble)
@@ -134,22 +135,23 @@ function DKP:IBPopulate(wndBubble)
 	if wndBubble:GetData().nItems == nil then wndBubble:GetData().nItems = knItemTilePerRow end
 	if wndBubble:GetData().nRows == nil then wndBubble:GetData().nRows = knItemTileRows end
 	
+	--Print(wndBubble:GetData().nRows)
+	
 	local nWidth = 0
 	local nHeight = 120
 	local bAddingWidth = true
 	local nRows = 1
 	for k=1,nUniqueLoot do
 		if bAddingWidth then nWidth = nWidth + knItemTileWidth + knItemTileHorzSpacing end
-		if k%(wndBubble:GetData().nItems+1) == 0 then 
+		if k%(wndBubble:GetData().nItems) == 0 then 
 			bAddingWidth = false
 		end
-		if not bAddingWidth and k%(wndBubble:GetData().nItems+1) == 0 then 
+		if not bAddingWidth and k%(wndBubble:GetData().nItems) == 0 then 
+			if nRows >= wndBubble:GetData().nRows then break end
 			nRows = nRows + 1
-			if nRows > wndBubble:GetData().nRows then break end
-			nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing 		
+			nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing	
 		end
 	end
-	
 	wndBubble:GetData().nWidthMod = (nWidth - knBubbleDefWidth) > 0 and nWidth - knBubbleDefWidth or 0
 	wndBubble:GetData().nHeightMod =  nHeight
 	tIDCounter = {}
@@ -231,7 +233,7 @@ function DKP:RIRequestRearrange(wndList)
 			
 			local bNewRow = false
 			
-			if newR >= wndList:GetWidth() then -- New Row
+			if newR >= wndList:GetWidth() or child:GetData().bForceNewRow then -- New Row
 				bNewRow = true
 				
 				newL = knBubbleHorzSpacing
