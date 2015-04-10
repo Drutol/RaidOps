@@ -206,7 +206,7 @@ L["#wndSettings:FilteredQual"] = "Filter Item Qualities"
 --rev 146
 L["#wndBid:Mainspec"] = "Mainspec"
 L["#wndBid:Offspec"] = "Offspec"
-L["#wndBid:ShortMsg"] = "Short Messages"
+L["#wndBid:Modes:ShortMsg"] = "Short Messages"
 
 L["#biddingStrings:short:DKPOpen"] = " [Chat Bidding] You are bidding for %s , Write the amount of DKP you want to spend on this item in %s channel"
 L["#biddingStrings:short:DKPHidden"] = " [Chat Bidding] You are bidding for %s , if you want to participate whisper the amout of DKP to : %s ."

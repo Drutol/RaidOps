@@ -134,16 +134,17 @@ local ktQual =
 local strChangelog = 
 [===[
 ---RaidOps version 2.0 revision 146 Beta ---
-{xx/04/2015}
+{10/04/2015}
 
 Fixed Chat bidding's final countdown value setting.
 Fixed bug that prevented from assigning items after chat bidding auction's end.
 Adjusted size of Recent Activity columns.
 Possible fix for disappearing class icons.
-Fixed issues with Mass Edit bars not displaying bigger icons.
+Fixed issues with Mass Edit while displaying color icons.
 Separated mainspec and offspec bids in Chat bidding.
-Added option to display mych shorter messages in Chat bidding.
+Added option to display much shorter messages in Chat bidding.
 Added option to request full DB sync instead of an update.
+Fixed an issue with alts and data sync.
 
 ---RaidOps version 2.0 revision 145 Beta ---
 {08/04/2015}
@@ -5608,12 +5609,12 @@ function DKP:ProccesEncodedData(strData)
 	local tData = serpent.load(Base64.Decode(strData))
 	
 	if tData then
+		for k, player in ipairs(tData) do
+			table.remove(self.tItems,k)
+		end
+		self.tItems["alts"] = tData["alts"]
 		for k,player in ipairs(tData) do
-			if self:GetPlayerByIDByName(player.strName) == -1 then
-				table.insert(self.tItems,player)
-			else
-				self.tItems[self:GetPlayerByIDByName(player.strName)] = player
-			end
+			table.insert(self.tItems,player)
 		end
 	end
 	Print("Data received and proccessed , full sync")
@@ -5625,6 +5626,12 @@ function DKP:ProccesEncodedDataUpdate(strData)
 	local tData = serpent.load(Base64.Decode(strData))
 	
 	if tData then
+		self.tItems["alts"] = tData["alts"]
+		for alt , owner in pairs(tData["alts"]) do
+			if self:GetPlayerByIDByName(alt) ~= -1 then
+				table.remove(self.tItems,self:GetPlayerByIDByName(alt))
+			end
+		end
 		for k,player in ipairs(tData) do
 			if self:GetPlayerByIDByName(player.strName) == -1 then
 				table.insert(self.tItems,player)
@@ -5691,6 +5698,7 @@ function DKP:GetEncodedData(strRequester)
 					table.insert(tPlayers,playerSource)
 				end
 			end
+			tPlayers["alts"] = self.tItems["alts"]
 			local tPlayersSource = {}
 			for k,player in ipairs(self.tItems) do
 				table.insert(tPlayersSource,player)

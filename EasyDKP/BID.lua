@@ -245,6 +245,7 @@ function DKP:BidCompleteInit()
 	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
 	--self.tItems["settings"].strBidChannel = "/s "
 	Hook.wndMasterLoot:Show(false,false)
+	self.strMyName = GameLib.GetPlayerUnit():GetName()
 end
 
 function DKP:BidFixedPriceChanged(wndHandler,wndControl,strText)
