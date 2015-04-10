@@ -476,16 +476,19 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 				self.tItems[i].GP = tonumber(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[i].GP))
 			end
 			
-		
 			if self.wndEPGPSettings:FindChild("DecayEP"):IsChecked() == true then
-				self.tItems[i].EP = self.tItems[i].EP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
+				local nPreEP = self.tItems[i].EP
+				self.tItems[i].EP = self.tItems[i].EP * ((100 - self.tItems["EPGP"].nDecayValue)/100)	
+				if self.tItems["settings"].logs == 1 then self:DetailAddLog(self.tItems["EPGP"].nDecayValue .. "% EP Decay","{Decay}",math.floor((nPreEP - self.tItems[i].EP)) * -1 ,i) end
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
+				local nPreGP = self.tItems[i].GP
 				if self.tItems["EPGP"].bDecayRealGP then
 					self.tItems[i].GP = (self.tItems[i].GP - self.tItems["EPGP"].BaseGP) * ((100 - self.tItems["EPGP"].nDecayValue)/100) + self.tItems["EPGP"].BaseGP
 				else
 					self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 				end
+				if self.tItems["settings"].logs == 1 then self:DetailAddLog(self.tItems["EPGP"].nDecayValue .. "% GP Decay","{Decay}",math.floor((nPreGP - self.tItems[i].GP)) * -1 ,i) end
 			end
 			if self.tItems["EPGP"].bMinGP and self.tItems[i].GP < 1 then self.tItems[i].GP = 1 end
 		end

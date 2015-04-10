@@ -145,6 +145,10 @@ Separated mainspec and offspec bids in Chat bidding.
 Added option to display much shorter messages in Chat bidding.
 Added option to request full DB sync instead of an update.
 Fixed an issue with alts and data sync.
+Added option to notify raid about triggering of custom event.
+Now Decay will add personal logs.
+Personal logs window is a bit bigger now.
+
 
 ---RaidOps version 2.0 revision 145 Beta ---
 {08/04/2015}
@@ -4224,7 +4228,7 @@ end
 function DKP:LogsInit()
 	self.wndLogs = Apollo.LoadForm(self.xmlDoc,"Logs",nil,self)
 	self.wndLogs:Show(false,true)
-	self.wndLogs:SetSizingMinimum(519,332)
+	self.wndLogs:SetSizingMinimum(648,329)
 	self.wndLogs:SetSizingMaximum(519,700)
 end
 
@@ -4369,14 +4373,24 @@ function DKP:CEInit()
 	
 	if self.tItems["settings"].CEEnable == nil then self.tItems["settings"].CEEnable = false end
 	if self.tItems["settings"].CERaidOnly == nil then self.tItems["settings"].CERaidOnly = false end
+	if self.tItems["settings"].CENotify == nil then self.tItems["settings"].CENotify = false end
 	
 	self.wndCE:FindChild("Enable"):SetCheck(self.tItems["settings"].CEEnable)
 	self.wndCE:FindChild("RaidOnly"):SetCheck(self.tItems["settings"].CERaidOnly)
+	self.wndCE:FindChild("Notify"):SetCheck(self.tItems["settings"].CENotify)
 	
 	if self.tItems["settings"].CEEnable then Apollo.RegisterEventHandler("CombatLogDamage","CEOnUnitDamage", self) end
 	
 	
 	if self.tItems["CE"] == nil then self.tItems["CE"] = {} end
+end
+
+function DKP:CENotifyEnable()
+	self.tItems["settings"].CENotify = true
+end
+
+function DKP:CENotifyDisable()
+	self.tItems["settings"].CENotify = false
 end
 
 function DKP:CEShow()
@@ -4497,7 +4511,19 @@ function DKP:CETriggerEvent(eID)
 			end
 			self:UndoAddActivity(string.format(ktUndoActions["cetrig"],strMob,eID),event.EP or event.GP or event.DKP,tMembers)
 		end
-
+		if self.tItems["settings"].CENotify then
+			local strAwards = ""
+			if event.EP then
+				strAwards = strAwards .. event.EP .. "EP  ,"
+			end			
+			if event.GP then
+				strAwards = strAwards .. event.GP .. "GP  ,"
+			end			
+			if event.DKP then
+				strAwards = strAwards .. event.DKP .. "DKP"
+			end
+			ChatSystemLib.Command("/party " .. string.format("Award for %s , %s",strMob,strAwards))
+		end
 		
 		for k,member in ipairs(raid) do
 			local pID = self:GetPlayerByIDByName(member)
@@ -5609,12 +5635,16 @@ function DKP:ProccesEncodedData(strData)
 	local tData = serpent.load(Base64.Decode(strData))
 	
 	if tData then
-		for k, player in ipairs(tData) do
+		for k, player in ipairs(self.tItems) do
 			table.remove(self.tItems,k)
 		end
-		self.tItems["alts"] = tData["alts"]
+		self.tItems["alts"] = tData["alts"] or {}
 		for k,player in ipairs(tData) do
-			table.insert(self.tItems,player)
+			if self:GetPlayerByIDByName(player.strName) == -1 then
+				table.insert(self.tItems,player)
+			else
+				self.tItems[self:GetPlayerByIDByName(player.strName)] = player
+			end
 		end
 	end
 	Print("Data received and proccessed , full sync")
@@ -5626,10 +5656,10 @@ function DKP:ProccesEncodedDataUpdate(strData)
 	local tData = serpent.load(Base64.Decode(strData))
 	
 	if tData then
-		self.tItems["alts"] = tData["alts"]
+		self.tItems["alts"] = tData["alts"] or {}
 		for alt , owner in pairs(tData["alts"]) do
-			if self:GetPlayerByIDByName(alt) ~= -1 then
-				table.remove(self.tItems,self:GetPlayerByIDByName(alt))
+			for k , player in ipairs(self.tItems) do
+				if string.lower(player.strName) == alt then table.remove(self.tItems,k) break end 
 			end
 		end
 		for k,player in ipairs(tData) do
@@ -5657,6 +5687,7 @@ local function ArePlayerTablesDifferent(p1,p2)
 	elseif #p1.logs ~= #p2.logs then	return true
 	elseif p1.net ~= p2.net then return true
 	elseif p1.tot ~= p2.tot then return true
+	elseif #p1.alts ~= #p2.alts then return true
 	else return false end
 end
 
