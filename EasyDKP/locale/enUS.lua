@@ -212,7 +212,7 @@ L["#biddingStrings:short:DKPOpen"] = " [Chat Bidding] You are bidding for %s , W
 L["#biddingStrings:short:DKPHidden"] = " [Chat Bidding] You are bidding for %s , if you want to participate whisper the amout of DKP to : %s ."
 L["#biddingStrings:short:EPGP"] = " [Chat Bidding] Item : %s , type !bid or !off to place your bet!"
 --rev 147
-L["#wndSettings:AutoComment"] = "Generate Commentsg Automatically"
+L["#wndSettings:AutoComment"] = "Generate Comments Automatically"
 
 
 
