@@ -133,6 +133,12 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.0 revision 147 Beta Release Candidate 2---
+{xx/04/2015}
+Item label will now work properly , getting its info from Loot Logs.
+Added option to automatically create simple comments.
+Fixed issue with Logs window resizing.
+
 ---RaidOps version 2.0 revision 146 Beta ---
 {10/04/2015}
 
@@ -162,11 +168,6 @@ Added item level filter to item filtering.
 Added item quality filter to item filtering.
 Fixed error on Convergence fight.
 Comments will be no longer filled in Recent Activity on Custom Event trigger.
-
-
----RaidOps version 2.0 revision 144 Beta Release Cadidate 1 ---
-{06/04/2015}
-Initial Release
  ]===]
 
 -- Localization stuff
@@ -387,6 +388,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bCountSelected == nil then self.tItems["settings"].bCountSelected = false end
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
+		if self.tItems["settings"].bAutoLog == nil then self.tItems["settings"].bAutoLog = true end
 		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
 		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
 		if self.tItems["settings"].nMinIlvl == nil then self.tItems["settings"].nMinIlvl = 1 end
@@ -435,6 +437,7 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("Decay"):Show(false)
 		self:DecayRestore()
 		self:ControlsUpdateQuickAddButtons()
+		self:EnableActionButtons()
 		self.wndChangelog:FindChild("Log"):SetText(strChangelog)
 		
 		if self.tItems["settings"].BidEnable == 1 then self:BidBeginInit()
@@ -884,11 +887,18 @@ function DKP:SetDKP(cycling)
 		return
 	end
 
-	if self.wndSelectedListItem ~=nil then
+	if self.wndSelectedListItem ~= nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
+			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+					comment = "Set EP"
+				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+					comment = "Set GP"
+				end
+			end
 			if self.tItems["EPGP"].Enable == 0 then	
 				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]}) end
 				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(value)
@@ -1000,10 +1010,12 @@ end
 function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
 	self.wndSelectedListItem = wndControl
+	self:EnableActionButtons()
 end
 
 function DKP:OnListItemDeselected()
 	self.wndSelectedListItem = nil
+	self:EnableActionButtons()
 end
 
 function DKP:ShowDetails(wndHandler,wndControl,eMouseButton)
@@ -1123,6 +1135,13 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 			local strName = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+					comment = "Add EP"
+				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+					comment = "Add GP"
+				end
+			end
 			local ID = self:GetPlayerByIDByName(strName)
 			if ID ~= -1  then
 				if self.tItems["EPGP"].Enable == 0 then
@@ -1204,6 +1223,13 @@ function DKP:SubtractDKP(cycling)
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			local ID = self:GetPlayerByIDByName(strName)
+			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+					comment = "Subtract EP"
+				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+					comment = "Subtract GP"
+				end
+			end
 			if ID ~= -1 then
 				if self.tItems["EPGP"].Enable == 0 then
 					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["subdkp"],value,{[1] = self.tItems[ID]}) end
@@ -1275,6 +1301,13 @@ end
 function DKP:Add100DKP()
 		if self.tItems["EPGP"].Enable == 0 then
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+					comment = "Add EP (whole raid)"
+				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+					comment = "Add GP (whole raid)"
+				end
+			end
 			local tMembers = {}
 			for i=1,GroupLib.GetMemberCount() do
 				local player = GroupLib.GetGroupMember(i)
@@ -1526,32 +1559,22 @@ function compare_easyDKP(a,b)
 	return a.value > b.value
 end
 
+--Old as heck
 function DKP:EnableActionButtons( wndHandler, wndControl, strText )
 	local wndCommentBox = self.wndMain:FindChild("Controls"):FindChild("EditBox")
 	local wndInputBox = self.wndMain:FindChild("Controls"):FindChild("EditBox1")
-	local strDKP = wndInputBox:GetText()
-	strText = wndCommentBox:GetText()
-	if strDKP ~= "Input Value" and strText ~= "Comment" and self.wndSelectedListItem~=nil or strDKP ~= "Input Value" and strText ~= "Comment" and self.MassEdit == true then
-		local setButton = self.wndMain:FindChild("ButtonSet")
-		local addButton = self.wndMain:FindChild("ButtonAdd")
-		local subtractButton = self.wndMain:FindChild("ButtonSubtract")
+	local val = tonumber(wndInputBox:GetText())
 
-		setButton:Enable(true)
-		addButton:Enable(true)
-		subtractButton:Enable(true)
-	end
-	if strDKP == "Input Value" or strDKP == "" then
+	
+	if self.tItems["settings"].bAutoLog and wndCommentBox:GetText() == "Comment" then wndCommentBox:SetText("Comment - Auto") end
+	local strComment = wndCommentBox:GetText()
+	
+	if val and strComment ~= "Comment" and self.wndSelectedListItem or val and strText ~= "Comment" and #selectedMembers > 0 and self.MassEdit then
+		self.wndMain:FindChild("ButtonSet"):Enable(true)
+		self.wndMain:FindChild("ButtonAdd"):Enable(true)
+		self.wndMain:FindChild("ButtonSubtract"):Enable(true)
+	else 
 		self:ResetInputAndComment()
-	end
-	if strText == "Comment" or strText == "" then
-		self:ResetInputAndComment()
-	end
-	if strText == "" then
-		local wndInputBox = self.wndMain:FindChild("Controls"):FindChild("EditBox")
-		wndInputBox:SetText("Comment")	
-	end
-	if strText ~= "Comment" then
-		self.wndMain:FindChild("Add100DKP"):Enable(true)
 	end
 end
 
@@ -1563,14 +1586,22 @@ end
 
 function DKP:ResetCommentBox( wndHandler, wndControl, strText )
 	if strText == "" then
-		self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment")
+		if not self.tItems["settings"].bAutoLog then
+			self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment")
+		else
+			self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment - Auto")
+		end
 	end
 end
 
 function DKP:ResetCommentBoxFull( wndHandler, wndControl, strText )
 	local wndCommentBox = self.wndMain:FindChild("Controls"):FindChild("EditBox")
 	if self.tItems["settings"].logs == 1 then
-		wndCommentBox:SetText("Comment")
+		if not self.tItems["settings"].bAutoLog then
+			self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment")
+		else
+			self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment - Auto")
+		end
 	else
 		wndCommentBox:SetText("Comments Disabled")
 	end
@@ -2193,12 +2224,16 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
-				if self.tItems["settings"]["Bid2"].tWinners then
-					local item = Item.GetDataFromId(self.tItems["settings"]["Bid2"].tWinners[playerItem.strName])
+				if playerItem.tLLogs then
+					local item = Item.GetDataFromId(playerItem.tLLogs[1].itemID)
 					if item then
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
-						playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(item:GetName())
-						Tooltip.GetItemTooltipForm(self,playerItem.wnd:FindChild("Stat"..tostring(i)), item  ,{bPrimary = true, bSelling = false})
+						Apollo.LoadForm(self.xmlDoc,"LoadIconToStat",playerItem.wnd:FindChild("Stat"..tostring(i)),self)
+						playerItem.wnd:FindChild("Stat"..tostring(i)):FindChild("LoadIconToStat"):SetSprite(item:GetIcon())
+						playerItem.wnd:FindChild("Stat"..tostring(i)):SetText("")
+						local l,t,r,b = playerItem.wnd:FindChild("Stat"..tostring(i)):GetAnchorOffsets()
+						playerItem.wnd:FindChild("Stat"..tostring(i)):SetAnchorOffsets(l+32.5,t,r-32.5,b)
+						Tooltip.GetItemTooltipForm(self,playerItem.wnd:FindChild("Stat"..tostring(i)):FindChild("LoadIconToStat"), item  ,{bPrimary = true, bSelling = false})
 					end
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Hrs" then
@@ -3009,6 +3044,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("TrackTimedUndo"):SetCheck(self.tItems["settings"].bTrackTimedAwardUndo)
 	self.wndSettings:FindChild("EnableLootLogs"):SetCheck(self.tItems["settings"].bLootLogs)
 	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
+	self.wndSettings:FindChild("AutoLog"):SetCheck(self.tItems["settings"].bAutoLog)
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n" ..
@@ -3110,6 +3146,18 @@ end
 function DKP:SettingsDisplayCounterDisable()
 	self.tItems["settings"].bDisplayCounter = false
 	self:RefreshMainItemList()
+end
+
+function DKP:SettingsAutoLogsEnable()
+	self.tItems["settings"].bAutoLog = true
+	self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment - Auto")
+	self:EnableActionButtons()
+end
+
+function DKP:SettingsAutoLogsDisable()
+	self.tItems["settings"].bAutoLog = false
+	self.wndMain:FindChild("Controls"):FindChild("EditBox"):SetText("Comment")
+	self:EnableActionButtons()
 end
 
 function DKP:SettingsCheckFetchedNameSpelling( wndHandler, wndControl, strText )
@@ -4229,7 +4277,7 @@ function DKP:LogsInit()
 	self.wndLogs = Apollo.LoadForm(self.xmlDoc,"Logs",nil,self)
 	self.wndLogs:Show(false,true)
 	self.wndLogs:SetSizingMinimum(648,329)
-	self.wndLogs:SetSizingMaximum(519,700)
+	self.wndLogs:SetSizingMaximum(648,550)
 end
 
 function DKP:LogsExport()

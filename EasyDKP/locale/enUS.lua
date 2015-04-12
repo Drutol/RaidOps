@@ -31,7 +31,7 @@ L["#LabelTooltips:EP"] =  "Value of player's Effort Points."
 L["#LabelTooltips:GP"] =  "Value of player's Gear Points."
 L["#LabelTooltips:PR"] =  "Value calculated by dividing the EP value by GP value"
 L["#LabelTooltips:Raids"] =  "Value of player's attended raids"
-L["#LabelTooltips:Item"] =   "Last item received.Recoreded via bidding (chat and network)"
+L["#LabelTooltips:Item"] =   "Last item received.Recoreded via Loot Logs"
 L["#LabelTooltips:RealGP"] =  "Current GP Value decreased by BaseGP"
 --wndMain:Controls
 L["#wndMain:Controls:InputValue"] = "Input value"
@@ -211,7 +211,8 @@ L["#wndBid:Modes:ShortMsg"] = "Short Messages"
 L["#biddingStrings:short:DKPOpen"] = " [Chat Bidding] You are bidding for %s , Write the amount of DKP you want to spend on this item in %s channel"
 L["#biddingStrings:short:DKPHidden"] = " [Chat Bidding] You are bidding for %s , if you want to participate whisper the amout of DKP to : %s ."
 L["#biddingStrings:short:EPGP"] = " [Chat Bidding] Item : %s , type !bid or !off to place your bet!"
-
+--rev 147
+L["#wndSettings:AutoComment"] = "Generate Commentsg Automatically"
 
 
 
