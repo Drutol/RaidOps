@@ -3,6 +3,8 @@
 -- Copyright (c) Piotr Szymczak 2015 	dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
 
+require "ICComm"
+
 local Hook = Apollo.GetAddon("MasterLoot")
 local DKP = Apollo.GetAddon("EasyDKP")
 
@@ -1069,6 +1071,10 @@ end
 
 -- Netorking
 function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
+	if string.len(strText) <= 4 then 
+		wndControl:SetText(self.tItems["settings"]["Bid2"].strChannel) 
+		return 
+	end
 	self.tItems["settings"]["Bid2"].strChannel = strText
 	self.wndBid2Settings:FindChild("Channel"):FindChild("Value"):SetText(strText)
 	self.wndMLSettings:FindChild("ChannelName"):SetText(strText)
@@ -1077,28 +1083,46 @@ function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
 end
 
 function DKP:BidJoinChannel()
-	self.channel = nil
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,"OnRaidResponse",self)
+	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Global)
+	self.channel:SetReceivedMessageFunction("OnRaidResponse",self)
 end
 
-function DKP:OnRaidResponse(channel, tMsg, strSender)
-	if tMsg then
+function DKP:Bid2PackAndSend(tData)
+	if not tData.type then return end
+	tData.strSender = strMyName
+	local strData = serpent.dump(tData)
+	self.channel:SendMessage("ROPS" .. strData)
+end
+
+function DKP:Bid2PackAndSendPrivate(tData,strTarget)
+	if not tData.type then return end
+	tData.strSender = strMyName
+	local strData = serpent.dump(tData)
+	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
+end
+
+function DKP:OnRaidResponse(channel, strMessage, idMessage)
+	if string.sub(strMessage,4) ~= "ROPS" then return end
+	local tMsg = serpent.load(string.sub(strMessage,4))
+	if tMsg.strSender and tMsg.type then
 		if tMsg.type == "Confirmation" then
-			self:BidRegisterCheckResponse(strSender)
-			self:AddResponse(strSender)
+			self:BidRegisterCheckResponse(tMsg.strSender)
+			self:AddResponse(tMsg.strSender)
 		elseif tMsg.type == "Choice" then
-			self:BidRegisterChoice(strSender,tMsg.option,tMsg.item,tMsg.itemCompare)
+			self:BidRegisterChoice(tMsg.strSender,tMsg.option,tMsg.item,tMsg.itemCompare)
 		elseif tMsg.type == "WantCostValues" then
-			self.channel:SendPrivateMessage({[1] = strSender},self:Bid2GetItemCostPackage(strSender))
+			self:Bid2PackAndSendPrivate(tMsg.strSender,self:Bid2GetItemCostPackage(strSender))
 		elseif tMsg.type == "ArUaML" then
-			self.channel:SendPrivateMessage({[1] = strSender},{type = "IamML"})
+			self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "IamML"})
 		elseif tMsg.type == "MyVote" then
-			self:Bid2RegisterVote(tMsg.who,tMsg.item,strSender)
+			self:Bid2RegisterVote(tMsg.who,tMsg.item,tMsg.strSender)
 		elseif tMsg.type == "NewAuction" then
 			self:BidAddNewAuction(tMsg.itemID,false,nil,tMsg.duration,true,tMsg.tLabels,tMsg.tLabelsState)
 		elseif tMsg.type == "GimmeAuctions" then
 			for k,auction in ipairs(self.ActiveAuctions) do
-				if auction.bActive then self.channel:SendPrivateMessage({[1] = strSender},{type = "ActiveAuction" ,item = auction.wnd:GetData(),progress = auction.nTimeLeft,biddersCount = #auction.bidders,votersCount = #auction.votes,duration = self.tItems["settings"]["Bid2"].duration}) end
+				if auction.bActive then 
+					self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "ActiveAuction" ,item = auction.wnd:GetData(),progress = auction.nTimeLeft,biddersCount = #auction.bidders,votersCount = #auction.votes,duration = self.tItems["settings"]["Bid2"].duration}) 
+				end
 			end
 		elseif tMsg.type == "ActiveAuction" then
 			self:Bid2RestoreFetchedAuctionFromID(tMsg.item,tMsg.progress,tMsg.biddersCount,tMsg.votersCount) -- we got an auction info
@@ -1113,7 +1137,7 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 		elseif tMsg.type == "GimmeVotes" then
 			for k,vote in ipairs(self.MyVotes) do
 				if vote.item == tMsg.item then
-					self.channel:SendPrivateMessage({[1] = strSender},{type = "MyVote",who = vote.who,item = vote.item})
+					self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "MyVote",who = vote.who,item = vote.item})
 					break
 				end
 			end
@@ -1136,11 +1160,11 @@ function DKP:OnRaidResponse(channel, tMsg, strSender)
 			self.tEquippedItems[strSender][item:GetSlot()] = tMsg.item
 			self:UpdatePlayerTileBar(strSender,item)
 		elseif tMsg.type =="SendMeThemStandings" then
-			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedStandings" , strData = self:DSGetEncodedStandings(strSender)})
+			self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "EncodedStandings" , strData = self:DSGetEncodedStandings(strSender)})
 		elseif tMsg.type =="SendMeThemLogs" then
-			self.channel:SendPrivateMessage({[1] = strSender},{type = "EncodedLogs" , strData = self:DSGetEncodedLogs(strSender)})
+			self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "EncodedLogs" , strData = self:DSGetEncodedLogs(strSender)})
 		elseif tMsg.type == "WantConfirmation" then
-			self.channel:SendPrivateMessage({[1] = strSender},{type = "Confirmation"})
+			self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "Confirmation"})
 		end
 	end
 end
@@ -1232,8 +1256,8 @@ end
 
 function DKP:Bid2SendUpdateInfo(auction)
 	if self.channel then
-		self.channel:SendPrivateMessage(self:Bid2GetNewTargetsTable(auction.bidders),{type = "SendMeThemChoices",item = auction.wnd:GetData()})
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "AuctionTimeUpdate",item = auction.wnd:GetData(),progress = auction.nTimeLeft})
+		self:Bid2PackAndSend({type = "SendMeThemChoices",item = auction.wnd:GetData()})
+		self:Bid2PackAndSend({type = "AuctionTimeUpdate",item = auction.wnd:GetData(),progress = auction.nTimeLeft})
 	end
 end
 
@@ -1256,8 +1280,8 @@ function DKP:Bid2RestoreAuctionFromNewInfo(itemID,progress,index) -- aka there a
 	local newTargets = self:Bid2GetNewTargetsTable(self.tItems["Auctions"][index].bidders)
 	local newVoters = self:Bid2GetNewTargetsTableVotes(self.tItems["Auctions"][index].voters)
 	if self.channel then 
-		self.channel:SendPrivateMessage(newTargets,{type = "SendMeThemChoices", item = itemID}) -- request for sending choice info once more
-		self.channel:SendPrivateMessage(newVoters,{type = "GimmeVotes",item = itemID})
+		self:Bid2PackAndSend({type = "SendMeThemChoices", item = itemID}) -- request for sending choice info once more
+		self:Bid2PackAndSend({type = "GimmeVotes",item = itemID})
 	end 
 
 	
@@ -1307,7 +1331,7 @@ function DKP:Bid2GetRandomML()
 	if self.channel then 
 		self.searchingML = true
 		self:Bid2StartAuctionFetchTimeout()
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ArUaML"}) -- expecting to get (1) response
+		self:Bid2PackAndSend({type = "ArUaML"}) -- expecting to get (1) response
 	end
 end
 
@@ -1437,7 +1461,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		msg.tLabels = self.tItems["settings"]["Bid2"].tLabels
 		msg.tLabelsState = self.tItems["settings"]["Bid2"].tLabelsState
 		msg.ver = knMemberModuleVersion
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
+		self:Bid2PackAndSend(msg)
 		if self.tItems["settings"]["Bid2"].bNotify then ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. "  [Network Bidding] - Auction started for " .. Item.GetDataFromId(itemID):GetChatLinkString() .."!") end
 	end
 end
@@ -1447,7 +1471,7 @@ function DKP:Bid2SendStopMessage(itemID)
 		local msg = {}
 		msg.type = "AuctionPaused"
 		msg.item = itemID
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
+		self:Bid2PackAndSend(msg)
 	end
 end
 
@@ -1456,7 +1480,7 @@ function DKP:Bid2SendResumeMessage(itemID)
 		local msg = {}
 		msg.type = "AuctionResumed"
 		msg.item = itemID
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg)
+		self:Bid2PackAndSend(msg)
 	end
 end
 
@@ -1551,7 +1575,7 @@ end
 function DKP:Bid2BroadcastMySuperiority()
 	local msg = {}
 	msg.type = "IamML"
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg) end
+	if self.channel then self:Bid2PackAndSend(msg) end
 end
 
 
@@ -1669,10 +1693,10 @@ function DKP:BID2ChoiceChanged(wndHandler,wndControl)
 	local itemComparee
 	local bPass
 	for k,auction in ipairs(self.ActiveAuctions) do if auction.wnd:GetData() == item:GetItemId() then bPass = auction.bPass break end end
-	if item:IsEquippable() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
+	if item:IsEquippable() and item:GetEquippedItemForItemType() then itemComparee = item:GetEquippedItemForItemType():GetItemId() end
 	self:BidRegisterChoice(GameLib.GetPlayerUnit():GetName(),wndControl:GetName(),wndControl:GetParent():GetParent():GetData(),itemComparee)
 	table.insert(self.MyChoices,{item = item:GetItemId(),option = wndControl:GetName()})
-	self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "Choice" , option = wndControl:GetName(), item = wndControl:GetParent():GetParent():GetData(), itemCompare = itemComparee})
+	self:Bid2PackAndSend({type = "Choice" , option = wndControl:GetName(), item = wndControl:GetParent():GetParent():GetData(), itemCompare = itemComparee})
 end
 
 function DKP:BidUpdateTabProgress(wndHandler,wndControl)
@@ -1970,7 +1994,7 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		Hook.tMasterLootSelectedLooter = selectedOne:GetData()
 		Hook.tMasterLootSelectedItem = selectedItem
 		
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ItemResults",item = item:GetItemId(),winner = selectedOne:GetData():GetName()})
+		self:Bid2PackAndSend({type = "ItemResults",item = item:GetItemId(),winner = selectedOne:GetData():GetName()})
 		if self.tItems["settings"]["Bid2"].tWinners == nil then self.tItems["settings"]["Bid2"].tWinners = {} end
 		self.tItems["settings"]["Bid2"].tWinners[selectedOne:GetData():GetName()] = item:GetItemId()
 		 
@@ -1980,7 +2004,7 @@ function DKP:Bid2AssignItem(wndHandler,wndControl)
 		end
 	else
 		if self.Bid2SelectedPlayerName and wndControl:GetParent():GetData() then 
-			self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "MyVote" , who = self.Bid2SelectedPlayerName, item = wndControl:GetParent():GetData()})
+			self:Bid2PackAndSend({type = "MyVote" , who = self.Bid2SelectedPlayerName, item = wndControl:GetParent():GetData()})
 			self:Bid2RegisterVote(self.Bid2SelectedPlayerName,wndControl:GetParent():GetData(),GameLib:GetPlayerUnit():GetName())
 			table.insert(self.MyVotes,{item = wndControl:GetParent():GetData(),who = self.Bid2SelectedPlayerName})
 		end
@@ -2254,7 +2278,7 @@ function sortMasterLootEasyDKPNonWnd(a,b)
 end
 
 function DKP:SendRequestsForCurrItem(itemz)
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "GimmeUrEquippedItem",item = itemz}) end
+	if self.channel then self:Bid2PackAndSend({type = "GimmeUrEquippedItem",item = itemz}) end
 end
 
 function DKP:BidAllowMultiSelection()
@@ -2781,7 +2805,7 @@ function DKP:SendRequests( wndHandler, wndControl, eMouseButton )
 	self.wndMLResponses:Show(true,false)
 	self.wndMLResponses:ToFront()
 	if self.channel then
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "WantConfirmation",ver = knMemberModuleVersion})
+		self:Bid2PackAndSend({type = "WantConfirmation",ver = knMemberModuleVersion})
 	end
 end
 
