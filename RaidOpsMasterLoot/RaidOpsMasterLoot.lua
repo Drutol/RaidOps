@@ -158,7 +158,9 @@ function RaidOpsMasterLoot:CompleteInit()
 	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc,"InsertMLControls",Hook.wndMasterLoot,self)
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
 	Hook:OnMasterLootUpdate(true)
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
+	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,ICCommLib.CodeEnumICCommChannelType.Global)
+	self.channel:SetReceivedMessageFunction("OnReceivedItem",self)
+	self.strMyName = GameLib.GetPlayerUnit():GetName()
 end
 
 function RaidOpsMasterLoot:ReArr()
@@ -303,7 +305,7 @@ function RaidOpsMasterLoot:MLSettingsArrangeLootTypeChanged(wndHandler,wndContro
 end
 
 function RaidOpsMasterLoot:SendRequestsForCurrItem(itemz)
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "GimmeUrEquippedItem",item = itemz}) end
+	if self.channel then self:Bid2PackAndSend({type = "GimmeUrEquippedItem",item = itemz}) end
 end
 
 -- Hook
@@ -374,15 +376,32 @@ function RaidOpsMasterLoot:MLRegisterItemWinner()
 	end
 end
 
-function RaidOpsMasterLoot:OnReceivedItem(channel, tMsg, strSender)
-	if tMsg.type then
+function RaidOpsMasterLoot:Bid2PackAndSend(tData)
+	if not tData.type then return end
+	tData.strSender = strMyName
+	local strData = serpent.dump(tData)
+	self.channel:SendMessage("ROPS" .. strData)
+end
+
+function RaidOpsMasterLoot:Bid2PackAndSendPrivate(tData,strTarget)
+	if not tData.type then return end
+	tData.strSender = strMyName
+	local strData = serpent.dump(tData)
+	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
+end
+
+
+function RaidOpsMasterLoot:OnReceivedItem(channel, strMessage, idMessage)
+	if string.sub(strMessage,1,4) ~= "ROPS" then return end
+	local tMsg = serpent.load(string.sub(strMessage,4))
+	if tMsg.type and tMsg.strSender then
 		if tMsg.type == "MyEquippedItem" then
 			local item = Item.GetDataFromId(tMsg.item)
 			self.tEquippedItems[strSender] = {}
 			self.tEquippedItems[strSender][item:GetSlot()] = tMsg.item
-			self:UpdatePlayerTileBar(strSender,item)
+			self:UpdatePlayerTileBar(tMsg.strSender,item)
 		elseif tMsg.type == "Confirmation" then
-			self:AddResponse(strSender)
+			self:AddResponse(tMsg.strSender)
 		end
 	end
 end
@@ -755,9 +774,13 @@ function RaidOpsMasterLoot:MLSettingsShowLastItemDisableTile( wndHandler, wndCon
 end
 
 function RaidOpsMasterLoot:SetChannelAndReconnect( wndHandler, wndControl, strText )
-	self.channel = nil
+	if string.len(strText) <= 4 then 
+		wndControl:SetText(self.tItems["settings"]["ML"].strChannel) 
+		return 
+	end
 	self.tItems["settings"]["ML"].strChannel = strText
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
+	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,ICCommLib.CodeEnumICCommChannelType.Global)
+	self.channel:SetReceivedMessageFunction("OnReceivedItem",self)
 end
 
 function RaidOpsMasterLoot:MLShowGuildBank()
@@ -807,7 +830,7 @@ function RaidOpsMasterLoot:SendRequests( wndHandler, wndControl, eMouseButton )
 	self.wndResponses:Show(true,false)
 	self.wndResponses:ToFront()
 	if self.channel then
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "WantConfirmation"})
+		self:Bid2PackAndSend({type = "WantConfirmation"})
 	end
 end
 

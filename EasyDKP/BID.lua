@@ -11,7 +11,7 @@ local DKP = Apollo.GetAddon("EasyDKP")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.91
+local knMemberModuleVersion = 1.92
 
 local ktClassToIcon =
 {
@@ -1102,7 +1102,7 @@ function DKP:Bid2PackAndSendPrivate(tData,strTarget)
 end
 
 function DKP:OnRaidResponse(channel, strMessage, idMessage)
-	if string.sub(strMessage,4) ~= "ROPS" then return end
+	if string.sub(strMessage,1,4) ~= "ROPS" then return end
 	local tMsg = serpent.load(string.sub(strMessage,4))
 	if tMsg.strSender and tMsg.type then
 		if tMsg.type == "Confirmation" then
