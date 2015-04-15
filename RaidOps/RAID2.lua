@@ -4,7 +4,7 @@
 -----------------------------------------------------------------------------------------------
 
 --MODULE
-local DKP = Apollo.GetAddon("EasyDKP")
+local DKP = Apollo.GetAddon("RaidOps")
 
 --Constants
 

@@ -83,7 +83,7 @@ function RaidOpsMasterLoot:OnDocLoaded()
 
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
 	    
-		if Apollo.GetAddon("EasyDKP") or Apollo.GetAddon("MasterLoot") == nil then
+		if Apollo.GetAddon("RaidOps") or Apollo.GetAddon("MasterLoot") == nil then
 			Print("[RaidOps MasterLoot] Main addon found or MasterLoot addon not found , disable this addon or figure out which addons you need to disable.")
 			Apollo.AddAddonErrorText(self, "Main addon found or MasterLoot addon not found , disable this addon or figure out which addons you need to disable.")
 			return	

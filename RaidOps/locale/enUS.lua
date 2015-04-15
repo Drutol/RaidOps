@@ -1,4 +1,4 @@
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("EasyDKP", "enUS",true)
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RaidOps", "enUS",true)
 if not L then return end
 --wndMain
 L["#wndMain:Title"] = "RaidOps - DKP/EPGP Management" 

@@ -4,12 +4,12 @@
 -----------------------------------------------------------------------------------------------
 
 local Hook = Apollo.GetAddon("MasterLoot")
-local DKP = Apollo.GetAddon("EasyDKP")
+local DKP = Apollo.GetAddon("RaidOps")
 
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("ChannelAdvice")
 
-local knMemberModuleVersion = 1.91
+local knMemberModuleVersion = 1.92
 
 local ktClassToIcon =
 {
@@ -404,7 +404,7 @@ end
 
 function DKP:BidMasterItemSelected()
 	local HookML = Apollo.GetAddon("MasterLoot")
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
 		DKPInstance.wndInsertedMasterButton:Enable(true)
@@ -506,6 +506,8 @@ function DKP:BidStart(strName)
 	self:BidCheckConditions()
 	self:BidUpdateBiddersList()
 	self:BidUpdateLastWinner()
+	self.wndBid:FindChild("ButtonStart"):Enable(true)
+	self.wndBid:FindChild("ButtonStop"):Enable(true)
 	if self.tItems["settings"].strBidMode == "ModeOpenDKP" then
 		if not self.tItems["settings"].bShortMsg then
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:DKPOpen"],self.CurrentItemChatStr,self.tItems["settings"].strBidChannel,tostring(self.tItems["settings"].BidMin)))
@@ -918,11 +920,12 @@ function DKP:BidClose()
 end
 
 function DKP:BidOpen()
-	if self.bIsBidding == true then
-		self.wndBid:Show(true,false)
-	else
-		Print("There's no bidding currently.")
+	if not self.bIsBidding then
+		self.wndBid:FindChild("ButtonStart"):Enable(false)
+		self.wndBid:FindChild("ButtonStop"):Enable(false)
 	end
+	self.wndBid:Show(true,false)
+
 end
 
 
@@ -1084,7 +1087,6 @@ end
 function DKP:OnRaidResponse(channel, tMsg, strSender)
 	if tMsg then
 		if tMsg.type == "Confirmation" then
-			self:BidRegisterCheckResponse(strSender)
 			self:AddResponse(strSender)
 		elseif tMsg.type == "Choice" then
 			self:BidRegisterChoice(strSender,tMsg.option,tMsg.item,tMsg.itemCompare)
@@ -1515,7 +1517,7 @@ function DKP:Bid2RemoveAuction(wndHandler,wndControl)
 		self.wndBid2:FindChild("Auctions"):FindChild("RemoveAuction"):Enable(false)
 		self.wndBid2:FindChild("Auctions"):FindChild("ShowVotes"):Enable(false)
 		self:BidCustomLabelsUpdate(false)
-	else
+	elseif #self.ActiveAuctions > 0 then
 		self.ActiveAuctions[1].wnd:SetName("Auctions")
 	end
 end
@@ -1822,7 +1824,7 @@ function DKP:Bid2SelectBidderAtRandom(wndHandler,wndControl)
 				if tonumber(string.sub(bidder.option,4)) < highestOpt then
 					tBidders = {}
 					table.insert(tBidders,bidder.strName)
-					highestOpt = tonumber(string.sub(bidder.option,3))
+					highestOpt = tonumber(string.sub(bidder.option,4))
 				else
 					table.insert(tBidders,bidder.strName)
 				end
@@ -2133,7 +2135,7 @@ end
 function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 
 	if luaCaller.tMasterLootSelectedItem ~= nil and luaCaller.tMasterLootSelectedLooter ~= nil then
-		local DKPInstance = Apollo.GetAddon("EasyDKP")
+		local DKPInstance = Apollo.GetAddon("RaidOps")
 		-- gotta save before it gets wiped out by event
 		local SelectedLooter = luaCaller.tMasterLootSelectedLooter
 		local SelectedItemLootId = luaCaller.tMasterLootSelectedItem.nLootId
@@ -2158,7 +2160,7 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 end
 
 function DKP:OnLootAssigned(luaCaller,objItem, strLooter)
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance.bIsSelectedGuildBank and string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then strLooter = "Guild Bank" end
 	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), objItem:GetName(), strLooter))
 end
@@ -2171,7 +2173,7 @@ function DKP:MLRegisterItemWinner()
 end
 
 function sortMasterLootEasyDKPasc(a,b)
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance == nil then return end
 	if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 		if DKPInstance.tItems["EPGP"].Enable == 1 then
@@ -2196,7 +2198,7 @@ function sortMasterLootEasyDKPasc(a,b)
 end
 
 function sortMasterLootEasyDKPdesc(a,b)
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance == nil then return end
 	if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 		if DKPInstance.tItems["EPGP"].Enable == 1 then
@@ -2221,7 +2223,7 @@ function sortMasterLootEasyDKPdesc(a,b)
 end
 
 function sortMasterLootEasyDKPNonWnd(a,b)
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance.tItems["settings"].BidSortAsc == 0 then
 		if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 			if DKPInstance.tItems["EPGP"].Enable == 1 then
@@ -2271,7 +2273,7 @@ end
 function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
 	if luaCaller ~= Apollo.GetAddon("MasterLoot") then luaCaller = Apollo.GetAddon("MasterLoot") end
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if luaCaller.tMasterLootSelectedItem ~= nil then
 		for idx, tItem in pairs (tMasterLootItemList) do
 			if tItem.nLootId == luaCaller.tMasterLootSelectedItem.nLootId then
@@ -2571,7 +2573,7 @@ end
 function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 
 	
 	for idx, tItem in ipairs (tMasterLootItemList) do

@@ -1,4 +1,4 @@
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("EasyDKP", "deDE" )
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RaidOps", "deDE" )
 if not L then return end
 ------------
 --Example & Info

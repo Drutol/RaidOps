@@ -1,9 +1,9 @@
 -----------------------------------------------------------------------------------------------
--- Client Lua Script for EasyDKP
+-- Client Lua Script for RaidOps
 -- Copyright (c) Piotr Szymczak 2015	 dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
 
-local DKP = Apollo.GetAddon("EasyDKP")
+local DKP = Apollo.GetAddon("RaidOps")
 local defaultSlotValues = 
 {
 	["Weapon"] = 1,

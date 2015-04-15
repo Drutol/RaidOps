@@ -2,7 +2,7 @@
 -- Client Lua Script for EasyDKP
 -- Copyright (c) Piotr Szymczak 2015	 dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
-local DKP = Apollo.GetAddon("EasyDKP")
+local DKP = Apollo.GetAddon("RaidOps")
 local ktClassToIcon =
 {
 	[GameLib.CodeEnumClass.Medic]       	= "Icon_Windows_UI_CRB_Medic",

@@ -4,7 +4,7 @@
 -----------------------------------------------------------------------------------------------
 
 --MODULE
-local DKP = Apollo.GetAddon("EasyDKP")
+local DKP = Apollo.GetAddon("RaidOps")
 
 local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrNormalText = ApolloColor.new("ChannelAdvice")

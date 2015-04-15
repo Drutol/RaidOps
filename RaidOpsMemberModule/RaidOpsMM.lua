@@ -10,7 +10,7 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
-local knVersion = 1.91
+local knVersion = 1.92
  
 local kUIBody = "ff39b5d4"
 local ktAuctionHeight = 119
@@ -947,7 +947,7 @@ function RaidOpsMM:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 		if wndControl ~= nil then wndControl:SetCheck(false) end
 		return
 	end
-	if Apollo.GetAddon("EasyDKP") then 
+	if Apollo.GetAddon("RaidOps") then 
 		Print("Master addon already installed")
 		self.settings.tooltips = false
 		if wndControl ~= nil then wndControl:SetCheck(false) end

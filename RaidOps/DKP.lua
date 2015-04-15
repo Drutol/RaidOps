@@ -133,8 +133,16 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.0 "Release"---
+{15/04/2015}
+Changed Addon name to RaidOps. Don't worry , your data is still there. All you need to is to go to %appdata%\Roaming\NCSOFT\WildStar\AddonSaveData and paste the content of EasyDKP_0_Gen.xml to RaidOps_0_Gen.xml. Remember to log off while doing this. 
+Changed /dkp to /epgp
+Fixed a few bugs with Master Loot window.
+/chatbid will now open bidding UI regardless of current auction state.
+
+
 ---RaidOps version 2.0 revision 147 Beta Release Candidate 2---
-{xx/04/2015}
+{12/04/2015}
 Item label will now work properly , getting its info from Loot Logs.
 Added option to automatically create simple comments.
 Fixed issue with Logs window resizing.
@@ -251,7 +259,7 @@ function DKP:OnDocLoaded()
 		--Localisation
 		
 		self.GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-		self.Locale = self.GeminiLocale:GetLocale("EasyDKP", true)
+		self.Locale = self.GeminiLocale:GetLocale("RaidOps", true)
 		self.GeminiLocale:TranslateWindow(self.Locale, self.wndMain)
 		self.GeminiLocale:TranslateWindow(self.Locale, self.wndSettings)
 		
@@ -318,7 +326,7 @@ function DKP:OnDocLoaded()
 		self.wndCredits:Show(false,true)
 		self.wndChangelog:Show(false,true)
 		self.wndMain:FindChild("MassEditControls"):Show(false,true)
-		Apollo.RegisterSlashCommand("dkp", "OnDKPOn", self)
+		Apollo.RegisterSlashCommand("epgp", "OnDKPOn", self)
 		Apollo.RegisterSlashCommand("sum", "RaidShowMainWindow", self)
 		Apollo.RegisterSlashCommand("rops", "HubShow", self)
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
@@ -2373,7 +2381,7 @@ function DKP:LabelGetColumnNumberForValue(value)
 end
 
 function easyDKPSortPlayerbyLabel(a,b)
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance.SortedLabel then
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
 		local label = "Stat"..DKPInstance.SortedLabel
@@ -2396,7 +2404,7 @@ function easyDKPSortPlayerbyLabel(a,b)
 end
 
 function easyDKPSortPlayerbyLabelNotWnd(a,b)
-	local DKPInstance = Apollo.GetAddon("EasyDKP")
+	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance.SortedLabel then
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
 		local label = "Stat"..DKPInstance.SortedLabel
@@ -3047,7 +3055,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("AutoLog"):SetCheck(self.tItems["settings"].bAutoLog)
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
-	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /dkp - For main DKP window \n" ..
+	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /epgp - For main roster window \n" ..
 									 " /rops - For RaidOps Hub window \n" ..
 									 " /ropsml - For Master Looter Settings window \n" ..
 									 " /nb - For Network Bidding window \n" ..
