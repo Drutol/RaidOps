@@ -99,7 +99,7 @@ function DKP:EPGPInit()
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
 	
-	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
+	Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
 end
@@ -275,10 +275,6 @@ function DKP:EPGPChangeUI()
 		self.wndLabelOptions:FindChild("LabelTypes"):ArrangeChildrenVert()
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(true)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(true)
-		if self.tItems["EPGP"].Tooltips == 1 then
-			self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
-			self:EPGPHookToETooltip()
-		end
 		
 	else
 		--Main Controls
@@ -638,7 +634,6 @@ function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 		return
 	end
 	self.tItems["EPGP"].Tooltips = 1
-	--Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 	if not self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then
 		self:RawHook(Apollo.GetAddon("ETooltip"),"AttachBelow")
 	end

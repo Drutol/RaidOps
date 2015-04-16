@@ -133,6 +133,13 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.01---
+{16/04/2015}
+Fixed issues with action buttons(add,sub,set) in Mass Edit mode.
+Hook to EToolTip will be now initialized after short delay.
+Role icons should no longer disappear upon selecting.
+Recent activity will now respect auto comments.
+
 ---RaidOps version 2.0 "Release"---
 {15/04/2015}
 Changed Addon name to RaidOps. Don't worry , your data is still there. All you need to is to go to %appdata%\Roaming\NCSOFT\WildStar\AddonSaveData and paste the content of EasyDKP_0_Gen.xml to RaidOps_0_Gen.xml. Remember to log off while doing this. 
@@ -506,18 +513,22 @@ function DKP:UndoInit()
 	self.wndActivity:FindChild("Redo"):Enable(false)
 end
 
-function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval)
+function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment)
 	if not self.tItems["settings"].bTrackUndo then return end
 	local tMembersNames = {}
 	local strComment = ""
-	if bRemoval == true or bRemoval == false then strComment = "--" 
-	elseif self:string_starts(strType,"Award for") then  strComment = "--" 
-	elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
-	elseif strType == ktUndoActions["remp"] then  strComment = "--" 
-	elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
-	elseif self.tItems["settings"].logs == 1 then 
-		strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
+	if not strForceComment then
+		if bRemoval == true or bRemoval == false then strComment = "--" 
+		elseif self:string_starts(strType,"Award for") then  strComment = "--" 
+		elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
+		elseif strType == ktUndoActions["remp"] then  strComment = "--" 
+		elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
+		elseif self.tItems["settings"].logs == 1 then 
+			strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			if strComment == "Comment" or strComment == "Comments Disabled" or strComment == "Comment - Auto" then strComment = "--" end
+		end
+	else
+		strComment = strForceComment
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.sort(tMembersNames,raidOpsSortCategories)
@@ -535,8 +546,6 @@ end
 
 function DKP:UndoRedo()
 	local tMembersToRevert = serpent.load(tRedoActions[1].strData)
-
-
 	if tMembersToRevert then
 		for k,revertee in ipairs(tMembersToRevert) do
 			if tRedoActions[1].bRemove == nil then
@@ -626,8 +635,9 @@ function DKP:UndoPopulate()
 			if activity.strComment then grid:SetCellData(k,6,activity.strComment) else grid:SetCellData(k,6,"--")	end
 			grid:SetCellData(k,7,activity.strTimestamp)	
 		end
-		
 	end
+	
+	--grid:ArrangeChildrenVert(0,function(a,b) return tonumber(a) < tonumber(b) end)
 end
 
 function DKP:UndoShowActions()
@@ -908,7 +918,7 @@ function DKP:SetDKP(cycling)
 				end
 			end
 			if self.tItems["EPGP"].Enable == 0 then	
-				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]}) end
+				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]},nil,comment) end
 				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(value)
 				local ID = self:GetPlayerByIDByName(strName)
 				
@@ -1090,8 +1100,10 @@ function DKP:OnSave(eLevel)
 			end
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
-			for k,auction in ipairs(self.ActiveAuctions) do
-				if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
+			if self.ActiveAuctions then
+				for k,auction in ipairs(self.ActiveAuctions) do
+					if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
+				end
 			end
 		else
 			tSave["purged"] = "purged"
@@ -1153,7 +1165,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 			local ID = self:GetPlayerByIDByName(strName)
 			if ID ~= -1  then
 				if self.tItems["EPGP"].Enable == 0 then
-				         	if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["adddkp"],value,{[1] = self.tItems[ID]})  end
+				         	if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["adddkp"],value,{[1] = self.tItems[ID]},nil,comment)  end
    				          local modifier = self.tItems[ID].net
 					self.tItems[ID].net = self.tItems[ID].net + value
 					self.tItems[ID].tot = self.tItems[ID].tot + value
@@ -1168,7 +1180,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
-					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["addgp"] or ktUndoActions["addep"],value,{[1] = self.tItems[ID]})  end
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["addgp"] or ktUndoActions["addep"],value,{[1] = self.tItems[ID]},comment)  end
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
@@ -1240,7 +1252,7 @@ function DKP:SubtractDKP(cycling)
 			end
 			if ID ~= -1 then
 				if self.tItems["EPGP"].Enable == 0 then
-					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["subdkp"],value,{[1] = self.tItems[ID]}) end
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["subdkp"],value,{[1] = self.tItems[ID]},nil,comment) end
 					local modifier = self.tItems[ID].net
 					self.tItems[ID].net = self.tItems[ID].net - value
 					modifier = self.tItems[ID].net - modifier
@@ -1307,39 +1319,39 @@ function DKP:SubtractDKP(cycling)
 end
 
 function DKP:Add100DKP()
-		if self.tItems["EPGP"].Enable == 0 then
-			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
-				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
-					comment = "Add EP (whole raid)"
-				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
-					comment = "Add GP (whole raid)"
-				end
+	if self.tItems["EPGP"].Enable == 0 then
+		local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+		if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+			if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+				comment = "Add EP (whole raid)"
+			elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+				comment = "Add GP (whole raid)"
 			end
-			local tMembers = {}
-			for i=1,GroupLib.GetMemberCount() do
-				local player = GroupLib.GetGroupMember(i)
-				local ID = self:GetPlayerByIDByName(player.strCharacterName)
-				
-				if ID ~= -1 then
-					if self.tItems["settings"].bTrackUndo then table.insert(tMembers,self.tItems[ID]) end 
-					self.tItems[ID].net = self.tItems[ID].net + tonumber(self.tItems["settings"].dkp)
-					self.tItems[ID].tot = self.tItems[ID].tot + tonumber(self.tItems["settings"].dkp)
-					
-					self:DetailAddLog(comment,"{DKP}",tostring(self.tItems["settings"].dkp),ID)
-					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,self.tItems["settings"].dkp)
-				end
-			end
-			self:ShowAll()
-			if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity(ktUndoActions["raward"],self.tItems["settings"].dkp,tMembers) end
-		else
-			local EP
-			local GP
-			if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then EP = self.tItems["settings"].dkp end
-			if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then GP = self.tItems["settings"].dkp end
-			self:EPGPAwardRaid(EP,GP)
 		end
-		self:EnableActionButtons()
+		local tMembers = {}
+		for i=1,GroupLib.GetMemberCount() do
+			local player = GroupLib.GetGroupMember(i)
+			local ID = self:GetPlayerByIDByName(player.strCharacterName)
+			
+			if ID ~= -1 then
+				if self.tItems["settings"].bTrackUndo then table.insert(tMembers,self.tItems[ID]) end 
+				self.tItems[ID].net = self.tItems[ID].net + tonumber(self.tItems["settings"].dkp)
+				self.tItems[ID].tot = self.tItems[ID].tot + tonumber(self.tItems["settings"].dkp)
+				
+				self:DetailAddLog(comment,"{DKP}",tostring(self.tItems["settings"].dkp),ID)
+				self:RaidRegisterDkpManipulation(self.tItems[ID].strName,self.tItems["settings"].dkp)
+			end
+		end
+		self:ShowAll()
+		if self.tItems["settings"].bTrackUndo and tMembers then self:UndoAddActivity(ktUndoActions["raward"],self.tItems["settings"].dkp,tMembers,nil,comment) end
+	else
+		local EP
+		local GP
+		if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then EP = self.tItems["settings"].dkp end
+		if self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then GP = self.tItems["settings"].dkp end
+		self:EPGPAwardRaid(EP,GP)
+	end
+	self:EnableActionButtons()
 end
 
 function DKP:OnChatMessage(channelCurrent, tMessage)	
@@ -1577,7 +1589,7 @@ function DKP:EnableActionButtons( wndHandler, wndControl, strText )
 	if self.tItems["settings"].bAutoLog and wndCommentBox:GetText() == "Comment" then wndCommentBox:SetText("Comment - Auto") end
 	local strComment = wndCommentBox:GetText()
 	
-	if val and strComment ~= "Comment" and self.wndSelectedListItem or val and strText ~= "Comment" and #selectedMembers > 0 and self.MassEdit then
+	if val and strComment ~= "Comment" and self.wndSelectedListItem or val and strComment ~= "Comment" and #selectedMembers > 0 and self.MassEdit then
 		self.wndMain:FindChild("ButtonSet"):Enable(true)
 		self.wndMain:FindChild("ButtonAdd"):Enable(true)
 		self.wndMain:FindChild("ButtonSubtract"):Enable(true)
@@ -2043,6 +2055,7 @@ function DKP:MassEditItemSelected( wndHandler, wndControl, eMouseButton )
 	if wndHandler ~= wndControl then return end
 	table.insert(selectedMembers,wndControl)
 	self:UpdateItemCount()
+	self:EnableActionButtons()
 end
 
 function DKP:MassEditItemDeselected( wndHandler, wndControl, eMouseButton)
@@ -2053,6 +2066,7 @@ function DKP:MassEditItemDeselected( wndHandler, wndControl, eMouseButton)
 		end
 	end
 	self:UpdateItemCount()
+	self:EnableActionButtons()
 end
 
 function DKP:StartOnlineRefreshTimer()
@@ -2232,7 +2246,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
-				if playerItem.tLLogs then
+				if playerItem.tLLogs and #playerItem.tLLogs > 0 then
 					local item = Item.GetDataFromId(playerItem.tLLogs[1].itemID)
 					if item then
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))

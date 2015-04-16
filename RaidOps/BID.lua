@@ -246,6 +246,12 @@ function DKP:BidCompleteInit()
 	--self.tItems["settings"].strBidChannel = "/s "
 	Hook.wndMasterLoot:Show(false,false)
 	self.strMyName = GameLib.GetPlayerUnit():GetName()
+	
+	-- GP on the tooltips
+	if self.tItems["EPGP"].Tooltips == 1 then
+		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
+		self:EPGPHookToETooltip()
+	end
 end
 
 function DKP:BidFixedPriceChanged(wndHandler,wndControl,strText)
