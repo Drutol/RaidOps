@@ -147,7 +147,6 @@ Changed /dkp to /epgp
 Fixed a few bugs with Master Loot window.
 /chatbid will now open bidding UI regardless of current auction state.
 
-
 ---RaidOps version 2.0 revision 147 Beta Release Candidate 2---
 {12/04/2015}
 Item label will now work properly , getting its info from Loot Logs.
@@ -169,7 +168,6 @@ Fixed an issue with alts and data sync.
 Added option to notify raid about triggering of custom event.
 Now Decay will add personal logs.
 Personal logs window is a bit bigger now.
-
 
 ---RaidOps version 2.0 revision 145 Beta ---
 {08/04/2015}
@@ -229,7 +227,6 @@ function DKP:Init()
 	local bHasConfigureFunction = false
 	local strConfigureButtonText = ""
 	local tDependencies = {
-		-- "UnitOrPackageName",
 	}
 	self.tItems = {}
 	self.tItems["purged"] = nil
@@ -313,7 +310,7 @@ function DKP:OnDocLoaded()
 			return
 		end
 		if self.wndMainLoc ~= nil then 
-			if self.tItems.wndMainLoc and self.tItems.wndMainLoc.nOffsets[1] ~= 0 then --and self.wndMainLoc.nOffsets[2] ~= 0 and self.wndMainLoc.nOffsets[3] ~= 0 and self.wndMainLoc.nOffsets[4] ~= 0 then
+			if self.tItems.wndMainLoc and self.tItems.wndMainLoc.nOffsets[1] ~= 0 then
 				self.wndMain:MoveToLocation(self.wndMainLoc) 
 				self.wndMainLoc = nil
 			end
@@ -473,6 +470,27 @@ function DKP:OnDocLoaded()
 		self.wndHub:FindChild("NetworkBidding"):Enable(false)
 		
 	end
+end
+
+function DKP:GetPlayerByIDByName(strName)
+
+	local strPlayer = ""
+	for uchar in string.gfind(strName, "([%z\1-\127\194-\244][\128-\191]*)") do
+		if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+		strPlayer = strPlayer .. uchar
+	end
+	strName = strPlayer
+	
+	for i=1,table.maxn(self.tItems) do
+		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then return i end
+	end
+	
+	for j,alt in pairs(self.tItems["alts"]) do
+		if string.lower(strName) == string.lower(j) then return self.tItems["alts"][j] end
+	end
+
+	
+	return -1
 end
 
 function DKP:DebugFetch()
