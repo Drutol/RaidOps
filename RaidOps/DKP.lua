@@ -134,15 +134,17 @@ local ktQual =
 local strChangelog = 
 [===[
 ---RaidOps version 2.02---
-{xx/04/2015}
+{19/04/2015}
 Chat bidding is now less obscure. (to hell with grid windows).
 Chat bidding comes with tiled and groupped list of bidders.
 Chat bidding now supports 4 custom commands for EPGP mode.
 Main roster window is no longer ashamed of other windows and will go to the front. ^^
 Changed default settings a bit.
-Separated Chat Bidding in Network Bidding buttons.
+Separated Chat Bidding in Network Bidding buttons (ML window).
 Fixed issue with tile PR display.
 Added option to automatically select Chat bidding winner.
+Final countdown can be now set to 0.
+/chatbid will now initialize with chatbidding initialization.
 
 ---RaidOps version 2.01---
 {16/04/2015}
@@ -334,7 +336,6 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
 		Apollo.RegisterSlashCommand("att", "AttendanceShow", self)
-		Apollo.RegisterSlashCommand("chatbid", "BidOpen", self)
 		--Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
