@@ -168,8 +168,7 @@ L["#biddingStrings:DKPOpen"] = " [Chat Bidding] Bidding is now starting in open 
 L["#biddingStrings:DKPHidden"] = " [Chat Bidding] Bidding is now starting in hidden mode.You are bidding for %s , if you want to participate whisper the amout of DKP to : %s .Minimum bid is : %s"
 L["#biddingStrings:roll"] = " [Chat Bidding] Type /roll in order to participate in an auction for item %s."
 L["#biddingStrings:modifiedRoll"] = " [Chat Bidding] Type /roll in order to participate in an auction for item %s.This is modified roll : %s percent of your EP will be added to roll."
-L["#biddingStrings:EPGP"] = " [Chat Bidding] If you want to participate in an auction for item %s write !bid in %s channel.Type !bid again to remove your bid."
-L["#biddingStrings:EPGPoffspec"] = " [Chat Bidding] Note: Offspec bidding is enabled ,  for offspec write !off . Offspec PR is decreased by %s percent.Type !off to remove offspec flag"
+L["#biddingStrings:EPGP"] = " [Chat Bidding] If you want to participate in an auction for item %s write %s in %s channel.Type !bid again to remove your bid."
 L["#biddingStrings:AuctionEndWinner"] = " [Chat Bidding] Auction ended , %s is the winner."
 L["#biddingStrings:AuctionEnd"] = " [Chat Bidding] Auction ended without winner."
 L["#biddingStrings:AuctionEndEarly"] = " [Chat Bidding] Auction ended early , %s is the winner."
@@ -210,9 +209,11 @@ L["#wndBid:Modes:ShortMsg"] = "Short Messages"
 
 L["#biddingStrings:short:DKPOpen"] = " [Chat Bidding] You are bidding for %s , Write the amount of DKP you want to spend on this item in %s channel"
 L["#biddingStrings:short:DKPHidden"] = " [Chat Bidding] You are bidding for %s , if you want to participate whisper the amout of DKP to : %s ."
-L["#biddingStrings:short:EPGP"] = " [Chat Bidding] Item : %s , type !bid or !off to place your bet!"
+L["#biddingStrings:short:EPGP"] = " [Chat Bidding] Item : %s , type %s to place your bet , type again to remove!"
 --rev 147
 L["#wndSettings:AutoComment"] = "Generate Comments Automatically"
+--v2.02
+L["#wndBid:Modes:AutoSelect"] = "Select winner automatically"
 
 
 

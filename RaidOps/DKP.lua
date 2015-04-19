@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------------------------
--- Client Lua Script for EasyDKP
+-- Client Lua Script for RaidOps
 -- Copyright (c) Piotr Szymczak 2015 	dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
  
@@ -133,6 +133,17 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.02---
+{xx/04/2015}
+Chat bidding is now less obscure. (to hell with grid windows).
+Chat bidding comes with tiled and groupped list of bidders.
+Chat bidding now supports 4 custom commands for EPGP mode.
+Main roster window is no longer ashamed of other windows and will go to the front. ^^
+Changed default settings a bit.
+Separated Chat Bidding in Network Bidding buttons.
+Fixed issue with tile PR display.
+Added option to automatically select Chat bidding winner.
+
 ---RaidOps version 2.01---
 {16/04/2015}
 Fixed issues with action buttons(add,sub,set) in Mass Edit mode.
@@ -168,19 +179,6 @@ Fixed an issue with alts and data sync.
 Added option to notify raid about triggering of custom event.
 Now Decay will add personal logs.
 Personal logs window is a bit bigger now.
-
----RaidOps version 2.0 revision 145 Beta ---
-{08/04/2015}
-
-Changed visual representation of Network Bidding window. [Final UI]
-Colored icons in roster window are now bigger.
-Added /chatbid command for chat bidding window.
-Fixed error when addon would try to close non-existant Network Bidding auction.
-From now on Network Bidding button in both Hub and and Main window will enable upon Network Bidding's init.
-Added item level filter to item filtering.
-Added item quality filter to item filtering.
-Fixed error on Convergence fight.
-Comments will be no longer filled in Recent Activity on Custom Event trigger.
  ]===]
 
 -- Localization stuff
