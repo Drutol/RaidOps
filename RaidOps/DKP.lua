@@ -133,6 +133,17 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.03---
+{21/04/2015}
+Raid Queue will now restore upon player's account removal.
+You can now change class by right clicking in context menu. (go back one)
+Fixed bug concerning player removal and Raid Queue.
+No more "Error pocessing popup window" message.
+Fixed command sorting in chat bidding.
+Now only names consisting of 2 words can be added.
+Fixed rare statup error.
+Added option to hide pop-up window for chat bidding winners.
+
 ---RaidOps version 2.02---
 {19/04/2015}
 Chat bidding is now less obscure. (to hell with grid windows).
@@ -165,22 +176,6 @@ Fixed a few bugs with Master Loot window.
 Item label will now work properly , getting its info from Loot Logs.
 Added option to automatically create simple comments.
 Fixed issue with Logs window resizing.
-
----RaidOps version 2.0 revision 146 Beta ---
-{10/04/2015}
-
-Fixed Chat bidding's final countdown value setting.
-Fixed bug that prevented from assigning items after chat bidding auction's end.
-Adjusted size of Recent Activity columns.
-Possible fix for disappearing class icons.
-Fixed issues with Mass Edit while displaying color icons.
-Separated mainspec and offspec bids in Chat bidding.
-Added option to display much shorter messages in Chat bidding.
-Added option to request full DB sync instead of an update.
-Fixed an issue with alts and data sync.
-Added option to notify raid about triggering of custom event.
-Now Decay will add personal logs.
-Personal logs window is a bit bigger now.
  ]===]
 
 -- Localization stuff
@@ -397,6 +392,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bRemErrInv == nil then self.tItems["settings"].bRemErrInv = true end
 		if self.tItems["settings"].bDisplayCounter == nil then self.tItems["settings"].bDisplayCounter = false end
 		if self.tItems["settings"].bCountSelected == nil then self.tItems["settings"].bCountSelected = false end
+		if self.tItems["settings"].bSkipBidders == nil then self.tItems["settings"].bSkipBidders = false end
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
 		if self.tItems["settings"].bAutoLog == nil then self.tItems["settings"].bAutoLog = true end
@@ -438,6 +434,7 @@ function DKP:OnDocLoaded()
 		-- Bidding
 		
 		self.tSelectedItems = {}
+		self.tPopUpExceptions = {} -- bid winners
 		self.bAwardingOnePlayer = false
 		
 		
@@ -1655,11 +1652,19 @@ end
 
 function DKP:ControlsAddPlayerByName( wndHandler, wndControl, eMouseButton )
 	local strName = self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):GetText()
-	if strName ~= "Input New Entry Name" then
-		self:OnUnitCreated(strName,true)
-		self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):SetText("Input New Entry Name")
-		self:UndoAddActivity(ktUndoActions["addp"],"--",{[1] = self.tItems[self:GetPlayerByIDByName(strName)]},false)
+	local counter = 0
+	for word in string.gmatch(strName,"%S+") do
+		counter = counter + 1
 	end
+	if counter ~= 2 then
+		self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):SetText("Input New Entry Name")
+		return
+	end
+
+	self:OnUnitCreated(strName,true)
+	self.wndMain:FindChild("Controls"):FindChild("EditBoxPlayerName"):SetText("Input New Entry Name")
+	self:UndoAddActivity(ktUndoActions["addp"],"--",{[1] = self.tItems[self:GetPlayerByIDByName(strName)]},false)
+
 end
 
 function DKP:ReloadUI( wndHandler, wndControl, eMouseButton )
@@ -1986,7 +1991,7 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
-	self:RaidQueueClear()
+	local save = self:RaidQueueSaveRestoreAndClear()
 	local tMembers = {}
 	for k,wnd in ipairs(selectedMembers) do
 		if wnd:GetData() and self.tItems[wnd:GetData()] then
@@ -2002,6 +2007,7 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 			table.remove(self.tItems,ID)
 		end
 	end
+	self:RaidQueueRestore(save)
 	self:RefreshMainItemList()
 end
 
@@ -2483,7 +2489,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			for k,player in ipairs(selectedMembers) do
 				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 			end
-		elseif self.wndSelectedListItem then
+		elseif self.wndSelectedListItem and self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")) then
 			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 		end
 	end
@@ -3084,6 +3090,8 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("EnableLootLogs"):SetCheck(self.tItems["settings"].bLootLogs)
 	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
 	self.wndSettings:FindChild("AutoLog"):SetCheck(self.tItems["settings"].bAutoLog)
+	self.wndSettings:FindChild("SkipWinner"):SetCheck(self.tItems["settings"].bSkipBidders)
+	
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /epgp - For main roster window \n" ..
@@ -3095,6 +3103,14 @@ function DKP:SettingsRestore()
 									 " /sum - For Raid Summaries \n" ..
 									 " /att - For Attendance \n")
 									 
+end
+
+function DKP:SettingsSkipBidderEnable()
+	self.tItems["settings"].bSkipBidders = true
+end
+
+function DKP:SettingsSkipBidderDisable()
+	self.tItems["settings"].bSkipBidders = false
 end
 
 function DKP:SettingsEnablePlayerCollection( wndHandler, wndControl, eMouseButton )
@@ -3608,7 +3624,7 @@ function DKP:ExportAsHTMLDKP()
 end
 
 ---------------------------------------------------------------------------------------------------
--- MasterLootPopUp Functions
+-- MasterLootPopUp Functions --freaking old .... gonna rewrite this all
 ---------------------------------------------------------------------------------------------------
 local CurrentPopUpID = nil
 local PopUpItemQueue = {} 
@@ -3738,6 +3754,24 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
 		return
 	end
+	
+	for k , exception in ipairs(self.tPopUpExceptions) do
+		if exception == strName then	
+			local itemID
+			if self.ItemDatabase[string.sub(strItem,2)] then
+				itemID = self.ItemDatabase[string.sub(strItem,2)].ID
+			else
+				itemID = self.ItemDatabase[strItem].ID
+			end
+			if itemID then
+				self:EPGPAdd(exception,nil,tonumber(string.sub(self:EPGPGetItemCostByID(itemID),36)))
+				self:DetailAddLog(strItem,"{GP}",tonumber(string.sub(self:EPGPGetItemCostByID(itemID),36)),self:GetPlayerByIDByName(strName))
+				table.remove(self.tPopUpExceptions,k)
+				return
+			end
+		end
+	end
+	
 	local ID_popup = nil
 	for i=1, table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then
@@ -3746,7 +3780,6 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 		end
 	end
 	if ID_popup == nil or not self.ItemDatabase[strItem] then 
-		Print ("Error processing PopUp window")
 		return
 	else
 		local item = {}
@@ -4033,6 +4066,13 @@ function DKP:ConInit()
 	self.wndContext:Show(false,true)
 end
 
+function DKP:ConChangeClassClick(wndHandler,wndControl,eMouseButton)
+	if wndHandler ~= wndControl then return end
+	if eMouseButton == GameLib.CodeEnumInputMouse.Right then
+		self:ConChangeClassInverted(wndHandler,wndControl)
+	end
+end
+
 function DKP:ConChangeClass(wndHandler,wndControl)
 	local strCurrClass = wndControl:GetText()
 	if strCurrClass == "Esper" then strCurrClass = "Medic" 
@@ -4041,6 +4081,21 @@ function DKP:ConChangeClass(wndHandler,wndControl)
 	elseif strCurrClass == "Stalker" then strCurrClass = "Engineer" 
 	elseif strCurrClass == "Engineer" then strCurrClass = "Spellslinger" 
 	elseif strCurrClass == "Spellslinger" then strCurrClass = "Esper"
+	elseif strCurrClass == "Set Class" then strCurrClass = "Esper"
+	end
+	wndControl:SetText(strCurrClass)
+	self.tItems[self.wndContext:GetData()].class = strCurrClass
+	self.wndContext:FindChild("Class"):FindChild("ClassIcon"):SetSprite(ktStringToIcon[strCurrClass])
+end
+
+function DKP:ConChangeClassInverted(wndHandler,wndControl)
+	local strCurrClass = wndControl:GetText()
+	if strCurrClass == "Medic" then strCurrClass = "Esper" 
+	elseif strCurrClass == "Warrior" then strCurrClass = "Medic" 
+	elseif strCurrClass == "Stalker" then strCurrClass = "Warrior" 
+	elseif strCurrClass == "Engineer" then strCurrClass = "Stalker" 
+	elseif strCurrClass == "Spellslinger" then strCurrClass = "Engineer" 
+	elseif strCurrClass == "Esper" then strCurrClass = "Spellslinger"
 	elseif strCurrClass == "Set Class" then strCurrClass = "Esper"
 	end
 	wndControl:SetText(strCurrClass)
@@ -4151,6 +4206,7 @@ function DKP:ConRemove(wndHandler,wndControl)
 end
 
 function DKP:ConRemoveFinal(wndHandler,wndControl)
+	local save = self:RaidQueueSaveRestoreAndClear()
 	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
 	self:UndoAddActivity(ktUndoActions["remp"],"--",{[1] = self.tItems[self.wndContext:GetData()]},true)
 	for k,alt in ipairs(self.tItems[self.wndContext:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
@@ -4158,8 +4214,8 @@ function DKP:ConRemoveFinal(wndHandler,wndControl)
 	self.wndContext:Close()
 	self.wndSelectedListItem = nil
 	wndControl:Show(false,false)
+	self:RaidQueueRestore(save)
 	self:RefreshMainItemList()
-	self:RaidQueueClear()
 end
 
 function DKP:ConRemoveContextIndicator()
@@ -4403,18 +4459,39 @@ end
 function DKP:IsPlayerInQueue(strPlayer,ID)
 	if ID and self.tItems[ID] then strPlayer = self.tItems[ID].strName end
 	for k,player in ipairs(self.tItems.tQueuedPlayers) do
-		if self.tItems[player].strName == strPlayer then return true end
+		if self.tItems[player] then
+			if self.tItems[player].strName == strPlayer then return true end
+		end
 	end
 	return false
 end
 
-function DKP:RaidQueueClear()
+function DKP:RaidQueueClear(bShow)
 	self.tItems.tQueuedPlayers = {}
 	for k,child in ipairs(self.wndItemList:GetChildren()) do
 		child:FindChild("Standby"):SetCheck(false)
 	end
 	if self.wndMain:FindChild("RaidOnly"):IsChecked() then self:RefreshMainItemList() end
-	self:RaidQueueShow()
+	if not bShow then self:RaidQueueShow() end
+end
+
+function DKP:RaidQueueSaveRestoreAndClear()
+	local tNames = {}
+	for k,player in ipairs(self.tItems.tQueuedPlayers) do
+		if self.tItems[player] then
+			table.insert(tNames,self.tItems[player].strName)
+		end
+	end
+	self:RaidQueueClear(true)
+	return tNames
+end
+
+function DKP:RaidQueueRestore(tNames)
+	for k , name in ipairs(tNames) do
+		if self:GetPlayerByIDByName(name) ~= -1 then
+			table.insert(self.tItems.tQueuedPlayers,self:GetPlayerByIDByName(name))
+		end
+	end
 end
 
 function DKP:RaidQueueShow()

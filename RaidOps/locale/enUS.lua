@@ -214,6 +214,8 @@ L["#biddingStrings:short:EPGP"] = " [Chat Bidding] Item : %s , type %s to place 
 L["#wndSettings:AutoComment"] = "Generate Comments Automatically"
 --v2.02
 L["#wndBid:Modes:AutoSelect"] = "Select winner automatically"
+--v2.03 
+L["#wndSettings:SkipBidWinner"] = "Hide Pop-up window if recipient won through bidding."
 
 
 

@@ -590,7 +590,8 @@ function DKP:BidStart(strName)
 		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:modifiedRoll"],self.CurrentItemChatStr,tostring(self.tItems["settings"].BidRollModifier)))
 	elseif self.tItems["settings"].strBidMode == "ModeEPGP" then
 		local strCmds = ""
-		for k ,tCommand in pairs(self.tItems["settings"].tBidCommands) do 
+		for k=1 ,4 do
+			local tCommand = self.tItems["settings"].tBidCommands["Cmd"..k]
 			if tCommand.bEnable then strCmds = strCmds .. "!" .. tCommand.strCmd .. " or " end
 		end
 		strCmds = string.sub(strCmds,0,-5)
@@ -819,7 +820,7 @@ function DKP:BidUpdateBiddersList()
 			wnd:RemoveEventHandler("ButtonCheck",self)
 			wnd:AddEventHandler("ButtonCheck","BidSelectBidder",self)
 			if self.CurrentBidSession.strSelected then
-				if self.CurrentBidSession.strSelected == bidder.strName then wnd:SetCheck(true) end
+				if self.CurrentBidSession.strSelected == tBidder.strName then wnd:SetCheck(true) end
 			end
 		end
 	end
@@ -859,7 +860,7 @@ function DKP:BidPerformCountdown()
 		if self.BidCountdown then self.BidCountdown:Stop() end
 		Apollo.RemoveEventHandler("BidPerformCountdown",self)
 		
-		if self.tItems["settings"].bAutoSelect then 
+		if self.tItems["settings"].bAutoSelect and not self.CurrentBidSession.strSelected then 
 			local strWinner = self:BidSelectWinner(1) 
 			if strWinner ~= "" then
 				self.CurrentBidSession.strSelected = strWinner
@@ -873,6 +874,9 @@ function DKP:BidPerformCountdown()
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndWinner"],self.CurrentBidSession.strSelected))
 		else
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. self.Locale["#biddingStrings:AuctionEnd"])
+		end
+		if self.tItems["settings"].bSkipBidders and self.tItems["settings"].strBidMode == "ModeEPGP" then 
+			table.insert(self.tPopUpExceptions,self.CurrentBidSession.strSelected)
 		end
 		self.bIsBidding = false
 		self:BidCheckConditions()
@@ -944,6 +948,9 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 				ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndEarly"],selectedOne:GetData():GetName()))
 				self.bIsBidding = false
 				self:BidCheckConditions()
+				if self.tItems["settings"].bSkipBidders and self.tItems["settings"].strBidMode == "ModeEPGP" then 
+					table.insert(self.tPopUpExceptions,self.CurrentBidSession.strSelected)
+				end
 			end
 			Hook:OnAssignDown() 
 		end
@@ -1503,11 +1510,11 @@ function DKP:Bid2SendResumeMessage(itemID)
 end
 
 function DKP:Bid2GetTargetsTable()
+	if not self.strMyName then return "" end
 	local targets = {}
-	local myName = GameLib.GetPlayerUnit():GetName()
 	for k=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetGroupMember(k)
-		if member.strCharacterName ~= myName then
+		if member.strCharacterName ~= self.strMyName then
 			table.insert(targets,member.strCharacterName)
 		end
 	end
@@ -1593,7 +1600,7 @@ end
 function DKP:Bid2BroadcastMySuperiority()
 	local msg = {}
 	msg.type = "IamML"
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),msg) end
+	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable() or "",msg) end
 end
 
 
@@ -2484,7 +2491,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 								wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2,"CharacterButtonTile", luaCaller.wndMasterLoot_LooterList,luaCaller)
 							end
 							
-							if DKPInstance.tItems["settings"]["ML"].bShowValues and DKPInstance:GetPlayerByIDByName(unitLooter:GetName()) ~= -1 then
+							if DKPInstance:GetPlayerByIDByName(unitLooter:GetName()) ~= -1 then
 								if DKPInstance.tItems["EPGP"].Enable == 1 then 
 									wndCurrentLooter:FindChild("CharacterLevel"):SetText("PR: " .. DKPInstance:EPGPGetPRByName(unitLooter:GetName()))
 								else
@@ -2673,10 +2680,10 @@ function DKP:MLSettingsRestore()
 	end
 	if self.tItems["settings"]["ML"].bArrItemTiles == nil then self.tItems["settings"]["ML"].bArrItemTiles = true end
 	if self.tItems["settings"]["ML"].bStandardLayout == nil then self.tItems["settings"]["ML"].bStandardLayout = true end
-	if self.tItems["settings"]["ML"].bShowValues == nil then self.tItems["settings"]["ML"].bListIndicators = true end
+	if self.tItems["settings"]["ML"].bListIndicators == nil then self.tItems["settings"]["ML"].bListIndicators = true end
 	if self.tItems["settings"]["ML"].bGroup == nil then self.tItems["settings"]["ML"].bGroup = false end
 	if self.tItems["settings"]["ML"].bShowLastItemBar == nil then self.tItems["settings"]["ML"].bShowLastItemBar = true end
-	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = false end	
+	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = true end	
 	if self.tItems["settings"]["ML"].bShowCurrItemBar == nil then self.tItems["settings"]["ML"].bShowCurrItemBar = true end
 	if self.tItems["settings"]["ML"].bShowCurrItemTile == nil then self.tItems["settings"]["ML"].bShowCurrItemTile = false end
 	if self.tItems["settings"]["ML"].bAllowMulti == nil then self.tItems["settings"]["ML"].bAllowMulti = false end
@@ -2690,7 +2697,7 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bStandardLayout then self.wndMLSettings:FindChild("Horiz"):SetCheck(true) else self.wndMLSettings:FindChild("Vert"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bArrItemTiles then self.wndMLSettings:FindChild("TilesLoot"):SetCheck(true) else self.wndMLSettings:FindChild("ListLoot"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bArrTiles then self.wndMLSettings:FindChild("Tiles"):SetCheck(true) else self.wndMLSettings:FindChild("List"):SetCheck(true) end
-	if self.tItems["settings"]["ML"].bShowValues then self.wndMLSettings:FindChild("ShowIndicators"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bListIndicators then self.wndMLSettings:FindChild("ShowIndicators"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bGroup then self.wndMLSettings:FindChild("GroupClass"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowLastItemBar then self.wndMLSettings:FindChild("ShowLastItemBar"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowLastItemTile then self.wndMLSettings:FindChild("ShowLastItemTile"):SetCheck(true) end
@@ -2704,12 +2711,12 @@ function DKP:MLSettingsRestore()
 end
 
 function DKP:MLSettingsValueEnable()
-	self.tItems["settings"]["ML"].bShowValues = true
+	self.tItems["settings"]["ML"].bListIndicators = true
 	Hook:OnMasterLootUpdate(true)
 end
 
 function DKP:MLSettingsValueDisable()
-	self.tItems["settings"]["ML"].bShowValues = false
+	self.tItems["settings"]["ML"].bListIndicators = false
 	Hook:OnMasterLootUpdate(true)
 end
 
