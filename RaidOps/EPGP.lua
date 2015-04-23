@@ -99,13 +99,12 @@ function DKP:EPGPInit()
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
 	
-	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
+	Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
 end
 
 function DKP:OnLootedItem(item)
-	item = Item.GetDataFromId(61624)
 	self.ItemDatabase[item:GetName()] = {}
 	self.ItemDatabase[item:GetName()].ID = item:GetItemId()
 	self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()
@@ -119,7 +118,7 @@ function DKP:OnLootedItem(item)
 		self.ItemDatabase[item:GetName()].slot = item:GetSlot()
 	end
 	--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(),"Drutol Windchaser" --[[self.tItems[math.random(1,10)].strName)]]))
+	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(),self.tItems[math.random(1,10)].strName))
 end
 
 function DKP:EPGPGetTokenItemID(strToken)

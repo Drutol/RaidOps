@@ -167,7 +167,7 @@ function DKP:IBPopulate(wndBubble)
 				tIDCounter[tItemPiece:GetName()] = {nCount = 1,wnd = wndTile}
 				local ID = tItemPiece:GetItemId()
 				local strTooltip = ""
-				for k , tooltip in ipairs(wndBubble:GetData().tItemTooltips) do
+				for k , tooltip in ipairs(wndBubble:GetData().tItemTooltips or {}) do
 					if ID == tooltip.ID and not string.find(strTooltip,tooltip.strInfo) then
 						strTooltip = strTooltip .. tooltip.strInfo .. "\n"
 					end

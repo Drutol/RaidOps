@@ -87,6 +87,10 @@ local ktUndoActions =
 	["addmp"] = "{Added Many Players}",
 	["remp"] = "{Removed Player}",
 	["mremp"] = "{Removed Multiple Players}",
+	--Alts
+	["amrg"] = "{Merged %s with %s}",
+	["acon"] = "{Converted %s to %s's alt}",
+
 	--CustomEvents
 	["cetrig"] = "{Award for %s , ID : %s}",
 	--TimedAwards
@@ -133,6 +137,13 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.03---
+{xx/04/2015}
+Fixed issue with alts converting/merging and RaidQueue.
+Alts add/convert now supports Undo.
+Fixed loot logs lua error when opened via context menu.
+
+
 ---RaidOps version 2.03---
 {21/04/2015}
 Raid Queue will now restore upon player's account removal.
@@ -468,6 +479,13 @@ function DKP:OnDocLoaded()
 	end
 end
 
+function DKP:ConvertOddAmericanDate(strDate)
+	local strNewDate = string.sub(strDate,3,-5)
+	strNewDate = strNewDate .. string.sub(strDate,0,-8)
+	strNewDate = strNewDate .. string.sub(strDate,6)
+	return strNewDate
+end
+
 function DKP:GetPlayerByIDByName(strName)
 
 	local strPlayer = ""
@@ -527,7 +545,7 @@ function DKP:UndoInit()
 	self.wndActivity:FindChild("Redo"):Enable(false)
 end
 
-function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment)
+function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bAddAlt)
 	if not self.tItems["settings"].bTrackUndo then return end
 	local tMembersNames = {}
 	local strComment = ""
@@ -537,6 +555,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment)
 		elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
 		elseif strType == ktUndoActions["remp"] then  strComment = "--" 
 		elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
+		elseif strType == ktUndoActions["amrg"] then  strComment = "--" 
 		elseif self.tItems["settings"].logs == 1 then 
 			strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			if strComment == "Comment" or strComment == "Comments Disabled" or strComment == "Comment - Auto" then strComment = "--" end
@@ -546,7 +565,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment)
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.sort(tMembersNames,raidOpsSortCategories)
-	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment})
+	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment,bAddAlt = bAddAlt})
 	if #tUndoActions > 15 then table.remove(tUndoActions,16) end
 	self:UndoPopulate()
 	tRedoActions = {} 
@@ -590,23 +609,52 @@ function DKP:Undo()
 	if #tUndoActions > 0 then
 		local tMembersToRevert = serpent.load(tUndoActions[1].strData)
 		
-		local tRevertMembers = {}
-		if tMembersToRevert then
-			for k,revertee in ipairs(tMembersToRevert) do
-				if tUndoActions[1].bRemove == nil or tUndoActions[1].bRemove == false then
-					local ID = self:GetPlayerByIDByName(revertee.strName)
-					if ID ~= -1 then
-						table.insert(tRevertMembers,self.tItems[ID])
+		if tUndoActions[1].bAddAlt == nil then
+			local tRevertMembers = {}
+			if tMembersToRevert then
+				for k,revertee in ipairs(tMembersToRevert) do
+					if tUndoActions[1].bRemove == nil or tUndoActions[1].bRemove == false then
+						local ID = self:GetPlayerByIDByName(revertee.strName)
+						if ID ~= -1 then
+							table.insert(tRevertMembers,self.tItems[ID])
+						end
+					elseif tUndoActions[1].bRemove == true then
+						table.insert(tRevertMembers,revertee)
 					end
-				elseif tUndoActions[1].bRemove == true then
-					table.insert(tRevertMembers,revertee)
-				end
-			end			
+				end			
+			end
+			self:UndoAddRevertActivity(tRevertMembers)
 		end
-		self:UndoAddRevertActivity(tRevertMembers)
-		
+
 		if tMembersToRevert then
 			for k,revertee in ipairs(tMembersToRevert) do
+				if tUndoActions[1].bAddAlt ~= nil then
+					if tUndoActions[1].bAddAlt == true then -- remove alt
+						--find owner
+						local nOwnerID = self:GetPlayerByIDByName(revertee.strName) --this player is now an alt so we need an owner
+						--remove alt from owner
+						if nOwnerID ~= -1 then
+							for k ,alt in ipairs(self.tItems[nOwnerID].alts) do
+								if string.lower(alt) == string.lower(revertee.strName) then
+									--alt found now remove
+									table.remove(self.tItems[nOwnerID].alts,k)
+									--free ID
+									self.tItems["alts"][string.lower(alt)] = nil
+									break
+								end
+							end
+							-- check if merged
+							if string.find(tUndoActions[1].strType,"Merged") then -- we need to remove added values to owner
+								self.tItems[nOwnerID].net =  self.tItems[nOwnerID].net - revertee.net
+								self.tItems[nOwnerID].tot =  self.tItems[nOwnerID].tot - revertee.tot
+								self.tItems[nOwnerID].EP =  self.tItems[nOwnerID].EP - revertee.EP
+								self.tItems[nOwnerID].GP =  self.tItems[nOwnerID].GP - revertee.GP
+								self.tItems[nOwnerID].Hrs =  self.tItems[nOwnerID].Hrs - revertee.Hrs
+							end
+						end
+					end
+				end
+
 				if tUndoActions[1].bRemove == nil then
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then -- modifications 
@@ -621,6 +669,8 @@ function DKP:Undo()
 						if player.strName == revertee.strName then table.remove(self.tItems,k) break end
 					end
 				end
+
+
 			end
 			table.remove(tUndoActions,1)
 			self:UndoPopulate()
@@ -4294,7 +4344,7 @@ end
 
 function DKP:AltsAddMerge()
 	local mergedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
-	
+	local save = self:RaidQueueSaveRestoreAndClear()
 	self.tItems[self.wndAlts:GetData()].net =  self.tItems[self.wndAlts:GetData()].net + mergedPlayer.net
 	self.tItems[self.wndAlts:GetData()].tot =  self.tItems[self.wndAlts:GetData()].tot + mergedPlayer.tot
 	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
@@ -4303,6 +4353,9 @@ function DKP:AltsAddMerge()
 	
 	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	
+	if self.tItems["settings"].bTrackUndo then
+		self:UndoAddActivity(string.format(ktUndoActions["amrg"],mergedPlayer.strName,recipent),"--",{[1] = mergedPlayer},true,nil,true)
+	end
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
 	
 	for k,player in ipairs(self.tItems) do if player.strName == recipent then self.wndAlts:SetData(k) end end
@@ -4311,7 +4364,7 @@ function DKP:AltsAddMerge()
 	
 	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
 	self.wndAlts:FindChild("NewAltBox"):SetText("")
-	
+	self:RaidQueueRestore(save)
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
 	self:AltsPopulate()
@@ -4337,16 +4390,21 @@ end
 
 function DKP:AltsAddConvert()
 	local recipent = self.tItems[self.wndAlts:GetData()].strName
-	
+	local save = self:RaidQueueSaveRestoreAndClear()
+	local convertedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
+	if self.tItems["settings"].bTrackUndo then
+		self:UndoAddActivity(string.format(ktUndoActions["acon"],convertedPlayer.strName,recipent),"--",{[1] = convertedPlayer},true,nil,true)
+	end
+
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
 	
 	for k,player in ipairs(self.tItems) do if player.strName == recipent then self.wndAlts:SetData(k) end end
 	
 	table.insert(self.tItems[self.wndAlts:GetData()].alts,self.wndAlts:FindChild("NewAltBox"):GetText())
-	
+
 	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
 	self.wndAlts:FindChild("NewAltBox"):SetText("")
-	
+	self:RaidQueueRestore(save)
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
 	self:AltsPopulate()
@@ -5351,7 +5409,7 @@ function DKP:LLPrepareData()
 							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
 						end
 					else -- Group Date
-						local strDate = os.date("%x",entry.nDate)
+						local strDate = self:ConvertOddAmericanDate(os.date("%x",entry.nDate))
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID]) then
 							table.insert(tGrouppedItems[strDate],entry.itemID)	
@@ -5384,7 +5442,7 @@ function DKP:LLPrepareData()
 					end
 				else
 					for j , entry in ipairs(player.tLLogs) do
-						local strDate = os.date("%x",entry.nDate)
+						local strDate = self:ConvertOddAmericanDate(os.date("%x",entry.nDate))
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
 							table.insert(tGrouppedItems[strDate],entry.itemID)
