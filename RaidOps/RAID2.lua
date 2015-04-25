@@ -88,8 +88,8 @@ function DKP:IBExpand(wndHandler,wndControl)
 	self:RIRequestRearrange(wndControl:GetParent():GetParent())
 	wndControl:GetParent():FindChild("Expand"):SetCheck(true)
 	wndControl:GetParent():GetData().bSearchOpen = false
-	
 end
+
 
 function DKP:IBECollapse(wndHandler,wndControl)
 	wndControl:GetParent():GetData().bExpanded = false
@@ -128,7 +128,7 @@ function DKP:IBPopulate(wndBubble)
 	for k,nItemID in ipairs(tLoot) do
 		if tIDCounter[nItemID] == nil then
 			tIDCounter[nItemID] = true
-			nUniqueLoot = nUniqueLoot +1
+			nUniqueLoot = nUniqueLoot + 1
 		end
 	end
 	
@@ -141,18 +141,22 @@ function DKP:IBPopulate(wndBubble)
 	local nHeight = 120
 	local bAddingWidth = true
 	local nRows = 1
-	for k=1,nUniqueLoot do
-		if bAddingWidth then nWidth = nWidth + knItemTileWidth + knItemTileHorzSpacing end
-		if k%(wndBubble:GetData().nItems) == 0 then 
+	for k=2,nUniqueLoot do
+		if k >= wndBubble:GetData().nItems then 
 			bAddingWidth = false
 		end
+
+		if bAddingWidth then 
+			nWidth = nWidth + knItemTileWidth + knItemTileHorzSpacing 
+		end
+
 		if not bAddingWidth and k%(wndBubble:GetData().nItems) == 0 then 
 			if nRows >= wndBubble:GetData().nRows then break end
 			nRows = nRows + 1
 			nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing	
 		end
 	end
-	wndBubble:GetData().nWidthMod = (nWidth - knBubbleDefWidth) > 0 and nWidth - knBubbleDefWidth or 0
+	wndBubble:GetData().nWidthMod = nWidth
 	wndBubble:GetData().nHeightMod =  nHeight
 	tIDCounter = {}
 	
@@ -169,11 +173,12 @@ function DKP:IBPopulate(wndBubble)
 				local strTooltip = ""
 				for k , tooltip in ipairs(wndBubble:GetData().tItemTooltips or {}) do
 					if ID == tooltip.ID and not string.find(strTooltip,tooltip.strInfo) then
-						strTooltip = strTooltip .. tooltip.strInfo .. "\n"
+						strTooltip = strTooltip .. tooltip.strInfo .. " \n"
 					end
 				end
 				if strTooltip ~= "" then
 					wndTile:FindChild("Tooltip"):SetTooltip(strTooltip)
+					wndTile:FindChild("Tooltip"):SetData(strTooltip)
 					wndTile:FindChild("Tooltip"):Show(true)
 				end
 
@@ -188,6 +193,26 @@ function DKP:IBPopulate(wndBubble)
 		end
 	end
 	wndBubble:GetData().bPopulated = true
+end
+
+function DKP:IBPostContents(wndHandler,wndControl)
+	self:IBPopulate(wndBubble)
+	local wndBubble = wndControl:GetParent()
+	local strItems = ""
+	for k , child in ipairs(wndBubble:FindChild("ItemGrid"):GetChildren()) do
+		strItems = strItems .. child:GetData():GetChatLinkString()
+	end
+	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " " .. wndBubble:FindChild("HeaderText"):GetText())
+	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " " .. strItems)
+end
+
+function DKP:IBPostItem(wndHandler,wndControl,eMouseButton)
+	if wndHandler ~= wndControl or eMouseButton ~= GameLib.CodeEnumInputMouse.Right then return end
+
+	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " Item :" .. wndControl:GetData():GetChatLinkString())
+	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " Count :" .. wndControl:FindChild("Count"):GetText())
+	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " Winners :" .. wndControl:FindChild("Tooltip"):GetData() or "")
+
 end
 
 ----

@@ -261,10 +261,11 @@ function DKP:BidCompleteInit()
 	if self.tItems["settings"].bAutoSelect == nil then self.tItems["settings"].bAutoSelect = false end
 	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("AutoSelect"):SetCheck(self.tItems["settings"].bAutoSelect)
 
-
+	if self.tItems["settings"].bAutoStart == nil then self.tItems["settings"].bAutoStart = false end
+	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("AutoStart"):SetCheck(self.tItems["settings"].bAutoStart)
 	
 	self.GeminiLocale:TranslateWindow(self.Locale, self.wndBid)
-	
+	self:BidDisplayHelp()
 	if not self.tItems["settings"].tBidCommands then self.tItems["settings"].tBidCommands = ktDefaultCommands end
 	self:BidCheckConditions()
 	local wndCmd = self.wndBid:FindChild("Commands")
@@ -313,6 +314,14 @@ end
 
 function DKP:BidAutoSelectDisable()
 	self.tItems["settings"].bAutoSelect = false
+end
+
+function DKP:BidAutoStartEnable()
+	self.tItems["settings"].bAutoStart = true
+end
+
+function DKP:BidAutoStartDisable()
+	self.tItems["settings"].bAutoStart = false
 end
 
 function DKP:ReArr()
@@ -389,21 +398,22 @@ end
 local prevLuckyChild
 function DKP:BidRandomLooter()
 	local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
-	
-	local luckyChild
-	for k,child in ipairs(children) do
-		if not child:IsEnabled() or child:FindChild("CharacterName"):GetText() == "Guild Bank" then table.remove(children,k) end
+	if #children > 0 then
+		local luckyChild
+		for k,child in ipairs(children) do
+			if not child:IsEnabled() or child:FindChild("CharacterName"):GetText() == "Guild Bank" then table.remove(children,k) end
+		end
+		
+		for k,child in pairs(children) do
+			child:SetCheck(false)
+		end
+		
+		luckyChild = children[math.random(#children)]
+		prevLuckyChild = luckyChild:FindChild("CharacterName"):GetText()
+		Hook.tMasterLootSelectedLooter = luckyChild:GetData()
+		Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
+		luckyChild:SetCheck(true)
 	end
-	
-	for k,child in pairs(children) do
-		child:SetCheck(false)
-	end
-	
-	luckyChild = children[math.random(#children)]
-	prevLuckyChild = luckyChild:FindChild("CharacterName"):GetText()
-	Hook.tMasterLootSelectedLooter = luckyChild:GetData()
-	Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
-	luckyChild:SetCheck(true)
 end
 
 function DKP:BidUpdateItemDatabase()
@@ -504,6 +514,7 @@ function DKP:StartChatBidding()
 		end
 		self.wndBid:Show(true,false)
 		self:BidCheckConditions()
+		if self.tItems["settings"].bAutoStart then self:BidStart() end
 	else
 		self.wndBid:Show(true,false)
 	end
@@ -558,6 +569,15 @@ function DKP:BidSetMode(wndHandler,wndControl)
 		wndControl:SetCheck(false)
 	else
 		self.tItems["settings"].strBidMode = wndControl:GetName()
+	end
+	self:BidDisplayHelp()
+end
+
+function DKP:BidDisplayHelp()
+	self.wndBid:FindChild("Commands"):Show(false)
+	self.wndBid:FindChild("Roll"):Show(false)
+	if self.tItems["settings"].strBidMode == "ModeEPGP" then self.wndBid:FindChild("Commands"):Show(true)
+	elseif self.tItems["settings"].strBidMode == "ModePureRoll" or self.tItems["settings"].strBidMode == "ModeModifiedRoll" then self.wndBid:FindChild("Roll"):Show(true)
 	end
 end
 

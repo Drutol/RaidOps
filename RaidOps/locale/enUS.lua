@@ -216,7 +216,9 @@ L["#wndSettings:AutoComment"] = "Generate Comments Automatically"
 L["#wndBid:Modes:AutoSelect"] = "Select winner automatically"
 --v2.03 
 L["#wndSettings:SkipBidWinner"] = "Hide Pop-up window if recipient won through bidding."
-
-
+--v2.04
+L["#wndBid:Modes:AutoStart"] = "Start auction automatically."
+--v2.05
+L["#wndSettings:RaidInvites"] = "Raid invites."
 
 

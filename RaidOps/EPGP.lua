@@ -99,7 +99,7 @@ function DKP:EPGPInit()
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
 	
-	Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
+	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
 end

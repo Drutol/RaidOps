@@ -137,12 +137,29 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.03---
+---RaidOps version 2.05---
 {xx/04/2015}
+Fixed date format bug.
+Fixed skip random looter not removing the looter after assign.
+Added option to invite people when they write for example "!raid" in guild channel.
+Added small help window in chat bidding depending on mode.
+Removed "save (/reloadui)" button.
+Added option to select players confirmed for raid in MassEdit.
+Resized Mass Edit Toolbox.
+
+
+
+---RaidOps version 2.04---
+{23/04/2015}
 Fixed issue with alts converting/merging and RaidQueue.
 Alts add/convert now supports Undo.
 Fixed loot logs lua error when opened via context menu.
-
+Fixed loot logs max item per row setting.
+Added option to report item on chat channel. Whole bubble or single item (right click on item in bubble).
+Fixed lua error when random button in ML window was pressed without any recipients to chose from.
+Added JSON export.(for testing purposes)
+Added option to start chat bidding automatically.
+Added option to switch between EU and NA dates.
 
 ---RaidOps version 2.03---
 {21/04/2015}
@@ -182,11 +199,6 @@ Changed /dkp to /epgp
 Fixed a few bugs with Master Loot window.
 /chatbid will now open bidding UI regardless of current auction state.
 
----RaidOps version 2.0 revision 147 Beta Release Candidate 2---
-{12/04/2015}
-Item label will now work properly , getting its info from Loot Logs.
-Added option to automatically create simple comments.
-Fixed issue with Logs window resizing.
  ]===]
 
 -- Localization stuff
@@ -304,7 +316,6 @@ function DKP:OnDocLoaded()
 		self.wndSettings:FindChild("ButtonShowGP"):SetTooltip(self.Locale["#wndSettings:Tooltips:GPTooltip"])
 		self.wndSettings:FindChild("ButtonSettingsBidModule"):SetTooltip(self.Locale["#wndSettings:Tooltips:EnableBidding"])
 		self.wndSettings:FindChild("RemoveErrorInvites"):SetTooltip(self.Locale["#wndSettings:Tooltips:InvErr"])
-		self.wndSettings:FindChild("FixUmlauts"):SetTooltip(self.Locale["#wndSettings:Tooltips:FixNames"])
 		self.wndSettings:FindChild("ButtonShowStandby"):SetTooltip(self.Locale["#wndSettings:Tooltips:Standby"])
 		self.wndSettings:FindChild("FilterKeywordsButton"):SetTooltip(self.Locale["#wndSettings:Tooltips:FilterKey"])
 		self.wndSettings:FindChild("ButtonSettingsPurge"):SetTooltip(self.Locale["#wndSettings:Tooltips:Purge"])
@@ -342,7 +353,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
 		Apollo.RegisterSlashCommand("att", "AttendanceShow", self)
-		--Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
+		Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
@@ -408,6 +419,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
 		if self.tItems["settings"].bAutoLog == nil then self.tItems["settings"].bAutoLog = true end
 		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
+		if self.tItems["settings"].strDateFormat == nil then self.tItems["settings"].strDateFormat = "EU" end
 		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
 		if self.tItems["settings"].nMinIlvl == nil then self.tItems["settings"].nMinIlvl = 1 end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
@@ -434,6 +446,7 @@ function DKP:OnDocLoaded()
 		self:CEInit()
 		self:RaidInit()
 		self:FQInit()
+		self:RIInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -479,11 +492,21 @@ function DKP:OnDocLoaded()
 	end
 end
 
-function DKP:ConvertOddAmericanDate(strDate)
-	local strNewDate = string.sub(strDate,3,-5)
-	strNewDate = strNewDate .. string.sub(strDate,0,-8)
-	strNewDate = strNewDate .. string.sub(strDate,6)
-	return strNewDate
+function DKP:ConvertDate(strDate)
+	if self.tItems["settings"].strDateFormat == "EU" then
+		local words = {}
+		for word in string.gmatch(strDate,"([^/]+)") do
+			table.insert(words,word)
+		end
+
+		return words[2] .. "/" .. words[1] .. "/" .. words[3]
+	else
+		return strDate
+	end
+end
+
+function DKP:ChangeDateFormat(wndHandler,wndControl)
+	self.tItems["settings"].strDateFormat = wndControl:GetName()
 end
 
 function DKP:GetPlayerByIDByName(strName)
@@ -508,7 +531,14 @@ function DKP:GetPlayerByIDByName(strName)
 end
 
 function DKP:DebugFetch()
-	self:ExportShowPreloadedText(tohtml(self:GetEncodedData("Drutol Windchaser")))
+	local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+	local tTestTable = {}
+	for k , player in ipairs(self.tItems) do
+		table.insert(tTestTable,player)
+		tTestTable[#tTestTable].wnd = nil
+	end
+    self:ExportShowPreloadedText(JSON.encode(tTestTable))
+	--self:ExportShowPreloadedText(tohtml(self:GetEncodedData("Drutol Windchaser")))
 end
 
 function DKP:ChangelogShow()
@@ -551,11 +581,11 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 	local strComment = ""
 	if not strForceComment then
 		if bRemoval == true or bRemoval == false then strComment = "--" 
-		elseif self:string_starts(strType,"Award for") then  strComment = "--" 
+		elseif self:string_starts(strType,"{Award for") then  strComment = "--" 
 		elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
 		elseif strType == ktUndoActions["remp"] then  strComment = "--" 
 		elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
-		elseif strType == ktUndoActions["amrg"] then  strComment = "--" 
+		elseif self:string_starts(strType,"{Merged") or self:string_starts(strType,"{Converted") then strComment = "--" 
 		elseif self.tItems["settings"].logs == 1 then 
 			strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			if strComment == "Comment" or strComment == "Comments Disabled" or strComment == "Comment - Auto" then strComment = "--" end
@@ -565,7 +595,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.sort(tMembersNames,raidOpsSortCategories)
-	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time()),strComment = strComment,bAddAlt = bAddAlt})
+	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time()),strComment = strComment,bAddAlt = bAddAlt})
 	if #tUndoActions > 15 then table.remove(tUndoActions,16) end
 	self:UndoPopulate()
 	tRedoActions = {} 
@@ -1518,11 +1548,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				return
 			end
 			 
-		         	 strItem = string.sub(strItem,2)
-			 
-
-			
-			
+		    strItem = string.sub(strItem,2)
 			
 			if self.tItems["settings"].FilterEquippable and self.ItemDatabase[strItem] then
 				local item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
@@ -1538,6 +1564,14 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 self:LLAddLog(strName,strItem)
 		end
 	end
+	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild then
+		if self.tItems["settings"].bRIEnable then
+			if tMessage.arMessageSegments[1].strText == "!" .. self.tItems["settings"].strRIcmd then
+				self:RIProcessInviteRequest(tMessage.strSender)
+			end
+		end
+	end
+
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_NPCSay and GroupLib.InRaid() then
 		local strText = ""
 		for i=1, table.getn(tMessage.arMessageSegments) do
@@ -2030,7 +2064,29 @@ function DKP:MassEditDeselect( wndHandler, wndControl, eMouseButton )
 	self:UpdateItemCount()
 end
 
+function DKP:MassEditSelectConfirmed()
+	for k,wnd in ipairs(selectedMembers) do
+		wnd:SetCheck(false)
+	end
+	selectedMembers = {}
+	for k,child in ipairs(self.wndItemList:GetChildren()) do
+		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
+			if strConfirmed == self.tItems[child:GetData()].strName then
+					table.insert(selectedMembers,child)
+					child:SetCheck(true)
+				break
+			end
+		end
+
+	end
+
+	self:UpdateItemCount()
+end
+
 function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
+	for k,wnd in ipairs(selectedMembers) do
+		wnd:SetCheck(false)
+	end
 	selectedMembers = {}
 	local children = self.wndItemList:GetChildren()
 	for k,child in ipairs(children) do
@@ -2365,6 +2421,13 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	if playerItem.alt then
 		playerItem.wnd:FindChild("Alt"):SetTooltip("Playing as : " .. playerItem.alt)
 		playerItem.wnd:FindChild("Alt"):Show(true,false)
+	end
+	if self.tItems["settings"].bRIEnable then
+		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
+			if playerItem.strName == strConfirmed then
+				playerItem.wnd:FindChild("Confirmation"):Show(true)
+			end
+		end
 	end
 end
 
@@ -3141,6 +3204,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
 	self.wndSettings:FindChild("AutoLog"):SetCheck(self.tItems["settings"].bAutoLog)
 	self.wndSettings:FindChild("SkipWinner"):SetCheck(self.tItems["settings"].bSkipBidders)
+	self.wndSettings:FindChild(self.tItems["settings"].strDateFormat):SetCheck(true)
 	
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
@@ -3798,7 +3862,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 		strName = strName .. uchar
 	end
 	
-	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then return end
+	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return end
 	
 	if self:GetPlayerByIDByName("Guild Bank") ~= -1 and strName == "Guild Bank" and self.tItems["settings"].bSkipGB then 
 		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
@@ -4486,7 +4550,7 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 			strComment = strComment .. uchar
 		end
 	
-		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = os.date("%x",os.time()) .. "  " .. os.date("%X",os.time())})
+		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = self:ConvertDate(os.date("%x",os.time())) .. "  " .. os.date("%X",os.time())})
 		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
 		if #self.tItems[ID].logs > 20 then table.remove(self.tItems[ID].logs,20) end
 	end
@@ -4767,7 +4831,7 @@ function DKP:CETriggerEvent(eID)
 		end
 		event.nTriggerCount = event.nTriggerCount + 1
 		if self.tItems["settings"].tCETriggeredEvents == nil then self.tItems["settings"].tCETriggeredEvents = {} end
-		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")",strDate = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
+		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")",strDate = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time())})
 		if #self.tItems["settings"].tCETriggeredEvents > 20 then table.remove(self.tItems["settings"].tCETriggeredEvents,20) end
 		if self.wndCE:IsShown() then self:CEPopulate() end
 
@@ -5108,6 +5172,19 @@ function DKP:InvitePopulate(bOpen)
 end
 
 function DKP:InviteOnResult(strName,eResult)
+	if self.tItems["settings"].bRIEnable then
+		if self.tItems["settings"].strRemConf == "join" then
+			for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
+				if strConfirmed == strName then
+					table.remove(self.tItems["settings"].tConfirmed,k)
+					break
+				end
+			end
+		end
+	end
+
+
+
 	if bInviteSuspend and GroupLib.InGroup() then 
 		bInviteSuspend = false
 		GroupLib.ConvertToRaid()
@@ -5225,6 +5302,8 @@ function DKP:LLInit()
 	if self.tItems["settings"].LL.nMaxRows == nil then self.tItems["settings"].LL.nMaxRows = 3 end
 	if self.tItems["settings"].LL.nMaxItems == nil then self.tItems["settings"].LL.nMaxItems = 3 end
 	
+	if self.tItems["settings"].LL.strChatPrefix == nil then self.tItems["settings"].LL.strChatPrefix = "party" end
+	
 	self.wndLLM:FindChild("Only"):FindChild("Equip"):SetCheck(self.tItems["settings"].LL.bEquippable)
 	self.wndLLM:FindChild("Only"):FindChild("MinLvl"):SetText(self.tItems["settings"].LL.nLevel)
 	
@@ -5264,7 +5343,12 @@ function DKP:LLInit()
 	self.wndLLM:FindChild("QualityTab"):Lock(true)
 	self.wndLLM:FindChild("MaxItems"):SetValue(self.tItems["settings"].LL.nMaxItems)
 	self.wndLLM:FindChild("MaxRows"):SetValue(self.tItems["settings"].LL.nMaxRows)
+	self.wndLLM:FindChild("ChannelPrefix"):SetText(self.tItems["settings"].LL.strChatPrefix)
 	self.wndLL:SetSizingMinimum(768,493)
+end
+
+function DKP:LLMSetPrefix(wndHandler,wndControl,strText)
+	self.tItems["settings"].LL.strChatPrefix = strText
 end
 
 function DKP:LLSetMinLevel(wndHandler,wndControl,strText)
@@ -5355,7 +5439,7 @@ function DKP:LLOpen(tIDs)
 	for k , ID in ipairs(tIDs) do
 		if not self.tItems[ID] then table.remove(tIDs) end
 	end
-	
+	self.wndLL:ToFront()
 	self.wndLL:SetData(tIDs)
 	self.wndLL:Show(true,false)
 	if #tIDs == 1 then
@@ -5409,7 +5493,7 @@ function DKP:LLPrepareData()
 							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
 						end
 					else -- Group Date
-						local strDate = self:ConvertOddAmericanDate(os.date("%x",entry.nDate))
+						local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID]) then
 							table.insert(tGrouppedItems[strDate],entry.itemID)	
@@ -5442,7 +5526,7 @@ function DKP:LLPrepareData()
 					end
 				else
 					for j , entry in ipairs(player.tLLogs) do
-						local strDate = self:ConvertOddAmericanDate(os.date("%x",entry.nDate))
+						local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
 							table.insert(tGrouppedItems[strDate],entry.itemID)
@@ -5965,7 +6049,7 @@ function DKP:GetEncodedData(strRequester)
 end
 
 function DKP:DFAddLog(strPlayer,bSucces)
-	table.insert(self.tItems["settings"].DF.tLogs,1,{strRequester = strPlayer,strState = bSucces and "{Yes}" or "{No}",strTimestamp = os.date("%x",os.time()) .. " " .. os.date("%X",os.time())})
+	table.insert(self.tItems["settings"].DF.tLogs,1,{strRequester = strPlayer,strState = bSucces and "{Yes}" or "{No}",strTimestamp = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time())})
 	if #self.tItems["settings"].DF.tLogs > 20 then table.remove(self.tItems["settings"].DF.tLogs,21) end
 	if self.wndDF:IsShown() then self:DFPopulate() end
 end
@@ -6038,6 +6122,101 @@ end
 
 function DKP:FQDisableQuality(wndHandler,wndControl)
 	self.tItems["settings"].tFilterQual[wndControl:GetName()] = false
+end
+-----------------------------------------------------------------------------------------------
+-- Raid Invites
+-----------------------------------------------------------------------------------------------
+function DKP:RIInit()
+	self.wndRI = Apollo.LoadForm(self.xmlDoc,"RaidInvites",nil,self)
+	self.wndRI:Show(false,true)
+
+	if self.tItems["settings"].bRIEnable == nil then self.tItems["settings"].bRIEnable = false end
+	if self.tItems["settings"].bRIConfirmation == nil then self.tItems["settings"].bRIConfirmation = false end
+	if self.tItems["settings"].strRIcmd == nil then self.tItems["settings"].strRIcmd = "raid" end
+	if self.tItems["settings"].strConfRem == nil then self.tItems["settings"].strConfRem = "join" end
+	if self.tItems["settings"].tConfirmed == nil then self.tItems["settings"].tConfirmed = {} end
+
+	self.wndRI:FindChild("Enable"):SetCheck(self.tItems["settings"].bRIEnable)
+	self.wndRI:FindChild("Conf"):SetCheck(self.tItems["settings"].bRIConfirmation)
+	self.wndRI:FindChild(self.tItems["settings"].strConfRem):SetCheck(true)
+	self.wndRI:FindChild("Command"):SetText(self.tItems["settings"].strRIcmd)
+end
+
+
+
+function DKP:RISetCmd(wndHandler,wndControl,strText)
+	self.tItems["settings"].strRIcmd = strText
+end
+
+function DKP:RIProcessInviteRequest(strRequester)
+	if self.tItems["settings"].bRIConfirmation then
+		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
+			if strConfirmed == strRequester then
+				if self.tItems["settings"].strConfRem == "inv" then
+					table.remove(self.tItems["settings"].tConfirmed,k)
+				end
+				if GroupLib.GetMemberCount() == 5 then GroupLib.ConvertToRaid() end
+				local strRealm = GameLib.GetRealmName()
+				local strMsg = "Raid time!"
+				GroupLib.Invite(strRequester,strRealm,strMessage)
+				break
+			end
+		end
+	else
+		if GroupLib.GetMemberCount() == 5 then GroupLib.ConvertToRaid() end
+		local strRealm = GameLib.GetRealmName()
+		local strMsg = "Raid time!"
+		GroupLib.Invite(strRequester,strRealm,strMessage)
+	end
+end
+
+function DKP:RIInvertConfirmation()
+	for k , wnd in ipairs(selectedMembers) do
+		local bFound = false
+		local atID
+		for k ,strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
+			if strConfirmed == self.tItems[wnd:GetData()].strName then
+				bFound = true
+				atID = k
+				break
+			end
+		end
+
+		if bFound then
+			table.remove(self.tItems["settings"].tConfirmed,atID)
+		else
+			table.insert(self.tItems["settings"].tConfirmed,self.tItems[wnd:GetData()].strName)
+		end
+	end
+	self:RefreshMainItemList()
+end
+
+function DKP:RIOpen()
+	self.wndRI:Show(true,false)
+end
+
+function DKP:RIHide()
+	self.wndRI:Show(false,false)
+end
+
+function DKP:RIEnable()
+	self.tItems["settings"].bRIEnable = true
+end
+
+function DKP:RIDisable()
+	self.tItems["settings"].bRIEnable = false
+end
+
+function DKP:RIConfEnable()
+	self.tItems["settings"].bRIConfirmation = true
+end
+
+function DKP:RIConfDisable()
+	self.tItems["settings"].bRIConfirmation = false
+end
+
+function DKP:RIConfRemChanged(wndHandler,wndControl)
+	self.tItems["settings"].strConfRem = wndControl:GetName()
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance
