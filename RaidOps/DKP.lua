@@ -138,16 +138,15 @@ local ktQual =
 local strChangelog = 
 [===[
 ---RaidOps version 2.05---
-{xx/04/2015}
+{26/04/2015}
 Fixed date format bug.
-Fixed skip random looter not removing the looter after assign.
-Added option to invite people when they write for example "!raid" in guild channel.
+Fixed skip random looter not removing skipped looter after assign.
+Added option to invite people when they write for example "!raid"(customizable) in guild channel or whiper this command to you.
 Added small help window in chat bidding depending on mode.
 Removed "save (/reloadui)" button.
 Added option to select players confirmed for raid in MassEdit.
-Resized Mass Edit Toolbox.
-
-
+Slight redesign of Mass Edit tools.
+Default settings tweaked a little bit.
 
 ---RaidOps version 2.04---
 {23/04/2015}
@@ -405,14 +404,14 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].FilterEquippable == nil then self.tItems["settings"].FilterEquippable = false end
 		if self.tItems["settings"].FilterWords == nil then self.tItems["settings"].FilterWords = false end
 		if self.tItems["settings"].networking == nil then self.tItems["settings"].networking = true end
-		if self.tItems["settings"].bTrackUndo == nil then self.tItems["settings"].bTrackUndo = false end
+		if self.tItems["settings"].bTrackUndo == nil then self.tItems["settings"].bTrackUndo = true end
 		if self.tItems["settings"].nPopUpGPRed == nil then self.tItems["settings"].nPopUpGPRed = 25 end
-		if self.tItems["settings"].bColorIcons == nil then self.tItems["settings"].bColorIcons = false end
-		if self.tItems["settings"].bDisplayRoles == nil then self.tItems["settings"].bDisplayRoles = false end
-		if self.tItems["settings"].bSaveUndo == nil then self.tItems["settings"].bSaveUndo = false end
+		if self.tItems["settings"].bColorIcons == nil then self.tItems["settings"].bColorIcons = true end
+		if self.tItems["settings"].bDisplayRoles == nil then self.tItems["settings"].bDisplayRoles = true end
+		if self.tItems["settings"].bSaveUndo == nil then self.tItems["settings"].bSaveUndo = true end
 		if self.tItems["settings"].bSkipGB == nil then self.tItems["settings"].bSkipGB = false end
 		if self.tItems["settings"].bRemErrInv == nil then self.tItems["settings"].bRemErrInv = true end
-		if self.tItems["settings"].bDisplayCounter == nil then self.tItems["settings"].bDisplayCounter = false end
+		if self.tItems["settings"].bDisplayCounter == nil then self.tItems["settings"].bDisplayCounter = true end
 		if self.tItems["settings"].bCountSelected == nil then self.tItems["settings"].bCountSelected = false end
 		if self.tItems["settings"].bSkipBidders == nil then self.tItems["settings"].bSkipBidders = false end
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
@@ -1564,7 +1563,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 self:LLAddLog(strName,strItem)
 		end
 	end
-	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild then
+	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild then
 		if self.tItems["settings"].bRIEnable then
 			if tMessage.arMessageSegments[1].strText == "!" .. self.tItems["settings"].strRIcmd then
 				self:RIProcessInviteRequest(tMessage.strSender)
@@ -1972,6 +1971,7 @@ function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	self:RefreshMainItemList()
 	self.wndMain:FindChild("MassEditControls"):Show(true,true)
 	self:EnableActionButtons()
+	self.wndMain:FindChild("MassEditControls"):FindChild("Confirm"):Enable(self.tItems["settings"].bRIEnable)
 end
 
 function DKP:MassEditDisable( wndHandler, wndControl, eMouseButton )
@@ -2072,8 +2072,8 @@ function DKP:MassEditSelectConfirmed()
 	for k,child in ipairs(self.wndItemList:GetChildren()) do
 		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
 			if strConfirmed == self.tItems[child:GetData()].strName then
-					table.insert(selectedMembers,child)
-					child:SetCheck(true)
+				table.insert(selectedMembers,child)
+				child:SetCheck(true)
 				break
 			end
 		end
@@ -4153,7 +4153,6 @@ function DKP:DSGetEncodedLogs(strRequester)
 	if self.tItems["settings"].DS.shareLogs then
 		local ID = self:GetPlayerByIDByName(strRequester)
 		if ID ~= -1 then
-			Print()
 			if self.tItems["settings"].DS.logs then self:DSAddLog(strRequester,"Logs") end
 			local tLogs = self.tItems[ID].logs
 			return Base64.Encode(serpent.dump(tLogs))
@@ -5172,8 +5171,8 @@ function DKP:InvitePopulate(bOpen)
 end
 
 function DKP:InviteOnResult(strName,eResult)
-	if self.tItems["settings"].bRIEnable then
-		if self.tItems["settings"].strRemConf == "join" then
+	if self.tItems["settings"].bRIEnable and eResult == 2 then
+		if self.tItems["settings"].strConfRem == "join" then
 			for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
 				if strConfirmed == strName then
 					table.remove(self.tItems["settings"].tConfirmed,k)
@@ -6193,6 +6192,7 @@ end
 
 function DKP:RIOpen()
 	self.wndRI:Show(true,false)
+	self.wndRI:ToFront()
 end
 
 function DKP:RIHide()
@@ -6201,10 +6201,12 @@ end
 
 function DKP:RIEnable()
 	self.tItems["settings"].bRIEnable = true
+	self.wndMain:FindChild("MassEditControls"):FindChild("Confirm"):Enable(true)
 end
 
 function DKP:RIDisable()
 	self.tItems["settings"].bRIEnable = false
+	self.wndMain:FindChild("MassEditControls"):FindChild("Confirm"):Enable(false)
 end
 
 function DKP:RIConfEnable()
