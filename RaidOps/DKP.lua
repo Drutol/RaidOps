@@ -137,6 +137,16 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.06---
+{29/04/2015}
+Fixed LUA error on bubble link.
+Export window now features Copy to Clipboard button for lengthy exports.
+Added website(yup , dedicated website) export option which exports data into JSON format.
+Now each item tile in Loot Logs will display winners only if they belong to the bubble.
+Fixed position of Raid Queue controls.
+New theme of export window.
+
+
 ---RaidOps version 2.05---
 {26/04/2015}
 Fixed date format bug.
@@ -530,14 +540,7 @@ function DKP:GetPlayerByIDByName(strName)
 end
 
 function DKP:DebugFetch()
-	local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
-	local tTestTable = {}
-	for k , player in ipairs(self.tItems) do
-		table.insert(tTestTable,player)
-		tTestTable[#tTestTable].wnd = nil
-	end
-    self:ExportShowPreloadedText(JSON.encode(tTestTable))
-	--self:ExportShowPreloadedText(tohtml(self:GetEncodedData("Drutol Windchaser")))
+
 end
 
 function DKP:ChangelogShow()
@@ -3498,28 +3501,28 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 	if not self.wndExport:FindChild("List"):IsChecked() then
 		if self.wndExport:FindChild("EPGP"):IsChecked() then
 			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
-				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVEPGP())
+				self:ExportSetOutputText(self:ExportAsCSVEPGP())
 			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
-				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLEPGP())
+				self:ExportSetOutputText(self:ExportAsHTMLEPGP())
 			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
-				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLEPGP())
+				self:ExportSetOutputText(self:ExportAsFormattedHTMLEPGP())
 			end
 		elseif self.wndExport:FindChild("DKP"):IsChecked() then
 			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
-				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVDKP())
+				self:ExportSetOutputText(self:ExportAsCSVDKP())
 			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
-				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLDKP())
+				self:ExportSetOutputText(self:ExportAsHTMLDKP())
 			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
-				self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLDKP())
+				self:ExportSetOutputText(self:ExportAsFormattedHTMLDKP())
 			end
 		end
 	else
 		if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsCSVList())
+			self:ExportSetOutputText(self:ExportAsCSVList())
 		elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsHTMLList())
+			self:ExportSetOutputText(self:ExportAsHTMLList())
 		elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
-			self.wndExport:FindChild("ExportBox"):SetText(self:ExportAsFormattedHTMLList())
+			self:ExportSetOutputText(self:ExportAsFormattedHTMLList())
 		end
 	end
 	
@@ -3547,8 +3550,7 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 		exportTables.tCE = self.tItems["CE"]
 		
 
-
-		self.wndExport:FindChild("ExportBox"):SetText(Base64.Encode(serpent.dump(exportTables)))
+		self:ExportSetOutputText(Base64.Encode(serpent.dump(exportTables)))
 	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
 		local tImportedTables = serpent.load(Base64.Decode(self.wndExport:FindChild("ExportBox"):GetText()))
 			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
@@ -3571,6 +3573,27 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 			Print("Error processing database")
 		end
 	end
+
+	if self.wndExport:FindChild("WebExport"):IsChecked() then
+		local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+		local tTestTable = {}
+		for k , player in ipairs(self.tItems) do
+			table.insert(tTestTable,player)
+			tTestTable[#tTestTable].wnd = nil
+			for k , entry in ipairs(tTestTable[#tTestTable].tLLogs) do
+				if not entry.nGP then
+					entry.nGP = tonumber(string.sub(self:EPGPGetItemCostByID(entry.itemID),36))
+				end 
+			end
+		end
+		self:ExportSetOutputText(JSON.encode(tTestTable))
+	    
+	end
+end
+
+function DKP:ExportSetOutputText(strText)
+	if string.len(strText) < 30000 then self.wndExport:FindChild("ExportBox"):SetText(strText) else self.wndExport:FindChild("ExportBox"):SetText("String is too long , use copy to clipboard button.") end
+	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, strText)
 end
 
 function DKP:ExportCloseWindow( wndHandler, wndControl, eMouseButton )
@@ -3758,6 +3781,12 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),"{DKP}",modifier,CurrentPopUpID)
 	else
 		self:EPGPAdd(self.tItems[CurrentPopUpID].strName,nil,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()))
+		for k , item in ipairs(self.tItems[CurrentPopUpID].tLLogs) do
+			if item.itemID == PopUpItemQueue[1].itemID then
+				item.nGP = tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())
+				break
+			end
+		end
 		if self:LabelGetColumnNumberForValue("GP") ~= -1 and self.tItems[CurrentPopUpID].wnd ~= nil then
 			self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[CurrentPopUpID].GP)
 		end
@@ -5300,11 +5329,14 @@ function DKP:LLInit()
 	if self.tItems["settings"].LL.nLevel == nil then self.tItems["settings"].LL.nLevel = 1 end
 	if self.tItems["settings"].LL.nMaxRows == nil then self.tItems["settings"].LL.nMaxRows = 3 end
 	if self.tItems["settings"].LL.nMaxItems == nil then self.tItems["settings"].LL.nMaxItems = 3 end
+	if self.tItems["settings"].LL.nMaxDays == nil then self.tItems["settings"].LL.nMaxDays = 3 end
 	
 	if self.tItems["settings"].LL.strChatPrefix == nil then self.tItems["settings"].LL.strChatPrefix = "party" end
+	if self.tItems["settings"].LL.nGP == nil then self.tItems["settings"].LL.nGP = 0 end
 	
 	self.wndLLM:FindChild("Only"):FindChild("Equip"):SetCheck(self.tItems["settings"].LL.bEquippable)
 	self.wndLLM:FindChild("Only"):FindChild("MinLvl"):SetText(self.tItems["settings"].LL.nLevel)
+	self.wndLLM:FindChild("Only"):FindChild("MinGP"):SetText(self.tItems["settings"].LL.nGP)
 	
 	for k,slot in pairs(self.tItems["settings"].LL.tSlots) do
 		local wnd = self.wndLLM:FindChild("Only"):FindChild("SlotsTab"):FindChild(k)
@@ -5342,6 +5374,7 @@ function DKP:LLInit()
 	self.wndLLM:FindChild("QualityTab"):Lock(true)
 	self.wndLLM:FindChild("MaxItems"):SetValue(self.tItems["settings"].LL.nMaxItems)
 	self.wndLLM:FindChild("MaxRows"):SetValue(self.tItems["settings"].LL.nMaxRows)
+	self.wndLLM:FindChild("MaxDays"):SetValue(self.tItems["settings"].LL.nMaxDays)
 	self.wndLLM:FindChild("ChannelPrefix"):SetText(self.tItems["settings"].LL.strChatPrefix)
 	self.wndLL:SetSizingMinimum(768,493)
 end
@@ -5356,6 +5389,15 @@ function DKP:LLSetMinLevel(wndHandler,wndControl,strText)
 		self.tItems["settings"].LL.nLevel = value
 	else
 		wndControl:SetText(self.tItems["settings"].LL.nLevel)
+	end
+end
+
+function DKP:LLSetMinGP(wndHandler,wndControl,strText)
+	local value = tonumber(strText)
+	if value and value >= 0 then
+		self.tItems["settings"].LL.nGP = value
+	else
+		wndControl:SetText(self.tItems["settings"].LL.nGP)
 	end
 end
 
@@ -5426,7 +5468,8 @@ function DKP:LLAddLog(strPlayer,strItem)
 		local item = self.ItemDatabase[strItem].ID
 		if item then
 			if self.tItems[ID].tLLogs == nil then self.tItems[ID].tLLogs = {} end
-			table.insert(self.tItems[ID].tLLogs,1,{itemID = self.ItemDatabase[strItem].ID,nDate = os.time()})
+			table.insert(self.tItems[ID].tLLogs,1,{itemID = self.ItemDatabase[strItem].ID,nDate = os.time(),nGP = tonumber(string.sub(self:EPGPGetItemCostByID(self.ItemDatabase[strItem].ID),36))})
+
 			if #self.tItems[ID].tLLogs > 50 then table.remove(self.tItems[ID].tLLogs,51) end
 
 		end
@@ -5479,7 +5522,7 @@ function DKP:LLPrepareData()
 					if self.tItems["settings"].LL.strGroup == "GroupName" then
 						tGrouppedItems[self.tItems[ID].strName] = {}
 						for j , entry in ipairs(self.tItems[ID].tLLogs) do
-							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID]) then
+							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
 								table.insert(tGrouppedItems[self.tItems[ID].strName],entry.itemID)
 								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = self.tItems[ID].strName})
 							end
@@ -5487,15 +5530,18 @@ function DKP:LLPrepareData()
 						if #tGrouppedItems[self.tItems[ID].strName] == 0 then tGrouppedItems[self.tItems[ID].strName] = nil end	
 					elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
 						local item = Item.GetDataFromId(entry.itemID)
-						if item and self:LLMeetsFilters(item,self.tItems[ID]) then
+						if item and self:LLMeetsFilters(item,self.tItems[ID],entry.nGP) then
 							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
 						end
 					else -- Group Date
-						local strDate = self:ConvertDate(os.date("%x",entry.nDate))
-						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID]) then
-							table.insert(tGrouppedItems[strDate],entry.itemID)	
+						local diff = os.date("*t",(os.time() - entry.nDate)).day
+						if diff <= self.tItems["settings"].LL.nMaxDays then 
+							local strDate = self:ConvertDate(os.date("%x",entry.nDate))
+							if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
+								table.insert(tGrouppedItems[strDate],entry.itemID)	
+							end
 						end
 					end
 				end
@@ -5508,28 +5554,31 @@ function DKP:LLPrepareData()
 				if self.tItems["settings"].LL.strGroup == "GroupName" then
 					tGrouppedItems[player.strName] = {}
 					for j , entry in ipairs(player.tLLogs) do
-						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
+						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) then
 							table.insert(tGrouppedItems[player.strName],entry.itemID)
-							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName})
+							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = player.strName})
 						end
 					end
 					if #tGrouppedItems[player.strName] == 0 then tGrouppedItems[player.strName] = nil end
 				elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
 					for j , entry in ipairs(player.tLLogs) do
 						local item = Item.GetDataFromId(entry.itemID)
-						if item and self:LLMeetsFilters(item,player) then
+						if item and self:LLMeetsFilters(item,player,entry.nGP) then
 							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)
-							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName})						
+							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName()})						
 						end
 					end
 				else
 					for j , entry in ipairs(player.tLLogs) do
-						local strDate = self:ConvertDate(os.date("%x",entry.nDate))
-						if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player) then
-							table.insert(tGrouppedItems[strDate],entry.itemID)
-							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName})						
+						local diff = os.date("*t",(os.time() - entry.nDate)).day
+						if diff <= self.tItems["settings"].LL.nMaxDays then 
+							local strDate = self:ConvertDate(os.date("%x",entry.nDate))
+							if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) then
+								table.insert(tGrouppedItems[strDate],entry.itemID)
+								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = strDate})						
+							end
 						end
 					end
 				end
@@ -5541,7 +5590,7 @@ function DKP:LLPrepareData()
 	return tGrouppedItems , tWinnersDictionary
 end
 
-function DKP:LLMeetsFilters(item,player)
+function DKP:LLMeetsFilters(item,player,nGP)
 	if not item or not player then return false end
 	-- Booleans setup
 	local bMeetSlot
@@ -5583,6 +5632,10 @@ function DKP:LLMeetsFilters(item,player)
 	end
 	--Item Level
 	if item:GetDetailedInfo().tPrimary.nEffectiveLevel < self.tItems["settings"].LL.nLevel then return false end
+	--Gp cost
+	if tonumber(nGP) then
+		if nGP < self.tItems["settings"].LL.nGP then return false end
+	end
 	--Classes
 	if not bMeetClass then
 		bMeetClass = self.tItems["settings"].LL.tClasses[player.class]
@@ -5671,6 +5724,12 @@ end
 function DKP:LLSetMaxItems( wndHandler, wndControl, fNewValue, fOldValue )
 	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxItems then
 		self.tItems["settings"].LL.nMaxItems = math.floor(fNewValue)
+	end
+end
+
+function DKP:LLSetMaxDays( wndHandler, wndControl, fNewValue, fOldValue )
+	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxDays then
+		self.tItems["settings"].LL.nMaxDays = math.floor(fNewValue)
 	end
 end
 

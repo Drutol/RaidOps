@@ -172,7 +172,7 @@ function DKP:IBPopulate(wndBubble)
 				local ID = tItemPiece:GetItemId()
 				local strTooltip = ""
 				for k , tooltip in ipairs(wndBubble:GetData().tItemTooltips or {}) do
-					if ID == tooltip.ID and not string.find(strTooltip,tooltip.strInfo) then
+					if ID == tooltip.ID and not string.find(strTooltip,tooltip.strInfo) and tooltip.strHeader == wndBubble:FindChild("HeaderText"):GetText() then
 						strTooltip = strTooltip .. tooltip.strInfo .. " \n"
 					end
 				end
@@ -196,7 +196,7 @@ function DKP:IBPopulate(wndBubble)
 end
 
 function DKP:IBPostContents(wndHandler,wndControl)
-	self:IBPopulate(wndBubble)
+	self:IBPopulate(wndControl:GetParent())
 	local wndBubble = wndControl:GetParent()
 	local strItems = ""
 	for k , child in ipairs(wndBubble:FindChild("ItemGrid"):GetChildren()) do
