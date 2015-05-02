@@ -200,3 +200,24 @@ L["#wndEPGPSettings:DecayReal"] = "Verfall Real GP"
 L["#wndEPGPSettings:GPMin"] = "Verhindere GP kleiner als 1."
 L["#wndEPGPSettings:RoundDecay"] = "Benutze gerundete Werte für den Verfall."
 L["#wndEPGPSettings:Reset"] = "Zurücksetzen"
+
+--rev 145
+L["#wndSettings:MinIlvl"] = "Mindest-Gegenstand-Stufe"
+L["#wndSettings:FilteredQual"] = "Gegenstandsqualitätsfilter" -- i love this one :D
+--rev 146
+L["#wndBid:Mainspec"] = "Hauptskillung"
+L["#wndBid:Offspec"] = "Nebenskillung"
+L["#wndBid:Modes:ShortMsg"] = "Kurze Benachrichtigung"
+L["#biddingStrings:short:DKPOpen"] = " [Text Auktion] Ihr bietet auf %s , schreibt das DKP Gebot in %s "
+L["#biddingStrings:short:DKPHidden"] = " [Text Auktion] Ihr bietet auf %s , um teilzunehmen flüstet euer DKP Gebot an : %s ."
+L["#biddingStrings:short:EPGP"] = " [Text Auktion] Gegenstand : %s , schreibe %s um dein Gebot zu setzen, schreibe es erneut zum entfernen!"
+--rev 147
+L["#wndSettings:AutoComment"] = "Erstelle Kommentare automatisch"
+--v2.02
+L["#wndBid:Modes:AutoSelect"] = "Bestimme den Gewinner automatisch"
+--v2.03
+L["#wndSettings:SkipBidWinner"] = "Verberge das Pop-up Fenster, wenn durch eine Auktion gewonnen wurde."
+--v2.04
+L["#wndBid:Modes:AutoStart"] = "Starte Auktion automatisch."
+--v2.05
+L["#wndSettings:RaidInvites"] = "Raid Einladungen."
