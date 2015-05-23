@@ -104,7 +104,7 @@ function DKP:EPGPInit()
 
 end
 
-function DKP:OnLootedItem(item)
+function DKP:OnLootedItem(item,bSuspend)
 	self.ItemDatabase[item:GetName()] = {}
 	self.ItemDatabase[item:GetName()].ID = item:GetItemId()
 	self.ItemDatabase[item:GetName()].quality = item:GetItemQuality()
@@ -118,7 +118,7 @@ function DKP:OnLootedItem(item)
 		self.ItemDatabase[item:GetName()].slot = item:GetSlot()
 	end
 	--if item:GetSlotName() == nil then self.ItemDatabase[item:GetName()] = nil end
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(),self.tItems[math.random(1,10)].strName))
+	if not bSuspend then Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), item:GetName(),self.tItems[math.random(1,10)].strName)) end
 end
 
 function DKP:EPGPGetTokenItemID(strToken)

@@ -6,6 +6,7 @@
 
 require "Apollo"
 require "Window"
+require "ICComm"
 
 -----------------------------------------------------------------------------------------------
 -- DKP Module Definition
@@ -137,14 +138,31 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.06---
+---RaidOps version 2.09---
+{23/05/2015}
+Fixed logs window sizing.
+Logs will now display "after" value.
+Timed awards will appear in logs from now on.
+Added Manual Award window.
+Added Rename option.
+Fixed sizing of the mass invite button , what made Custom Events accessible. 
+
+---RaidOps version 2.08---
+Updated to API-10.
+---RaidOps version 2.07---
+{2/05/2015}
+Added JSON import.
+Added option to input export strings longer than 30.000 characters.
+
+This is the last update before my break (final exams) , if drop 5 hits during this period I have updated version prepared. I will be still checking github/curse etc. for any reports. Estimated break end is on 22th of May as this is the day of my last exam. Website is functional (still a lot of things needs to be done) if you want to use it it's here : http://raid-ops-web.herokuapp.com . Wish me luck and see you in 3 weeks time!
 {29/04/2015}
 Fixed LUA error on bubble link.
 Export window now features Copy to Clipboard button for lengthy exports.
-Added website(yup , dedicated website) export option which exports data into JSON format.
+Added website (yup , dedicated website) export option which exports data into JSON format.
 Now each item tile in Loot Logs will display winners only if they belong to the bubble.
 Fixed position of Raid Queue controls.
 New theme of export window.
+Added option to set maximum day difference when grouping by day in loot logs.
 
 
 ---RaidOps version 2.05---
@@ -180,33 +198,6 @@ Fixed command sorting in chat bidding.
 Now only names consisting of 2 words can be added.
 Fixed rare statup error.
 Added option to hide pop-up window for chat bidding winners.
-
----RaidOps version 2.02---
-{19/04/2015}
-Chat bidding is now less obscure. (to hell with grid windows).
-Chat bidding comes with tiled and groupped list of bidders.
-Chat bidding now supports 4 custom commands for EPGP mode.
-Main roster window is no longer ashamed of other windows and will go to the front. ^^
-Changed default settings a bit.
-Separated Chat Bidding in Network Bidding buttons (ML window).
-Fixed issue with tile PR display.
-Added option to automatically select Chat bidding winner.
-Final countdown can be now set to 0.
-/chatbid will now initialize with chatbidding initialization.
-
----RaidOps version 2.01---
-{16/04/2015}
-Fixed issues with action buttons(add,sub,set) in Mass Edit mode.
-Hook to EToolTip will be now initialized after short delay.
-Role icons should no longer disappear upon selecting.
-Recent activity will now respect auto comments.
-
----RaidOps version 2.0 "Release"---
-{15/04/2015}
-Changed Addon name to RaidOps. Don't worry , your data is still there. All you need to is to go to %appdata%\Roaming\NCSOFT\WildStar\AddonSaveData and paste the content of EasyDKP_0_Gen.xml to RaidOps_0_Gen.xml. Remember to log off while doing this. 
-Changed /dkp to /epgp
-Fixed a few bugs with Master Loot window.
-/chatbid will now open bidding UI regardless of current auction state.
 
  ]===]
 
@@ -423,10 +414,8 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bRemErrInv == nil then self.tItems["settings"].bRemErrInv = true end
 		if self.tItems["settings"].bDisplayCounter == nil then self.tItems["settings"].bDisplayCounter = true end
 		if self.tItems["settings"].bCountSelected == nil then self.tItems["settings"].bCountSelected = false end
-		if self.tItems["settings"].bSkipBidders == nil then self.tItems["settings"].bSkipBidders = false end
 		if self.tItems["settings"].bTrackTimedAwardUndo == nil then self.tItems["settings"].bTrackTimedAwardUndo = false end
 		if self.tItems["settings"].bLootLogs == nil then self.tItems["settings"].bLootLogs = true end
-		if self.tItems["settings"].bAutoLog == nil then self.tItems["settings"].bAutoLog = true end
 		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
 		if self.tItems["settings"].strDateFormat == nil then self.tItems["settings"].strDateFormat = "EU" end
 		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
@@ -456,6 +445,8 @@ function DKP:OnDocLoaded()
 		self:RaidInit()
 		self:FQInit()
 		self:RIInit()
+		self:MAInit()
+		self:RenameInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -467,7 +458,6 @@ function DKP:OnDocLoaded()
 		-- Bidding
 		
 		self.tSelectedItems = {}
-		self.tPopUpExceptions = {} -- bid winners
 		self.bAwardingOnePlayer = false
 		
 		
@@ -499,44 +489,6 @@ function DKP:OnDocLoaded()
 		self.wndHub:FindChild("NetworkBidding"):Enable(false)
 		
 	end
-end
-
-function DKP:ConvertDate(strDate)
-	if self.tItems["settings"].strDateFormat == "EU" then
-		local words = {}
-		for word in string.gmatch(strDate,"([^/]+)") do
-			table.insert(words,word)
-		end
-
-		return words[2] .. "/" .. words[1] .. "/" .. words[3]
-	else
-		return strDate
-	end
-end
-
-function DKP:ChangeDateFormat(wndHandler,wndControl)
-	self.tItems["settings"].strDateFormat = wndControl:GetName()
-end
-
-function DKP:GetPlayerByIDByName(strName)
-
-	local strPlayer = ""
-	for uchar in string.gfind(strName, "([%z\1-\127\194-\244][\128-\191]*)") do
-		if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
-		strPlayer = strPlayer .. uchar
-	end
-	strName = strPlayer
-	
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then return i end
-	end
-	
-	for j,alt in pairs(self.tItems["alts"]) do
-		if string.lower(strName) == string.lower(j) then return self.tItems["alts"][j] end
-	end
-
-	
-	return -1
 end
 
 function DKP:DebugFetch()
@@ -581,19 +533,14 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 	if not self.tItems["settings"].bTrackUndo then return end
 	local tMembersNames = {}
 	local strComment = ""
-	if not strForceComment then
-		if bRemoval == true or bRemoval == false then strComment = "--" 
-		elseif self:string_starts(strType,"{Award for") then  strComment = "--" 
-		elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
-		elseif strType == ktUndoActions["remp"] then  strComment = "--" 
-		elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
-		elseif self:string_starts(strType,"{Merged") or self:string_starts(strType,"{Converted") then strComment = "--" 
-		elseif self.tItems["settings"].logs == 1 then 
-			strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-			if strComment == "Comment" or strComment == "Comments Disabled" or strComment == "Comment - Auto" then strComment = "--" end
-		end
-	else
-		strComment = strForceComment
+	if bRemoval == true or bRemoval == false then strComment = "--" 
+	elseif self:string_starts(strType,"Award for") then  strComment = "--" 
+	elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
+	elseif strType == ktUndoActions["remp"] then  strComment = "--" 
+	elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
+	elseif self.tItems["settings"].logs == 1 then 
+		strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
 	end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.sort(tMembersNames,raidOpsSortCategories)
@@ -637,6 +584,27 @@ function DKP:UndoRedo()
 	if #tRedoActions == 0 then self.wndActivity:FindChild("Redo"):Enable(false) end
 end
 
+function DKP:GetPlayerByIDByName(strName)
+ 
+	local strPlayer = ""
+	for uchar in string.gfind(strName, "([%z\1-\127\194-\244][\128-\191]*)") do
+		if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
+		strPlayer = strPlayer .. uchar
+	end
+	strName = strPlayer
+	
+	for i=1,table.maxn(self.tItems) do
+		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then return i end
+	end
+	
+	for j,alt in pairs(self.tItems["alts"]) do
+		if string.lower(strName) == string.lower(j) then return self.tItems["alts"][j] end
+	end
+
+	
+	return -1
+end
+
 function DKP:Undo()
 	if #tUndoActions > 0 then
 		local tMembersToRevert = serpent.load(tUndoActions[1].strData)
@@ -660,33 +628,6 @@ function DKP:Undo()
 
 		if tMembersToRevert then
 			for k,revertee in ipairs(tMembersToRevert) do
-				if tUndoActions[1].bAddAlt ~= nil then
-					if tUndoActions[1].bAddAlt == true then -- remove alt
-						--find owner
-						local nOwnerID = self:GetPlayerByIDByName(revertee.strName) --this player is now an alt so we need an owner
-						--remove alt from owner
-						if nOwnerID ~= -1 then
-							for k ,alt in ipairs(self.tItems[nOwnerID].alts) do
-								if string.lower(alt) == string.lower(revertee.strName) then
-									--alt found now remove
-									table.remove(self.tItems[nOwnerID].alts,k)
-									--free ID
-									self.tItems["alts"][string.lower(alt)] = nil
-									break
-								end
-							end
-							-- check if merged
-							if string.find(tUndoActions[1].strType,"Merged") then -- we need to remove added values to owner
-								self.tItems[nOwnerID].net =  self.tItems[nOwnerID].net - revertee.net
-								self.tItems[nOwnerID].tot =  self.tItems[nOwnerID].tot - revertee.tot
-								self.tItems[nOwnerID].EP =  self.tItems[nOwnerID].EP - revertee.EP
-								self.tItems[nOwnerID].GP =  self.tItems[nOwnerID].GP - revertee.GP
-								self.tItems[nOwnerID].Hrs =  self.tItems[nOwnerID].Hrs - revertee.Hrs
-							end
-						end
-					end
-				end
-
 				if tUndoActions[1].bRemove == nil then
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then -- modifications 
@@ -1014,7 +955,7 @@ function DKP:SetDKP(cycling)
 				end
 			end
 			if self.tItems["EPGP"].Enable == 0 then	
-				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]},nil,comment) end
+				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]}) end
 				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(value)
 				local ID = self:GetPlayerByIDByName(strName)
 				
@@ -1276,7 +1217,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
-					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["addgp"] or ktUndoActions["addep"],value,{[1] = self.tItems[ID]},comment)  end
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["addgp"] or ktUndoActions["addep"],value,{[1] = self.tItems[ID]})  end
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
@@ -1574,7 +1515,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 		end
 	end
 
-	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_NPCSay and GroupLib.InRaid() then
+	--[[if channelCurrent:GetType() == ChatSystemLib.ChatChannel_NPCSay and GroupLib.InRaid() then
 		local strText = ""
 		for i=1, table.getn(tMessage.arMessageSegments) do
 			strText = strText .. tMessage.arMessageSegments[i].strText
@@ -1590,7 +1531,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				end
 			end
 		end
-	end
+	end]]
 	if self.tItems["settings"].whisp == 1 then
 		if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
 			local senderStr = tMessage.strSender
@@ -1889,6 +1830,7 @@ function DKP:TimeAwardAward()
 		local unit_member = GroupLib.GetGroupMember(i)
 		table.insert(raidMembers,unit_member.strCharacterName)
 	end
+	table.insert(raidMembers,"Drutol Windchaser")
 	local tMembers = {}
 	if self.tItems["settings"].bTrackUndo  and self.tItems["settings"].bTrackTimedAwardUndo then	
 		for k, member in ipairs(raidMembers) do
@@ -1906,15 +1848,18 @@ function DKP:TimeAwardAward()
 		if ID ~= -1 then
 			if self.wndTimeAward:FindChild("Settings"):FindChild("EP"):IsChecked() then
 				self.tItems[ID].EP = self.tItems[ID].EP + self.tItems["AwardTimer"].amount
+				self:DetailAddLog("Timed Award","{EP}",self.tItems["AwardTimer"].amount,ID)
 			end
 			
 			if self.wndTimeAward:FindChild("Settings"):FindChild("GP"):IsChecked() then
 				self.tItems[ID].GP = self.tItems[ID].GP + self.tItems["AwardTimer"].amount
+				self:DetailAddLog("Timed Award","{GP}",self.tItems["AwardTimer"].amount,ID)
 			end
 			
 			if self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):IsChecked() then
 				self.tItems[ID].net = self.tItems[ID].net + self.tItems["AwardTimer"].amount
 				self.tItems[ID].tot = self.tItems[ID].tot + self.tItems["AwardTimer"].amount
+				self:DetailAddLog("Timed Award","{DKP}",self.tItems["AwardTimer"].amount,ID)
 			end
 		end
 	end
@@ -1974,7 +1919,6 @@ function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	self:RefreshMainItemList()
 	self.wndMain:FindChild("MassEditControls"):Show(true,true)
 	self:EnableActionButtons()
-	self.wndMain:FindChild("MassEditControls"):FindChild("Confirm"):Enable(self.tItems["settings"].bRIEnable)
 end
 
 function DKP:MassEditDisable( wndHandler, wndControl, eMouseButton )
@@ -2100,7 +2044,7 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
-	local save = self:RaidQueueSaveRestoreAndClear()
+	self:RaidQueueClear()
 	local tMembers = {}
 	for k,wnd in ipairs(selectedMembers) do
 		if wnd:GetData() and self.tItems[wnd:GetData()] then
@@ -2213,6 +2157,19 @@ end
 
 function DKP:OnlineUpdate()
 	self:ImportFromGuild()
+end
+
+function DKP:ConvertDate(strDate)
+	if self.tItems["settings"].strDateFormat == "EU" then
+		local words = {}
+		for word in string.gmatch(strDate,"([^/]+)") do
+			table.insert(words,word)
+		end
+
+		return words[2] .. "/" .. words[1] .. "/" .. words[3]
+	else
+		return strDate
+	end
 end
 
 function DKP:GetOnlinePlayers()
@@ -3222,14 +3179,6 @@ function DKP:SettingsRestore()
 									 
 end
 
-function DKP:SettingsSkipBidderEnable()
-	self.tItems["settings"].bSkipBidders = true
-end
-
-function DKP:SettingsSkipBidderDisable()
-	self.tItems["settings"].bSkipBidders = false
-end
-
 function DKP:SettingsEnablePlayerCollection( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].collect_new = 1
 end
@@ -3496,8 +3445,10 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Export Functions
 ---------------------------------------------------------------------------------------------------
+local strConcatedString
 
-function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
+function DKP:ExportExport()
+
 	if not self.wndExport:FindChild("List"):IsChecked() then
 		if self.wndExport:FindChild("EPGP"):IsChecked() then
 			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
@@ -3552,25 +3503,44 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 
 		self:ExportSetOutputText(Base64.Encode(serpent.dump(exportTables)))
 	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
-		local tImportedTables = serpent.load(Base64.Decode(self.wndExport:FindChild("ExportBox"):GetText()))
-			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
-			for k,player in ipairs(self.tItems) do
-				self.tItems[k] = nil
+		self.wndExport:FindChild("ClearString"):Show(false)
+		self.wndExport:FindChild("StoredLength"):SetText("0")
+		local strImportString = strConcatedString
+		strConcatedString = nil
+		if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
+		if string.sub(strImportString, 1, 1) == '[' then
+			local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+			local tImportedPlayers = JSON.decode(strImportString)
+			if tImportedPlayers then
+				for k,player in ipairs(self.tItems) do
+					self.tItems[k] = nil
+				end
+				for k , player in ipairs(tImportedPlayers) do
+					table.insert(self.tItems,player)
+				end
 			end
-			for k,player in ipairs(tImportedTables.tPlayers) do
-				table.insert(self.tItems,player)
-			end
-			for k,player in ipairs(self.tItems) do
-				self.tItems[k].logs = {}
-			end
-			self.tItems["settings"] = tImportedTables.tSettings
-			self.tItems["EPGP"] = tImportedTables.tEPGP
-			self.tItems["Standby"] = tImportedTables.tStandby
-			self.tItems["CE"] = tImportedTables.tCE
-			
 			ChatSystemLib.Command("/reloadui")
 		else
-			Print("Error processing database")
+			local tImportedTables = serpent.load(Base64.Decode(strImportString))
+			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
+				for k,player in ipairs(self.tItems) do
+					self.tItems[k] = nil
+				end
+				for k,player in ipairs(tImportedTables.tPlayers) do
+					table.insert(self.tItems,player)
+				end
+				for k,player in ipairs(self.tItems) do
+					self.tItems[k].logs = {}
+				end
+				self.tItems["settings"] = tImportedTables.tSettings
+				self.tItems["EPGP"] = tImportedTables.tEPGP
+				self.tItems["Standby"] = tImportedTables.tStandby
+				self.tItems["CE"] = tImportedTables.tCE
+				
+				ChatSystemLib.Command("/reloadui")
+			else
+				Print("Error processing database")
+			end
 		end
 	end
 
@@ -3580,15 +3550,34 @@ function DKP:ExportExport( wndHandler, wndControl, eMouseButton )
 		for k , player in ipairs(self.tItems) do
 			table.insert(tTestTable,player)
 			tTestTable[#tTestTable].wnd = nil
-			for k , entry in ipairs(tTestTable[#tTestTable].tLLogs) do
-				if not entry.nGP then
-					entry.nGP = tonumber(string.sub(self:EPGPGetItemCostByID(entry.itemID),36))
-				end 
+			if tTestTable[#tTestTable].tLLogs then
+				for k , entry in ipairs(tTestTable[#tTestTable].tLLogs) do
+					if not entry.nGP then
+						entry.nGP = tonumber(string.sub(self:EPGPGetItemCostByID(entry.itemID),36))
+					end 
+				end
 			end
 		end
 		self:ExportSetOutputText(JSON.encode(tTestTable))
 	    
 	end
+end
+
+function DKP:ExportAddStringPart()
+	self.wndExport:FindChild("ClearString"):Show(true)
+	if not strConcatedString then
+		strConcatedString = self.wndExport:FindChild("ExportBox"):GetText()
+		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
+	else
+		strConcatedString = strConcatedString .. self.wndExport:FindChild("ExportBox"):GetText()
+		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
+	end
+end
+
+function DKP:ExportResetString()
+	self.wndExport:FindChild("StoredLength"):SetText("0")
+	self.wndExport:FindChild("ClearString"):Show(false)
+	strConcatedString = nil
 end
 
 function DKP:ExportSetOutputText(strText)
@@ -3897,24 +3886,6 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
 		return
 	end
-	
-	for k , exception in ipairs(self.tPopUpExceptions) do
-		if exception == strName then	
-			local itemID
-			if self.ItemDatabase[string.sub(strItem,2)] then
-				itemID = self.ItemDatabase[string.sub(strItem,2)].ID
-			else
-				itemID = self.ItemDatabase[strItem].ID
-			end
-			if itemID then
-				self:EPGPAdd(exception,nil,tonumber(string.sub(self:EPGPGetItemCostByID(itemID),36)))
-				self:DetailAddLog(strItem,"{GP}",tonumber(string.sub(self:EPGPGetItemCostByID(itemID),36)),self:GetPlayerByIDByName(strName))
-				table.remove(self.tPopUpExceptions,k)
-				return
-			end
-		end
-	end
-	
 	local ID_popup = nil
 	for i=1, table.maxn(self.tItems) do
 		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then
@@ -4007,8 +3978,7 @@ function DKP:StandbyListAdd( wndHandler, wndControl, strText )
 	if self:GetPlayerByIDByName(strText) ~= -1 then
 		self.tItems["Standby"][string.lower(strText)] = {}
 		self.tItems["Standby"][string.lower(strText)].strName = strText
-		local currDate = os.date("*t",os.time())
-		self.tItems["Standby"][string.lower(strText)].strDate = tostring(currDate.day .. "/" .. currDate.month .. "/" .. currDate.year)
+		self.tItems["Standby"][string.lower(strText)].strDate = self:ConvertDate(os.date("%x",os.time()))
 	end
 	if self.wndStandby:IsShown() then self:StandbyListPopulate() end
 	if wndControl ~= nil then wndControl:SetText("") end
@@ -4208,13 +4178,6 @@ function DKP:ConInit()
 	self.wndContext:Show(false,true)
 end
 
-function DKP:ConChangeClassClick(wndHandler,wndControl,eMouseButton)
-	if wndHandler ~= wndControl then return end
-	if eMouseButton == GameLib.CodeEnumInputMouse.Right then
-		self:ConChangeClassInverted(wndHandler,wndControl)
-	end
-end
-
 function DKP:ConChangeClass(wndHandler,wndControl)
 	local strCurrClass = wndControl:GetText()
 	if strCurrClass == "Esper" then strCurrClass = "Medic" 
@@ -4331,8 +4294,16 @@ function DKP:ConLogs()
 	self:LogsShow()
 end
 
+function DKP:ConRename()
+	self:RenameShow(self.wndContext:GetData())
+end
+
 function DKP:ConLootLogs()
 	self:LLOpen({[1] = self.wndContext:GetData()})
+end
+
+function DKP:ConManualAward()
+	self:MAOpen(self.wndContext:GetData())
 end
 
 function DKP:ConStandbyEnable()
@@ -4521,8 +4492,8 @@ end
 function DKP:LogsInit()
 	self.wndLogs = Apollo.LoadForm(self.xmlDoc,"Logs",nil,self)
 	self.wndLogs:Show(false,true)
-	self.wndLogs:SetSizingMinimum(648,329)
-	self.wndLogs:SetSizingMaximum(648,550)
+	self.wndLogs:SetSizingMinimum(751,332)
+	self.wndLogs:SetSizingMaximum(751,435)
 end
 
 function DKP:LogsExport()
@@ -4564,9 +4535,18 @@ function DKP:LogsPopulate()
 	for k,entry in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
 		grid:AddRow(k..".")
 		grid:SetCellData(k,1,entry.strComment)
-		grid:SetCellData(k,3,entry.strType)
-		grid:SetCellData(k,2,entry.strModifier)
-		grid:SetCellData(k,4,entry.strTimestamp)
+		grid:SetCellData(k,4,entry.strType)
+		if entry.strModifier then
+			grid:SetCellData(k,2,entry.strModifier)
+		end
+		if entry.strTimestamp then
+			grid:SetCellData(k,5,entry.strTimestamp)
+		elseif entry.nDate then
+			grid:SetCellData(k,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
+		end
+		if entry.nAfter then
+			grid:SetCellData(k,3,entry.nAfter)
+		end
 	end
 end
 
@@ -4578,9 +4558,20 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 			strComment = strComment .. uchar
 		end
 	
-		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,strTimestamp = self:ConvertDate(os.date("%x",os.time())) .. "  " .. os.date("%X",os.time())})
+		local after
+		if strType == "{EP}" then after = self.tItems[ID].EP
+		elseif strType == "{GP}" then after = self.tItems[ID].GP
+		elseif strType == "{DKP}" then after = self.tItems[ID].net
+		end
+
+		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after)})
+		if #self.tItems[ID].logs >= 15 then 
+			for k=15,#self.tItems[ID].logs do
+				table.remove(self.tItems[ID].logs,15) 
+			end
+		end
 		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
-		if #self.tItems[ID].logs > 20 then table.remove(self.tItems[ID].logs,20) end
+
 	end
 end
 
@@ -4637,6 +4628,7 @@ function DKP:RaidQueueSaveRestoreAndClear()
 end
 
 function DKP:RaidQueueRestore(tNames)
+	if not tNames then return end
 	for k , name in ipairs(tNames) do
 		if self:GetPlayerByIDByName(name) ~= -1 then
 			table.insert(self.tItems.tQueuedPlayers,self:GetPlayerByIDByName(name))
@@ -4687,7 +4679,6 @@ function DKP:CEInit()
 	
 	if self.tItems["settings"].CEEnable == nil then self.tItems["settings"].CEEnable = false end
 	if self.tItems["settings"].CERaidOnly == nil then self.tItems["settings"].CERaidOnly = false end
-	if self.tItems["settings"].CENotify == nil then self.tItems["settings"].CENotify = false end
 	
 	self.wndCE:FindChild("Enable"):SetCheck(self.tItems["settings"].CEEnable)
 	self.wndCE:FindChild("RaidOnly"):SetCheck(self.tItems["settings"].CERaidOnly)
@@ -4697,14 +4688,6 @@ function DKP:CEInit()
 	
 	
 	if self.tItems["CE"] == nil then self.tItems["CE"] = {} end
-end
-
-function DKP:CENotifyEnable()
-	self.tItems["settings"].CENotify = true
-end
-
-function DKP:CENotifyDisable()
-	self.tItems["settings"].CENotify = false
 end
 
 function DKP:CEShow()
@@ -4975,7 +4958,7 @@ local tKilledBossesInSession = {
 
 function DKP:CEOnUnitDamage(tArgs)
 	if self.tItems["settings"].CERaidOnly and not GroupLib.InRaid() then return end
-	if  tArgs.bTargetKilled== false then return end
+	if  tArgs.bTargetKilled == false then return end
 	if tArgs.unitTarget == nil then return end
 	local tUnits = {}
 	local tBosses = {}
@@ -5336,7 +5319,6 @@ function DKP:LLInit()
 	
 	self.wndLLM:FindChild("Only"):FindChild("Equip"):SetCheck(self.tItems["settings"].LL.bEquippable)
 	self.wndLLM:FindChild("Only"):FindChild("MinLvl"):SetText(self.tItems["settings"].LL.nLevel)
-	self.wndLLM:FindChild("Only"):FindChild("MinGP"):SetText(self.tItems["settings"].LL.nGP)
 	
 	for k,slot in pairs(self.tItems["settings"].LL.tSlots) do
 		local wnd = self.wndLLM:FindChild("Only"):FindChild("SlotsTab"):FindChild(k)
@@ -5494,6 +5476,7 @@ function DKP:LLOpen(tIDs)
 		for k , ID in ipairs(tIDs) do strTooltip = strTooltip .. self.tItems[ID].strName .. "\n" end
 		self.wndLL:FindChild("Controls"):FindChild("Player"):SetTooltip(strTooltip)
 		self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(true)
+		self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(true)
 	end
 	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
 	self:LLPopuplate()
@@ -5504,6 +5487,16 @@ function DKP:LLOpenWhole()
 	self.wndLL:SetData("AllMode")
 	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Whole Roster")
 	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(true)
+	self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(true)
+	self:LLPopuplate()
+end
+
+function DKP:LLOpenML()
+	self.wndLL:Show(true,false)
+	self.wndLL:SetData("ML")
+	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Master Loot Entries")
+	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(false)
+	self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(false)
 	self:LLPopuplate()
 end
 
@@ -5514,77 +5507,86 @@ end
 function DKP:LLPrepareData()
 	local tGrouppedItems = {}
 	local tWinnersDictionary = {}
-	if self.wndLL:GetData() ~= "AllMode" then
-		for k , ID in ipairs(self.wndLL:GetData()) do 
-			if self.tItems[ID].tLLogs ~= nil then
-				tWinnersDictionary[self.tItems[ID].strName] = {}
-				for k , entry in ipairs(self.tItems[ID].tLLogs) do
-					if self.tItems["settings"].LL.strGroup == "GroupName" then
-						tGrouppedItems[self.tItems[ID].strName] = {}
-						for j , entry in ipairs(self.tItems[ID].tLLogs) do
-							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
-								table.insert(tGrouppedItems[self.tItems[ID].strName],entry.itemID)
-								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = self.tItems[ID].strName})
-							end
-						end
-						if #tGrouppedItems[self.tItems[ID].strName] == 0 then tGrouppedItems[self.tItems[ID].strName] = nil end	
-					elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
-						local item = Item.GetDataFromId(entry.itemID)
-						if item and self:LLMeetsFilters(item,self.tItems[ID],entry.nGP) then
-							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
-							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
-						end
-					else -- Group Date
-						local diff = os.date("*t",(os.time() - entry.nDate)).day
-						if diff <= self.tItems["settings"].LL.nMaxDays then 
-							local strDate = self:ConvertDate(os.date("%x",entry.nDate))
-							if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
-							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
-								table.insert(tGrouppedItems[strDate],entry.itemID)	
-							end
-						end
-					end
-				end
+	if self.wndLL:GetData() == "ML" then
+		for j , entry in pairs(self.ItemDatabase) do
+			local item = Item.GetDataFromId(entry.ID)
+			if item and self:LLMeetsFilters(item,"ML","ML") then
+				if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+				table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.ID)						
 			end
 		end
 	else
-		for k , player in ipairs(self.tItems) do
-			if player.tLLogs then
-				tWinnersDictionary[player.strName] = {}
-				if self.tItems["settings"].LL.strGroup == "GroupName" then
-					tGrouppedItems[player.strName] = {}
-					for j , entry in ipairs(player.tLLogs) do
-						if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) then
-							table.insert(tGrouppedItems[player.strName],entry.itemID)
-							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = player.strName})
+		if self.wndLL:GetData() ~= "AllMode" then
+			for k , ID in ipairs(self.wndLL:GetData()) do 
+				if self.tItems[ID].tLLogs ~= nil then
+					tWinnersDictionary[self.tItems[ID].strName] = {}
+					for k , entry in ipairs(self.tItems[ID].tLLogs) do
+						if self.tItems["settings"].LL.strGroup == "GroupName" then
+							tGrouppedItems[self.tItems[ID].strName] = {}
+							for j , entry in ipairs(self.tItems[ID].tLLogs) do
+								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
+									table.insert(tGrouppedItems[self.tItems[ID].strName],entry.itemID)
+									table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = self.tItems[ID].strName})
+								end
+							end
+							if #tGrouppedItems[self.tItems[ID].strName] == 0 then tGrouppedItems[self.tItems[ID].strName] = nil end	
+						elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
+							local item = Item.GetDataFromId(entry.itemID)
+							if item and self:LLMeetsFilters(item,self.tItems[ID],entry.nGP) then
+								if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+								table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
+							end
+						else -- Group Date
+							local diff = os.date("*t",(os.time() - entry.nDate)).day
+							if diff <= self.tItems["settings"].LL.nMaxDays then 
+								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
+								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
+									table.insert(tGrouppedItems[strDate],entry.itemID)	
+								end
+							end
 						end
 					end
-					if #tGrouppedItems[player.strName] == 0 then tGrouppedItems[player.strName] = nil end
-				elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
-					for j , entry in ipairs(player.tLLogs) do
-						local item = Item.GetDataFromId(entry.itemID)
-						if item and self:LLMeetsFilters(item,player,entry.nGP) then
-							if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
-							table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)
-							table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName()})						
-						end
-					end
-				else
-					for j , entry in ipairs(player.tLLogs) do
-						local diff = os.date("*t",(os.time() - entry.nDate)).day
-						if diff <= self.tItems["settings"].LL.nMaxDays then 
-							local strDate = self:ConvertDate(os.date("%x",entry.nDate))
-							if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+				end
+			end
+		else
+			for k , player in ipairs(self.tItems) do
+				if player.tLLogs then
+					tWinnersDictionary[player.strName] = {}
+					if self.tItems["settings"].LL.strGroup == "GroupName" then
+						tGrouppedItems[player.strName] = {}
+						for j , entry in ipairs(player.tLLogs) do
 							if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) then
-								table.insert(tGrouppedItems[strDate],entry.itemID)
-								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = strDate})						
+								table.insert(tGrouppedItems[player.strName],entry.itemID)
+								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = player.strName})
+							end
+						end
+						if #tGrouppedItems[player.strName] == 0 then tGrouppedItems[player.strName] = nil end
+					elseif self.tItems["settings"].LL.strGroup == "GroupCategory" then
+						for j , entry in ipairs(player.tLLogs) do
+							local item = Item.GetDataFromId(entry.itemID)
+							if item and self:LLMeetsFilters(item,player,entry.nGP) then
+								if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
+								table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)
+								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName()})						
+							end
+						end
+					else
+						for j , entry in ipairs(player.tLLogs) do
+							local diff = os.date("*t",(os.time() - entry.nDate)).day
+							if diff <= self.tItems["settings"].LL.nMaxDays then 
+								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
+								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
+								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) then
+									table.insert(tGrouppedItems[strDate],entry.itemID)
+									table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = strDate})						
+								end
 							end
 						end
 					end
 				end
 			end
 		end
-	
 	end
 	if #self.wndLL:GetData() == 1 then tWinnersDictionary = nil end
 	return tGrouppedItems , tWinnersDictionary
@@ -5633,11 +5635,11 @@ function DKP:LLMeetsFilters(item,player,nGP)
 	--Item Level
 	if item:GetDetailedInfo().tPrimary.nEffectiveLevel < self.tItems["settings"].LL.nLevel then return false end
 	--Gp cost
-	if tonumber(nGP) then
+	if nGP ~= "ML" and tonumber(nGP) then
 		if nGP < self.tItems["settings"].LL.nGP then return false end
 	end
 	--Classes
-	if not bMeetClass then
+	if player ~= "ML" and not bMeetClass  then
 		bMeetClass = self.tItems["settings"].LL.tClasses[player.class]
 
 		
@@ -5734,6 +5736,7 @@ function DKP:LLSetMaxDays( wndHandler, wndControl, fNewValue, fOldValue )
 end
 
 
+
 function DKP:LLPopuplate()
 	local wndList = self.wndLL:FindChild("List")
 	local tExpandedBubbles = {}
@@ -5758,7 +5761,9 @@ function DKP:LLPopuplate()
 			local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
 			wndBubble:SetData({bExpanded = false,bPopulated = false,bSearchOpen = false,nItems = self.tItems["settings"].LL.nMaxItems,nRows = self.tItems["settings"].LL.nMaxRows, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items,tItemTooltips = tWinnersDictionary})
 			wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
-			
+			if self.wndLL:GetData() == "ML" then
+				self:IBAddTileClickHandler(wndBubble,"MAUpdateID")
+			end
 			for k , prevBubble in ipairs(tExpandedBubbles) do
 				if prevBubble == cat then 
 					self:IBExpand(nil,wndBubble:FindChild("Header")) 
@@ -5974,29 +5979,35 @@ end
 
 -- Syncing
 local tFetchers = {} -- heavy stuff
-function DKP:DFJoinSyncChannel( wndHandler, wndControl, eMouseButton )
-	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel","DFOnSyncMessage",self)
+function DKP:DFJoinSyncChannel()
+	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel",ICCommLib.CodeEnumICCommChannelType.Global)
+	self.sChannel:SetReceivedMessageFunction("DFOnSyncMessage",self)
+	--self.sChannel:SetSendMessageResultFunction("DFSyncMessageResult",self)
 end
 
-function DKP:DFOnSyncMessage(channel, tMsg, strSender)
-	if tMsg.type then
+function DKP:DFSyncMessageResult(iccomm, eResult, idMessage)
+
+end
+
+function DKP:DFOnSyncMessage(channel, strMessage, idMessage)
+	local tMsg = serpent.load(strMessage)
+	if tMsg.type  then
 		if tMsg.type == "SendMeData" then
-			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
+			self.sChannel:SendPrivateMessage(tMsg.strSender,self:GetEncodedData(tMsg.strSender))
 		elseif tMsg.type == "SendMeFullData" then
-			tFetchers[strSender] = nil 
-			self.sChannel:SendPrivateMessage({[1] = strSender},self:GetEncodedData(strSender))
+			tFetchers[tMsg.strSender] = nil 
+			self.sChannel:SendPrivateMessage(tMsg.strSender,self:GetEncodedData(tMsg.strSender))
 		elseif tMsg.type == "EncodedDataFull" then
-			self:ProccesEncodedData(tMsg.strData)		
-			elseif tMsg.type == "EncodedDataSelected" then
-			self:ProccesEncodedDataUpdate(tMsg.strData)
+			self:ProccesEncodedData(tMsg.tData)		
+		elseif tMsg.type == "EncodedDataSelected" then
+			self:ProccesEncodedDataUpdate(tMsg.tData)
 		elseif tMsg.type == "Data unavailable" then
 			Print("Permission to data was denied , contact the person in charge")
 		end
 	end
 end
 
-function DKP:ProccesEncodedData(strData)
-	local tData = serpent.load(Base64.Decode(strData))
+function DKP:ProccesEncodedData(tData)
 	
 	if tData then
 		for k, player in ipairs(self.tItems) do
@@ -6016,9 +6027,7 @@ function DKP:ProccesEncodedData(strData)
 	self:RefreshMainItemList()
 end
 
-function DKP:ProccesEncodedDataUpdate(strData)
-	local tData = serpent.load(Base64.Decode(strData))
-	
+function DKP:ProccesEncodedDataUpdate(tData)
 	if tData then
 		self.tItems["alts"] = tData["alts"] or {}
 		for alt , owner in pairs(tData["alts"]) do
@@ -6068,7 +6077,7 @@ function DKP:GetEncodedData(strRequester)
 			for k,player in ipairs(self.tItems) do
 				table.insert(tPlayers,player)
 			end
-			tData.strData = Base64.Encode(serpent.dump(tPlayers))
+			tData.tData = tPlayers
 			if self.tItems["settings"].DF.bSmart then tFetchers[strRequester] = serpent.load(serpent.dump(tPlayers)) end
 		elseif self.tItems["settings"].DF.bSmart then
 			tData.type = "EncodedDataSelected"
@@ -6098,12 +6107,13 @@ function DKP:GetEncodedData(strRequester)
 			for k,player in ipairs(self.tItems) do
 				table.insert(tPlayersSource,player)
 			end
-			tData.strData = Base64.Encode(serpent.dump(tPlayers))
+			tData.tData = tPlayers
 			tFetchers[strRequester] = serpent.load(serpent.dump(tPlayersSource))
 		end
 		self:DFAddLog(strRequester,true)
 	end
-	return tData
+	tData.strSender = GameLib.GetPlayerUnit():GetName()
+	return serpent.dump(tData)
 end
 
 function DKP:DFAddLog(strPlayer,bSucces)
@@ -6115,17 +6125,16 @@ end
 function DKP:DFFetchDataTimed()
 	local myUnit = GameLib.GetPlayerUnit()
 	if self.tItems["settings"].DF.bFetchOOC and myUnit:IsInCombat() or self.tItems["settings"].DF.bFetchRaid and not GroupLib.InRaid() then return end
-	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
+	if self.sChannel then self.sChannel:SendPrivateMessage(self.tItems["settings"].DF.strSource,serpent.dump({type = "SendMeData",strSender = self.strMyName})) end
 end
 
 function DKP:DFFetchData()
-	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeData"}) end
+	if self.sChannel then self.sChannel:SendPrivateMessage(self.tItems["settings"].DF.strSource,serpent.dump({type = "SendMeData",strSender = self.strMyName})) end
 end
 
 function DKP:DFFetchFullData()
-	if self.sChannel then self.sChannel:SendPrivateMessage({[1] = self.tItems["settings"].DF.strSource},{type = "SendMeFullData"}) end
+	if self.sChannel then self.sChannel:SendPrivateMessage(self.tItems["settings"].DF.strSource,serpent.dump({type = "SendMeFullData",strSender = self.strMyName})) end
 end
-
 -----------------------------------------------------------------------------------------------
 -- Loot Filtering
 -----------------------------------------------------------------------------------------------
@@ -6278,6 +6287,135 @@ end
 
 function DKP:RIConfRemChanged(wndHandler,wndControl)
 	self.tItems["settings"].strConfRem = wndControl:GetName()
+end
+-----------------------------------------------------------------------------------------------
+-- Manual Award 
+-----------------------------------------------------------------------------------------------
+function DKP:MAInit()
+	self.wndMA = Apollo.LoadForm(self.xmlDoc,"ManualAward",nil,self)
+	self.wndMA:Show(false)
+
+end
+
+function DKP:MAOpenLL()
+	self:LLOpenML()
+end
+
+function DKP:MAOpen(ID)
+	if not self.wndMA:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndMA:Move(tCursor.x - 100, tCursor.y - 100, self.wndMA:GetWidth(), self.wndMA:GetHeight())
+	end
+	self.wndMA:Show(true,false)
+	self.wndMA:ToFront()
+
+	self.wndMA:FindChild("Name"):SetText(self.tItems[ID].strName)
+	self.wndMA:FindChild("TickName"):Show(true)
+	self:MACheckConditions()
+end
+
+function DKP:MAClose()
+	self.wndMAL:Show(false,false)
+end
+
+function DKP:MACheckName(wndHandler,wndControl,strText)
+	if self:GetPlayerByIDByName(strText) ~= -1 then self.wndMA:FindChild("TickName"):Show(true) else self.wndMA:FindChild("TickName"):Show(false) end
+	self:MACheckConditions()
+end
+
+function DKP:MACheckConditions()
+	if self.wndMA:FindChild("TickName"):IsShown() and self.wndMA:FindChild("TickID"):IsShown() then
+		self.wndMA:FindChild("Proceed"):Enable(true)
+	else
+		self.wndMA:FindChild("Proceed"):Enable(false)
+	end
+end
+
+function DKP:MAUpdateID(wndHandler,wndControl)
+	if not string.find(wndControl:GetName(),"Tile") then return end
+
+	self.wndMA:FindChild("ID"):SetText(wndControl:GetData():GetItemId())
+	Tooltip.GetItemTooltipForm(self, self.wndMA:FindChild("ID") , wndControl:GetData(), {bPrimary = true, bSelling = false})
+	self.wndMA:FindChild("TickID"):Show(true)
+	self:MACheckConditions()
+end
+
+function DKP:MAUpdateTooltip(wndHandler,wndControl,strText)
+	if tonumber(strText) then
+		local item = Item.GetDataFromId(tonumber(strText))
+		if item then
+			Tooltip.GetItemTooltipForm(self, self.wndMA:FindChild("ID") , item, {bPrimary = true, bSelling = false})
+			self.wndMA:FindChild("TickID"):Show(true)
+		else
+			self.wndMA:FindChild("TickID"):Show(false)
+		end
+	else
+		self.wndMA:FindChild("TickID"):Show(false)
+	end
+	self:MACheckConditions()
+end
+
+function DKP:MAProceed()
+	local item = Item.GetDataFromId(tonumber(self.wndMA:FindChild("ID"):GetText()))
+	self:OnLootedItem(item,true)
+	self:PopUpWindowOpen(self.wndMA:FindChild("Name"):GetText(),item:GetName())
+end
+-----------------------------------------------------------------------------------------------
+-- Manual Award 
+-----------------------------------------------------------------------------------------------
+function DKP:RenameInit()
+	self.wndRen = Apollo.LoadForm(self.xmlDoc,"RenameFloater",nil,self)
+	self.wndRen:Show(false)
+end
+
+function DKP:RenameShow(ID)
+	if not self.wndRen:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndRen:Move(tCursor.x - 100, tCursor.y - 100, self.wndRen:GetWidth(), self.wndRen:GetHeight())
+	end
+	self.wndRen:Show(true,false)
+	self.wndRen:ToFront()
+
+	self.wndRen:SetData(ID)
+	self.wndRen:FindChild("Name"):SetText(self.tItems[ID].strName)
+end
+
+function DKP:RenameHide()
+	self.wndRen:Show(false,false)
+end
+
+function DKP:RenameNameChanged(wndHandler,wndControl,strText)
+	self:RenameCheck(strText)
+end
+
+function DKP:RenameCommit()
+	local ID = self.wndRen:GetData()
+	local strPrevName = self.tItems[ID].strName
+	local strNewName = self.wndRen:FindChild("Name"):GetText()
+
+	self.tItems["Standby"][string.lower(strNewName)] = self.tItems["Standby"][string.lower(strPrevName)]
+	self.tItems["Standby"][string.lower(strNewName)].strName = strNewName
+	self.tItems["Standby"][string.lower(strPrevName)] = nil
+
+	if self.wndStandby:IsShown() then self:StandbyListPopulate() end
+
+	self.tItems[ID].strName = strNewName
+	self:RefreshMainItemList()
+	self:RenameHide()
+end
+
+function DKP:RenameCheck(strName)
+	if self:GetPlayerByIDByName(strName) ~= - 1 then self.wndRen:FindChild("Commit"):Enable(false) return end
+	local counter = 0
+	for word in string.gmatch(strName,"%S+") do
+		counter = counter + 1
+	end
+	if counter == 2 then
+		self.wndRen:FindChild("Commit"):Enable(true)
+	else
+		self.wndRen:FindChild("Commit"):Enable(false)
+	end
+
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

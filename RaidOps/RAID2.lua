@@ -131,6 +131,10 @@ function DKP:IBPopulate(wndBubble)
 			nUniqueLoot = nUniqueLoot + 1
 		end
 	end
+
+	if wndBubble:GetData().clickFunc then
+		wndBubble:AddEventHandler("MouseButtonUp",wndBubble:GetData().clickFunc,self)
+	end
 	
 	if wndBubble:GetData().nItems == nil then wndBubble:GetData().nItems = knItemTilePerRow end
 	if wndBubble:GetData().nRows == nil then wndBubble:GetData().nRows = knItemTileRows end
@@ -175,6 +179,9 @@ function DKP:IBPopulate(wndBubble)
 					if ID == tooltip.ID and not string.find(strTooltip,tooltip.strInfo) and tooltip.strHeader == wndBubble:FindChild("HeaderText"):GetText() then
 						strTooltip = strTooltip .. tooltip.strInfo .. " \n"
 					end
+				end
+				if wndBubble:GetData().clickFunc then
+					wndTile:AddEventHandler("MouseButtonUp",wndBubble:GetData().clickFunc,self)
 				end
 				if strTooltip ~= "" then
 					wndTile:FindChild("Tooltip"):SetTooltip(strTooltip)
@@ -287,5 +294,15 @@ function DKP:RIRequestRearrange(wndList)
 			prevChild = child
 			table.insert(tRows,{wnd = child , nHeight = child:GetHeight()})
 		end
+	end
+end
+
+function DKP:IBAddTileClickHandler(wndBubble,func)
+	if wndBubble:GetData().bPopulated then
+		for k , tile in ipairs(wndBubble:FindChild("ItemGrid"):GetChildren()) do
+			tile:AddEventHandler("MouseButtonUp",func,self)
+		end
+	else
+		wndBubble:GetData().clickFunc = func
 	end
 end
