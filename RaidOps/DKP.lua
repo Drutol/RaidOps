@@ -18,6 +18,9 @@ local DKP = {}
 -----------------------------------------------------------------------------------------------
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloNormal")
+
+local knLabelSpacing = 14
+local knLabelWidth = 103
  
  local ktClassToIcon =
 {
@@ -138,6 +141,11 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.10---
+{25/05/2015}
+Fixed errors appearing after setting guild channel.
+Added on-screen notification when Custom event was triggered.
+Fixed dependency.
 ---RaidOps version 2.09---
 {23/05/2015}
 Fixed logs window sizing.
@@ -358,7 +366,6 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterTimerHandler(10, "RaidUpdateCurrentRaidSession", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
 		Apollo.RegisterEventHandler("Group_Invite_Result","InviteOnResult", self)
-
 		
 		self.timer = ApolloTimer.Create(10, true, "OnTimer", self)
 
@@ -447,6 +454,9 @@ function DKP:OnDocLoaded()
 		self:RIInit()
 		self:MAInit()
 		self:RenameInit()
+		self:NotificationInit()
+		self:MresInit()
+		self:LabelInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -455,6 +465,13 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
 		self.wndMain:FindChild("ShowTank"):SetCheck(true)
 		
+		-- wndMain resizing
+
+		self.wndMain:SetSizingMinimum(1057,778)
+		self.wndMain:SetSizingMaximum(1540,778)
+
+
+
 		-- Bidding
 		
 		self.tSelectedItems = {}
@@ -492,7 +509,7 @@ function DKP:OnDocLoaded()
 end
 
 function DKP:DebugFetch()
-
+	self:NotificationStart("LOLOLOLOLOLOLO!",10,5)
 end
 
 function DKP:ChangelogShow()
@@ -542,6 +559,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 		strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
 	end
+	if strForceComment then strComment = strForceComment end
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.sort(tMembersNames,raidOpsSortCategories)
 	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time()),strComment = strComment,bAddAlt = bAddAlt})
@@ -780,7 +798,7 @@ function DKP:GIImport()
 			table.insert(tMembers,self.tItems[self:GetPlayerByIDByName(member.strName)])
 		end
 	end
-	self:UndoAddActivity(#tMembers == 1 and ktUndoActions["addp"] or ktUndoActions["addmp"],"--",tMembers,false)
+	self:UndoAddActivity(#tMembers == 1 and ktUndoActions["addp"] or ktUndoActions["addmp"],"--",tMembers,nil,nil,false)
 	self:RefreshMainItemList()
 	self:GIUpdateCount()
 	
@@ -955,7 +973,7 @@ function DKP:SetDKP(cycling)
 				end
 			end
 			if self.tItems["EPGP"].Enable == 0 then	
-				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]}) end
+				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]},nil,comment) end
 				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(value)
 				local ID = self:GetPlayerByIDByName(strName)
 				
@@ -975,7 +993,7 @@ function DKP:SetDKP(cycling)
 			else
 				local ID = self:GetPlayerByIDByName(strName)
 				if cycling ~= true and self.tItems["settings"].bTrackUndo then 	
-					self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["setgp"] or ktUndoActions["setep"],value,{[1] = self.tItems[ID]}) 
+					self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["setgp"] or ktUndoActions["setep"],value,{[1] = self.tItems[ID]},nil,comment) 
 				end
 				local modEP = self.tItems[ID].EP
 				local modGP = self.tItems[ID].GP
@@ -2202,7 +2220,7 @@ function DKP:IsPlayerRoleDesired(strRole)
 end
 
 
-function DKP:RefreshMainItemList()
+function DKP:RefreshMainItemList(tIDs)
 	self.nHScroll = self.wndItemList:GetVScrollPos()
 	if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() return end
 	local selectedPlayer = ""
@@ -2223,7 +2241,8 @@ function DKP:RefreshMainItemList()
 	local nameLabel = self:LabelGetColumnNumberForValue("Name")
 	local tOnlineMembers
 	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
-	for k,player in ipairs(self.tItems) do
+	for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
+		if type(tIDs) == "table" then player = self.tItems[player] end
 		if player.strName ~= "Guild Bank" then
 			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
@@ -2321,10 +2340,48 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			if playerItem.alt then break end
 		end
 	end
+
+	local nStats = 0
+	for k , child in ipairs(playerItem.wnd:GetChildren()) do
+		if string.find(child:GetName(),"Stat") then nStats = nStats + 1 end
+	end
+
+
+	if nStats < self.currentLabelCount then
+		for k=1,self.currentLabelCount - nStats do
+
+			local wndLastStat = playerItem.wnd:FindChild("Stat5")
+			local nLastStat = 5
+			for k , child in ipairs(playerItem.wnd:GetChildren()) do
+				if string.find(child:GetName(),"Stat") and child:IsShown() and tonumber(string.sub(child:GetName(),5)) > nLastStat then 
+					nLastStat = tonumber(string.sub(child:GetName(),5))
+					wndLastStat = child 
+				end
+			end
+			local wndStat = playerItem.wnd:FindChild("Stat"..nLastStat+1)
+			if not wndStat then
+				wndStat = Apollo.LoadForm(self.xmlDoc,"StatX",playerItem.wnd,self)
+				local l,t,r,b = wndLastStat:GetAnchorOffsets()
+				wndStat:SetName("Stat"..nLastStat+1)
+				wndStat:SetAnchorOffsets(l + knLabelWidth + knLabelSpacing,t,r + knLabelSpacing + knLabelWidth ,b)
+			else
+				wndStat:Show(true)
+			end
+		end
+	else
+		for k=5,9 do --max 9 labels 
+			if k > self.currentLabelCount then
+				if playerItem.wnd:FindChild("Stat"..k) then playerItem.wnd:FindChild("Stat"..k):Show(false) end
+			end
+		end
+	end
+
+
+
 	if self.tItems["settings"].GroupByClass then
 		if k and k == 1 or bAddedClass == false then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
 	end
-	for i=1,5 do
+	for i=1,self.currentLabelCount do
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
 			if self.tItems["settings"].LabelOptions[i] == "Name" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.strName)
@@ -2392,42 +2449,129 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 end
 
 ---------------------------------------------------------------------------------------------------
+-- wndMain resize logic
+---------------------------------------------------------------------------------------------------
+
+local prevWidth
+
+function DKP:MresInit()
+	self.wndLabelBar = self.wndMain:FindChild("LabelBar")
+	self.currentLabelCount = 5
+	local nLabelsToRender 
+	
+	prevWidth = self.wndMain:GetWidth()
+	if prevWidth <= 1060 then 
+		nLabelsToRender = 5
+	else
+		local nAddWidth = prevWidth - 1057
+		if nAddWidth / (knLabelSpacing+knLabelWidth) >= 1 then
+			nLabelsToRender = math.floor(nAddWidth / (knLabelSpacing+knLabelWidth)) + 5
+		else
+			nLabelsToRender = 5
+		end
+	end
+	for k=5,nLabelsToRender do
+		self:MresRenderLabels(k)
+	end
+end
+
+function DKP:MresOnResize()
+	if prevWidth ~= self.wndMain:GetWidth() then 
+			prevWidth = self.wndMain:GetWidth()
+			if prevWidth <= 1060 then 
+				nLabelsToRender = 5
+			else
+				local nAddWidth = prevWidth - 1057
+				if nAddWidth / (knLabelSpacing+knLabelWidth) >= 1 then
+					nLabelsToRender = math.floor(nAddWidth / (knLabelSpacing+knLabelWidth)) + 5
+				else
+					nLabelsToRender = 5
+				end
+			end
+	end
+	self:MresRenderLabels(nLabelsToRender)
+end
+
+function DKP:MresRenderLabels(nCount)
+	if nCount and nCount ~= self.currentLabelCount then
+		nCount = nCount
+		if nCount > self.currentLabelCount then
+			local wndLastLabel = self.wndLabelBar:FindChild("Label5")
+			local nLastLabel = 5
+			for k , child in ipairs(self.wndLabelBar:GetChildren()) do
+				if child:GetName() ~= "Button" and child:IsShown() and tonumber(string.sub(child:GetName(),6)) > nLastLabel then 
+					nLastLabel = tonumber(string.sub(child:GetName(),6))
+					wndLastLabel = child 
+				end
+			end
+			local wndLabel = self.wndLabelBar:FindChild("Label"..nLastLabel+1)
+			if not wndLabel then
+				wndLabel = Apollo.LoadForm(self.xmlDoc,"LabelX",self.wndLabelBar,self)
+
+				local l,t,r,b = wndLastLabel:GetAnchorOffsets()
+				wndLabel:SetName("Label"..nLastLabel+1)
+				wndLabel:SetText(self.tItems["settings"].LabelOptions[nLastLabel+1])
+				wndLabel:SetAnchorOffsets(l + knLabelWidth + knLabelSpacing,t,r + knLabelSpacing + knLabelWidth ,b)
+				if not self.tItems["settings"].LabelOptions[nLastLabel+1] then self.tItems["settings"].LabelOptions[nLastLabel+1] = "Nil" end
+				wndLabel:SetText(self.tItems["settings"].LabelOptions[nLastLabel+1])
+			else
+				wndLabel:Show(true)
+			end
+		else	
+			for k=5,9 do --max 9 labels 
+				if k > nCount then
+					if self.wndLabelBar:FindChild("Label"..k) then self.wndLabelBar:FindChild("Label"..k):Show(false) end
+				end
+			end
+		end
+		local bHidden = false
+		for k=5,9 do --max 9 labels 
+			if k > nCount then
+				if self.tItems["settings"].LabelOptions[k] ~= "Nil" then
+					bHidden = true
+				end
+			end
+		end
+		self.wndMain:FindChild("HiddenColumns"):Show(bHidden)
+		self.currentLabelCount = nCount
+		self:RefreshMainItemList()
+	end
+end
+
+
+
+---------------------------------------------------------------------------------------------------
 -- Label Setting
 ---------------------------------------------------------------------------------------------------
 
-function DKP:LabelNumberChanged(wndHandler, wndControl, eMouseButton)
-		self.CurrentlyEditedLabel = tonumber(wndControl:GetText())
-		self:LabelTypeButtonsCheck(self.tItems["settings"].LabelOptions[tonumber(wndControl:GetText())])
+function DKP:LabelInit()
+	self.wndLabelMenu = Apollo.LoadForm(self.xmlDoc,"LabelSelection",nil,self)
+	self.wndLabelMenu:Show(false)
 end
 
-function DKP:LabelCheckNumber( wndHandler, wndControl, eMouseButton )
-	local parent = wndControl:GetParent()
-	if parent:FindChild("Button1"):IsChecked() == false and parent:FindChild("Button2"):IsChecked() == false and parent:FindChild("Button3"):IsChecked() == false and parent:FindChild("Button4"):IsChecked() == false and parent:FindChild("Button5"):IsChecked() == false then
-		self.CurrentlyEditedLabel = nil
-		self:LabelTypeButtonsUncheckAll()
-	end
+function DKP:LabelMenuOpen(wndHandler,wndControl)
+	if not string.find(wndControl:GetName(),"Label") then return end
+	local tCursor = Apollo.GetMouse()
+	self.wndLabelMenu:Move(tCursor.x - 50, tCursor.y + 30, self.wndLabelMenu:GetWidth(), self.wndLabelMenu:GetHeight())
+
+	self.wndLabelMenu:Show(true,false)
+	self.wndLabelMenu:ToFront()
+	self.CurrentlyEditedLabel = tonumber(string.sub(wndControl:GetName(),6))
+end
+
+function DKP:LabelMenuHide()
+	self.wndLabelMenu:Show(false,false)
 end
 
 function DKP:LabelCheckType( wndHandler, wndControl, eMouseButton )
-	local parent = wndControl:GetParent()
-	if parent:FindChild("Name"):IsChecked() == false and parent:FindChild("Net"):IsChecked() == false and parent:FindChild("Tot"):IsChecked() == false and parent:FindChild("Hrs"):IsChecked() == false and parent:FindChild("Spent"):IsChecked() == false and parent:FindChild("Priority"):IsChecked() == false then
-		if self.CurrentlyEditedLabel ~= nil then
-			self.tItems["settings"].LabelOptions[self.CurrentlyEditedLabel] = "Nil"
-			
-		end
-	end
-	self:LabelUpdateList()
-end
-
-
-function DKP:LabelTypeChanged( wndHandler, wndControl, eMouseButton )
-	
 	if self.CurrentlyEditedLabel ~= nil then
-		for i=1,5 do
+
+		for i=1,self.currentLabelCount do
 			if self.tItems["settings"].LabelOptions[i] == wndControl:GetName() then
 				 self.tItems["settings"].LabelOptions[i] = "Nil"
 			end
 		end
+
 		self.tItems["settings"].LabelOptions[self.CurrentlyEditedLabel] = wndControl:GetName()
 	end
 	self:LabelUpdateList()
@@ -2435,24 +2579,17 @@ end
 
 function DKP:LabelUpdateList() 
 	-- Label Bar first
-	local wndLabelBar = self.wndMain:FindChild("LabelBar")
-	for i=1,5 do 
-		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
-			wndLabelBar:FindChild("Label"..tostring(i)):Show(true,false)
-			wndLabelBar:FindChild("Label"..tostring(i)):SetText(self.tItems["settings"].LabelOptions[i])
-			wndLabelBar:FindChild("Label"..tostring(i)):SetTooltip(self:LabelAddTooltipByValue(self.tItems["settings"].LabelOptions[i]))
-		else
-			wndLabelBar:FindChild("Label"..tostring(i)):Show(false)
-		end
-		
+	for i=1,self.currentLabelCount do
+		self.wndLabelBar:FindChild("Label"..tostring(i)):Show(true,false)
+		self.wndLabelBar:FindChild("Label"..tostring(i)):SetText(self.tItems["settings"].LabelOptions[i])
+		self.wndLabelBar:FindChild("Label"..tostring(i)):SetTooltip(self:LabelAddTooltipByValue(self.tItems["settings"].LabelOptions[i]))
+
 		if self.SortedLabel and self.SortedLabel == i then
-			wndLabelBar:FindChild("Label"..tostring(i)):FindChild("SortIndicator"):Show(true)
+			self.wndLabelBar:FindChild("Label"..tostring(i)):FindChild("SortIndicator"):Show(true)
 		end
 	end
 	-- Check for priority sorting
 	self:RefreshMainItemList()
-	-- Remove prev item selected
-	self.wndSelectedListItem = nil 
 
 end
 
@@ -2460,31 +2597,8 @@ function DKP:LabelAddTooltipByValue(value)
 	return self.Locale["#LabelTooltips:"..value]
 end
 
-function DKP:LabelTypeButtonsCheck(which)
-	self:LabelTypeButtonsUncheckAll()
-	if which ~= "Nil" then
-		self.wndLabelOptions:FindChild("LabelTypes"):FindChild(which):SetCheck(true)
-	end
-end
-
-function DKP:LabelTypeButtonsUncheckAll()
-	 local boxes = self.wndLabelOptions:FindChild("LabelTypes"):GetChildren()
-	 for i, box in ipairs(boxes) do
-		box:SetCheck(false)
-	end
-
-end
-
-function DKP:LabelOptionsShow()
-	self.wndLabelOptions:Show(true)
-end
-
-function DKP:LabelOptionsHide()
-	self.wndLabelOptions:Show(false)
-end
-
 function DKP:LabelGetColumnNumberForValue(value)
-	for i=1,5 do
+	for i=1,self.currentLabelCount do
 		if self.tItems["settings"].LabelOptions[i] == value then return i end
 	end
 	return -1
@@ -2714,8 +2828,7 @@ function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
 		end
 		
 	else
-		self.SortedLabel = nil
-		self:RefreshMainItemList()
+		self:LabelMenuOpen(wndHandler,wndControl)
 	end
 	if self.tItems["settings"].bDisplayCounter and not self.tItems["settings"].GroupByClass then
 		for k,child in ipairs(self.wndItemList:GetChildren()) do
@@ -2739,7 +2852,7 @@ function DKP:LabelUpdateColorHighlight()
 end
 function DKP:LabelHideIndicators()
 	local wndLabelBar = self.wndMain:FindChild("LabelBar")
-	for i=1,5 do
+	for i=1,self.currentLabelCount do
 		if i ~= self.SortedLabel then
 			wndLabelBar:FindChild("Label"..i):FindChild("SortIndicator"):Show(false,false)
 		else
@@ -4808,17 +4921,19 @@ function DKP:CETriggerEvent(eID)
 			end
 			self:UndoAddActivity(string.format(ktUndoActions["cetrig"],strMob,eID),event.EP or event.GP or event.DKP,tMembers)
 		end
-		if self.tItems["settings"].CENotify then
 			local strAwards = ""
 			if event.EP then
-				strAwards = strAwards .. event.EP .. "EP  ,"
+				strAwards = strAwards .. event.EP .. "EP  "
 			end			
 			if event.GP then
-				strAwards = strAwards .. event.GP .. "GP  ,"
+				strAwards = strAwards .. event.GP .. "GP  "
 			end			
 			if event.DKP then
-				strAwards = strAwards .. event.DKP .. "DKP"
+				strAwards = strAwards .. event.DKP .. "DKP "
 			end
+			
+			self:NotificationStart(string.format("Award for %s , %s",strMob,strAwards),10,5)
+		if self.tItems["settings"].CENotify then
 			ChatSystemLib.Command("/party " .. string.format("Award for %s , %s",strMob,strAwards))
 		end
 		
@@ -6378,6 +6493,8 @@ function DKP:RenameShow(ID)
 
 	self.wndRen:SetData(ID)
 	self.wndRen:FindChild("Name"):SetText(self.tItems[ID].strName)
+	self.wndRen:FindChild("Edited"):SetText(self.tItems[ID].strName)
+	self:RenameCheck(self.tItems[ID].strName)
 end
 
 function DKP:RenameHide()
@@ -6416,6 +6533,54 @@ function DKP:RenameCheck(strName)
 		self.wndRen:FindChild("Commit"):Enable(false)
 	end
 
+end
+
+function DKP:NotificationInit()
+	self.wndNot = Apollo.LoadForm(self.xmlDoc,"Notification",nil,self)
+	self.wndNot:Show(false)
+	self.wndNot:SetOpacity(0)
+	--self:NotificationStart("LOLOLOL",5)
+end
+local nCounter
+local nTime
+local nOpacity
+local nOpacityTick
+local nPeak
+
+function DKP:NotificationStart(strMsg,nSecs,nPeakSec)
+	local x,y = Apollo.GetScreenSize()
+	local l,t,r,b = self.wndNot:GetAnchorOffsets()
+	self.wndNot:Move( (x/2)-self.wndNot:GetWidth()/2, t, self.wndNot:GetWidth(), self.wndNot:GetHeight())
+	self.wndNot:SetOpacity(0)
+	self.wndNot:SetText(strMsg)
+	Apollo.RegisterTimerHandler(.1,"NotificationTimer",self)
+	nTime = nSecs
+	nCounter = 0
+	nOpacity = 0
+	nPeak = nPeakSec
+	nOpacityTick = 1/(nTime*2)
+	self.NotificationTime = ApolloTimer.Create(.1, true, "NotificationTimer", self)
+	self.wndNot:Show(true)
+end
+
+function DKP:NotificationTimer()
+	if nCounter < nTime/2 then
+		nOpacity = nOpacity + nOpacityTick 
+	elseif nCounter == nTime/2 then
+		if nPeak > 0 then
+			nCounter = nCounter - .5
+			nPeak = nPeak - .5
+		end
+	elseif nCounter > nTime/2 then
+		nOpacity = nOpacity - nOpacityTick
+	end
+	self.wndNot:SetOpacity(nOpacity*2)
+	nCounter = nCounter + 0.5
+	if nCounter > nTime then 
+		self.wndNot:Show(false)
+		self.NotificationTime:Stop() 
+	end
+	self.wndNot:ToFront()
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

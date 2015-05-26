@@ -151,10 +151,10 @@ function DKP:BidCompleteInit()
 		self.wndMain:FindChild("LabelAuction"):Show(false)
 		self.wndHub:FindChild("NetworkBidding"):Enable(false)
 		self.wndHub:FindChild("NetworkBidding"):SetTextColor("vdarkgray")
-		Print("RaidOps - Could not find default Master Loot Addon - All Bidding/ML Functionalities are now suspended.")
+		Print("RaidOps - Could not find Dependency Master Loot Addon - All Bidding/ML Functionalities are now suspended.")
 		self:DSInit()
-			bInitialized = true
-	self.wait_timer:Stop()
+		bInitialized = true
+		self.wait_timer:Stop()
 		return
 	end
 				bInitialized = true
@@ -1140,15 +1140,15 @@ function DKP:Bid2RearrBidders()
 	for k,auction in ipairs(self.ActiveAuctions) do self:Bid2ArrangeResponses(auction) end
 end
 
--- Netorking
+-- Networking
 function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
 	if string.len(strText) <= 4 then 
-		wndControl:SetText(self.tItems["settings"]["Bid2"].strChannel) 
+		wndControl:SetText(self.tItems["settings"]["Bid2"].strChannel)
 		return 
 	end
 	self.tItems["settings"]["Bid2"].strChannel = strText
-	self.wndBid2Settings:FindChild("Channel"):FindChild("Value"):SetText(strText)
-	self.wndMLSettings:FindChild("ChannelName"):SetText(strText)
+	if self.wndBid2Settings then self.wndBid2Settings:FindChild("Channel"):FindChild("Value"):SetText(strText) end
+	if self.wndMLSettings then self.wndMLSettings:FindChild("ChannelName"):SetText(strText) end
 	self.wndDS:FindChild("Channel"):SetText(strText)
 	self:BidJoinChannel()
 end

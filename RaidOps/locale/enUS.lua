@@ -33,6 +33,7 @@ L["#LabelTooltips:PR"] =  "Value calculated by dividing the EP value by GP value
 L["#LabelTooltips:Raids"] =  "Value of player's attended raids"
 L["#LabelTooltips:Item"] =   "Last item received.Recoreded via Loot Logs"
 L["#LabelTooltips:RealGP"] =  "Current GP Value decreased by BaseGP"
+L["#LabelTooltips:Nil"] =  "Empty column"
 --wndMain:Controls
 L["#wndMain:Controls:InputValue"] = "Input value"
 L["#wndMain:Controls:Comment"] = "Comment"
