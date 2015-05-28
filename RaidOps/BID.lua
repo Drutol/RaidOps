@@ -492,6 +492,7 @@ function DKP:BidMasterItemSelected()
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
+		Print(HookML.tMasterLootSelectedItem.itemDrop:GetName())
 		DKPInstance.wndInsertedMasterButton:Enable(true)
 		DKPInstance.wndInsertedMasterButton1:Enable(true)
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
@@ -2240,7 +2241,7 @@ function DKP:HookToMasterLootDisp()
 		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"OnAssignDown")
 		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"RefreshMasterLootItemList")
 		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"OnLootAssigned")
-		self:PostHook(Apollo.GetAddon("MasterLootDependency"),"OnItemMouseButtonUp","BidMasterItemSelected")
+		self:PostHook(Apollo.GetAddon("MasterLootDependency"),"OnItemCheck","BidMasterItemSelected")
 		self:Hook(Apollo.GetAddon("MasterLootDependency"),"OnCharacterCheck","BidCharacterChecked")
 	end
 end

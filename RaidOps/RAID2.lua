@@ -81,6 +81,11 @@ function DKP:RSDebugInit()
 	self.wndRS:FindChild("RaidCategoryGA"):AttachTab(wndDS,false)
 end
 
+function DKP:IBInit()
+	self.wndIBMenu = Apollo.LoadForm(self.xmlDoc3,"TileMenu",nil,self)
+	self.wndIBMenu:Show(false)
+end
+
 function DKP:IBExpand(wndHandler,wndControl)
 	self:IBPopulate(wndControl:GetParent())
 	wndControl:GetParent():GetData().bExpanded = true
@@ -213,13 +218,54 @@ function DKP:IBPostContents(wndHandler,wndControl)
 	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " " .. strItems)
 end
 
-function DKP:IBPostItem(wndHandler,wndControl,eMouseButton)
-	if wndHandler ~= wndControl or eMouseButton ~= GameLib.CodeEnumInputMouse.Right then return end
+function DKP:IBTileMenuShow(wndHandler,wndControl,eMouseButton)
+	if wndControl:GetName() ~= "BubbleItemTile" or eMouseButton ~= GameLib.CodeEnumInputMouse.Right then return end
 
+	local counter = 0
+	for word in string.gmatch((wndControl:FindChild("Tooltip"):GetData() or ""),"%S+") do
+		counter = counter + 1
+	end
+
+
+	if self.tItems["settings"].LL.strGroup ~= "GroupName" and counter ~= 2  then
+		self.wndIBMenu:FindChild("Reass"):Enable(false)
+		self.wndIBMenu:FindChild("Rem"):Enable(false)
+	else
+		self.wndIBMenu:FindChild("Reass"):Enable(true)
+		self.wndIBMenu:FindChild("Rem"):Enable(true)
+	end
+	
+	if not self.wndIBMenu:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndIBMenu:Move(tCursor.x - 100, tCursor.y - 100, self.wndIBMenu:GetWidth(), self.wndIBMenu:GetHeight())
+	end
+	self.wndIBMenu:Show(true,false)
+	self.wndIBMenu:ToFront()
+	self.wndIBMenu:SetData(wndControl)
+end
+
+function DKP:IBTileMenuPost()
+	self:IBPostItem(self.wndIBMenu:GetData())
+end
+
+function DKP:IBTileMenuReassign()
+	local wndControl = self.wndIBMenu:GetData()
+	self:ReassShow(wndControl:FindChild("Tooltip"):GetData(),wndControl:GetData())
+end
+
+function DKP:IBTileMenuRemove(wndHandler,wndControl)
+	wndControl:FindChild("Confirm"):Show(not wndControl:FindChild("Confirm"):IsShown()))
+end
+
+function DKP:IBTileMenuRemoveConfirm(wndHandler,wndControl)
+	self:LLRemLog(string.sub(wndControl:FindChild("Tooltip"):GetData(),1,#wndControl:FindChild("Tooltip"):GetData()-2),wndControl:GetData())
+	wndControl:Show(false)
+end
+
+function DKP:IBPostItem(wndControl)
 	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " Item :" .. wndControl:GetData():GetChatLinkString())
 	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " Count :" .. wndControl:FindChild("Count"):GetText())
 	ChatSystemLib.Command("/" .. self.tItems["settings"].LL.strChatPrefix .. " Winners :" .. wndControl:FindChild("Tooltip"):GetData() or "")
-
 end
 
 ----

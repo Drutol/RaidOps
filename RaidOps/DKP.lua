@@ -141,6 +141,25 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.12---
+{xx/05/2015}
+Fixed Loot Logs not showing winners in Miscellaneous tab.
+Added option to reassign item.
+Added option to remove item from logs.
+Reasign , manual award and item removal will result with undo log.
+Fixed Mass Edit's recent activity comments.
+---RaidOps version 2.11---
+{27/05/2015}
+Update missing art.
+Network Bidding , Data Sync and Data Sharing are no longer working due to Carbine breaking essential library.
+Added notification to those windows informing about the situation.
+Fixed Chat Bidding's item selection.
+Main window is now resizable.
+Label system has been revamped.Now to change data type siply right click on teh label and press appropriate button.
+Increased max label count to 9 (up from 5).
+Labels will be displayed in count of 5-9 depending on the main window's size.
+Fixed error on Guild Import.
+Fixed comments in recent activity (Comment-Auto).
 ---RaidOps version 2.10---
 {25/05/2015}
 Fixed errors appearing after setting guild channel.
@@ -183,29 +202,6 @@ Removed "save (/reloadui)" button.
 Added option to select players confirmed for raid in MassEdit.
 Slight redesign of Mass Edit tools.
 Default settings tweaked a little bit.
-
----RaidOps version 2.04---
-{23/04/2015}
-Fixed issue with alts converting/merging and RaidQueue.
-Alts add/convert now supports Undo.
-Fixed loot logs lua error when opened via context menu.
-Fixed loot logs max item per row setting.
-Added option to report item on chat channel. Whole bubble or single item (right click on item in bubble).
-Fixed lua error when random button in ML window was pressed without any recipients to chose from.
-Added JSON export.(for testing purposes)
-Added option to start chat bidding automatically.
-Added option to switch between EU and NA dates.
-
----RaidOps version 2.03---
-{21/04/2015}
-Raid Queue will now restore upon player's account removal.
-You can now change class by right clicking in context menu. (go back one)
-Fixed bug concerning player removal and Raid Queue.
-No more "Error pocessing popup window" message.
-Fixed command sorting in chat bidding.
-Now only names consisting of 2 words can be added.
-Fixed rare statup error.
-Added option to hide pop-up window for chat bidding winners.
 
  ]===]
 
@@ -429,9 +425,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].nMinIlvl == nil then self.tItems["settings"].nMinIlvl = 1 end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
-		self.wndLabelOptions = self.wndMain:FindChild("LabelOptions")
 		self.wndTimeAward = self.wndMain:FindChild("TimeAward")
-		self.wndLabelOptions:Show(false,true)
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
 		-- Inits
@@ -457,6 +451,8 @@ function DKP:OnDocLoaded()
 		self:NotificationInit()
 		self:MresInit()
 		self:LabelInit()
+		self:ReassInit()
+		self:IBInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -1220,8 +1216,8 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 			local ID = self:GetPlayerByIDByName(strName)
 			if ID ~= -1  then
 				if self.tItems["EPGP"].Enable == 0 then
-				         	if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["adddkp"],value,{[1] = self.tItems[ID]},nil,comment)  end
-   				          local modifier = self.tItems[ID].net
+				    if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["adddkp"],value,{[1] = self.tItems[ID]},nil,comment)  end
+   				    local modifier = self.tItems[ID].net
 					self.tItems[ID].net = self.tItems[ID].net + value
 					self.tItems[ID].tot = self.tItems[ID].tot + value
 					modifier = self.tItems[ID].net - modifier
@@ -1235,7 +1231,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
-					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["addgp"] or ktUndoActions["addep"],value,{[1] = self.tItems[ID]})  end
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["addgp"] or ktUndoActions["addep"],value,{[1] = self.tItems[ID]},nil,comment)  end
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
@@ -1318,7 +1314,7 @@ function DKP:SubtractDKP(cycling)
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
 					self:RaidRegisterDkpManipulation(self.tItems[ID].strName,modifier)
 				else
-					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["subgp"] or ktUndoActions["subep"],value,{[1] = self.tItems[ID]})  end
+					if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() and ktUndoActions["subgp"] or ktUndoActions["subep"],value,{[1] = self.tItems[ID]},nil,comment)  end
 					local modEP = self.tItems[ID].EP
 					local modGP = self.tItems[ID].GP
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() == true then
@@ -2101,7 +2097,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers) end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"--") end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			self.wndSelectedListItem = wnd
@@ -2118,7 +2114,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers) end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"--") end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
@@ -2136,7 +2132,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end		
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers) end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"--") end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
@@ -2569,11 +2565,13 @@ function DKP:LabelCheckType( wndHandler, wndControl, eMouseButton )
 		for i=1,self.currentLabelCount do
 			if self.tItems["settings"].LabelOptions[i] == wndControl:GetName() then
 				 self.tItems["settings"].LabelOptions[i] = "Nil"
+				 if self.SortedLabel == i then self.SortedLabel = self.CurrentlyEditedLabel end
 			end
 		end
 
 		self.tItems["settings"].LabelOptions[self.CurrentlyEditedLabel] = wndControl:GetName()
 	end
+	if self.SortedLabel == self:LabelGetColumnNumberForValue("Item") then self.SortedLabel = nil end
 	self:LabelUpdateList()
 end
 
@@ -3615,6 +3613,7 @@ function DKP:ExportExport()
 		
 
 		self:ExportSetOutputText(Base64.Encode(serpent.dump(exportTables)))
+
 	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
 		self.wndExport:FindChild("ClearString"):Show(false)
 		self.wndExport:FindChild("StoredLength"):SetText("0")
@@ -3625,6 +3624,7 @@ function DKP:ExportExport()
 			local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 			local tImportedPlayers = JSON.decode(strImportString)
 			if tImportedPlayers then
+
 				for k,player in ipairs(self.tItems) do
 					self.tItems[k] = nil
 				end
@@ -5012,6 +5012,14 @@ function DKP:CERemoveEvent(wndHandler,wndControl)
 	end
 end
 
+function DKP:CENotifyEnable()
+	self.tItems["settings"].CENotify = true
+end
+
+function DKP:CENotifyDisable()
+	self.tItems["settings"].CENotify = false
+end
+
 function DKP:CELShow()
 	self.wndCEL:Show(true,false)
 	self.wndCEL:ToFront()
@@ -5411,7 +5419,7 @@ function DKP:LLInit()
 	
 	if self.tItems["settings"].LL == nil then self.tItems["settings"].LL = {} end
 	if self.tItems["settings"].LL.strGroup == nil then self.tItems["settings"].LL.strGroup = "GroupCategory" end
-	if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
+	--if self.tItems["settings"].LL.strGroup == "GroupName" then self.tItems["settings"].LL.strGroup = "GroupCategory" end
 	self.wndLL:FindChild("Controls"):FindChild(self.tItems["settings"].LL.strGroup):SetCheck(true)
 	
 	if self.tItems["settings"].LL.tSlots == nil then self.tItems["settings"].LL.tSlots = {} end
@@ -5574,12 +5582,16 @@ function DKP:LLAddLog(strPlayer,strItem)
 	if self.wndLL:IsShown() then self:LLPopuplate() end
 end
 
-function DKP:LLOpen(tIDs)
+function DKP:LLRemLog(strPlayer,item)
+
+end
+
+function DKP:LLOpen(tIDs,strMode)
 	for k , ID in ipairs(tIDs) do
-		if not self.tItems[ID] then table.remove(tIDs) end
+		if not self.tItems[ID] then table.remove(tIDs,k) end
 	end
 	self.wndLL:ToFront()
-	self.wndLL:SetData(tIDs)
+	self.wndLL:SetData({tIDs = tIDs,strMode = strMode})
 	self.wndLL:Show(true,false)
 	if #tIDs == 1 then
 		self.wndLL:FindChild("Controls"):FindChild("Player"):SetText(self.tItems[tIDs[1]].strName)
@@ -5599,7 +5611,7 @@ end
 
 function DKP:LLOpenWhole()
 	self.wndLL:Show(true,false)
-	self.wndLL:SetData("AllMode")
+	self.wndLL:SetData({strMode = "AllMode"})
 	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Whole Roster")
 	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(true)
 	self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(true)
@@ -5608,7 +5620,7 @@ end
 
 function DKP:LLOpenML()
 	self.wndLL:Show(true,false)
-	self.wndLL:SetData("ML")
+	self.wndLL:SetData({strMode = "ML"})
 	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Master Loot Entries")
 	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(false)
 	self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(false)
@@ -5622,7 +5634,7 @@ end
 function DKP:LLPrepareData()
 	local tGrouppedItems = {}
 	local tWinnersDictionary = {}
-	if self.wndLL:GetData() == "ML" then
+	if self.wndLL:GetData().strMode == "ML" then
 		for j , entry in pairs(self.ItemDatabase) do
 			local item = Item.GetDataFromId(entry.ID)
 			if item and self:LLMeetsFilters(item,"ML","ML") then
@@ -5631,8 +5643,8 @@ function DKP:LLPrepareData()
 			end
 		end
 	else
-		if self.wndLL:GetData() ~= "AllMode" then
-			for k , ID in ipairs(self.wndLL:GetData()) do 
+		if self.wndLL:GetData().strMode ~= "AllMode" then
+			for k , ID in ipairs(self.wndLL:GetData().tIDs) do 
 				if self.tItems[ID].tLLogs ~= nil then
 					tWinnersDictionary[self.tItems[ID].strName] = {}
 					for k , entry in ipairs(self.tItems[ID].tLLogs) do
@@ -5683,7 +5695,7 @@ function DKP:LLPrepareData()
 							if item and self:LLMeetsFilters(item,player,entry.nGP) then
 								if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
 								table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)
-								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName()})						
+								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName() == "" and "Miscellaneous" or item:GetItemCategoryName()})						
 							end
 						end
 					else
@@ -5703,7 +5715,7 @@ function DKP:LLPrepareData()
 			end
 		end
 	end
-	if #self.wndLL:GetData() == 1 then tWinnersDictionary = nil end
+	if self.wndLL:GetData().tIDs and #self.wndLL:GetData().tIDs == 1 then tWinnersDictionary = nil end
 	return tGrouppedItems , tWinnersDictionary
 end
 
@@ -5876,8 +5888,11 @@ function DKP:LLPopuplate()
 			local wndBubble = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",wndList,self)
 			wndBubble:SetData({bExpanded = false,bPopulated = false,bSearchOpen = false,nItems = self.tItems["settings"].LL.nMaxItems,nRows = self.tItems["settings"].LL.nMaxRows, strTitle = cat ,nWidthMod = 1,nHeightMod = 0,tCustomData = items,tItemTooltips = tWinnersDictionary})
 			wndBubble:FindChild("Header"):FindChild("HeaderText"):SetText(cat)
-			if self.wndLL:GetData() == "ML" then
+			if self.wndLL:GetData().strMode == "ML" then
 				self:IBAddTileClickHandler(wndBubble,"MAUpdateID")
+			end
+			if self.wndLL:GetData().strMode == "Reass" then
+				self:IBAddTileClickHandler(wndBubble,"ReassUpdateItem")
 			end
 			for k , prevBubble in ipairs(tExpandedBubbles) do
 				if prevBubble == cat then 
@@ -6097,11 +6112,16 @@ local tFetchers = {} -- heavy stuff
 function DKP:DFJoinSyncChannel()
 	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel",ICCommLib.CodeEnumICCommChannelType.Global)
 	self.sChannel:SetReceivedMessageFunction("DFOnSyncMessage",self)
-	--self.sChannel:SetSendMessageResultFunction("DFSyncMessageResult",self)
+	self.sChannel:SetSendMessageResultFunction("DFSyncMessageResult",self)
+	--[[for result , id in pairs(ICCommLib.CodeEnumICCommMessageResult) do
+		Print(result .. " : " .. id)
+	end
+	Print("Limit down " .. ICCommLib. GetDownloadCapacityByType(ICCommLib.CodeEnumICCommChannelType.Global))
+	Print("Limit up " .. ICCommLib. GetUploadCapacityByType(ICCommLib.CodeEnumICCommChannelType.Global))]]
 end
 
 function DKP:DFSyncMessageResult(iccomm, eResult, idMessage)
-
+	Print("res : " .. eResult .. " id : " .. idMessage)
 end
 
 function DKP:DFOnSyncMessage(channel, strMessage, idMessage)
@@ -6110,8 +6130,10 @@ function DKP:DFOnSyncMessage(channel, strMessage, idMessage)
 		if tMsg.type == "SendMeData" then
 			self.sChannel:SendPrivateMessage(tMsg.strSender,self:GetEncodedData(tMsg.strSender))
 		elseif tMsg.type == "SendMeFullData" then
-			tFetchers[tMsg.strSender] = nil 
-			self.sChannel:SendPrivateMessage(tMsg.strSender,self:GetEncodedData(tMsg.strSender))
+			tFetchers[tMsg.strSender] = nil
+
+			local id = self.sChannel:SendPrivateMessage(tMsg.strSender,string.sub(self:GetEncodedData(tMsg.strSender),30719))
+			Print("sent id: " .. id)
 		elseif tMsg.type == "EncodedDataFull" then
 			self:ProccesEncodedData(tMsg.tData)		
 		elseif tMsg.type == "EncodedDataSelected" then
@@ -6430,7 +6452,7 @@ function DKP:MAOpen(ID)
 end
 
 function DKP:MAClose()
-	self.wndMAL:Show(false,false)
+	self.wndMA:Show(false,false)
 end
 
 function DKP:MACheckName(wndHandler,wndControl,strText)
@@ -6581,6 +6603,110 @@ function DKP:NotificationTimer()
 		self.NotificationTime:Stop() 
 	end
 	self.wndNot:ToFront()
+end
+-----------------------------------------------------------------------------------------------
+-- Item Reassign
+-----------------------------------------------------------------------------------------------
+function DKP:ReassInit()
+	self.wndReass = Apollo.LoadForm(self.xmlDoc,"ItemReassign",nil,self)
+	self.wndReass:Show(false)
+end
+local prevValidName
+function DKP:ReassShow(strName , item)
+	if not self.wndReass:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndReass:Move(tCursor.x - 100, tCursor.y - 100, self.wndReass:GetWidth(), self.wndReass:GetHeight())
+	end
+
+	self.wndReass:Show(true,false)
+	self.wndReass:ToFront()
+	if strName then
+		prevValidName = string.sub(strName,1,#strName-2)
+		self.wndReass:FindChild("GName"):SetText(prevValidName)
+	end
+
+	if item then
+		self.wndReass:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+		self.wndReass:FindChild("ItemFrame"):FindChild("Icon"):SetSprite(item:GetIcon())
+		self.wndReass:FindChild("GGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+		self.wndReass:FindChild("RGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+		Tooltip.GetItemTooltipForm(self,self.wndReass:FindChild("Icon"),item,{})
+		self.wndReass:FindChild("TickGGP"):Show(true)
+		self.wndReass:FindChild("TickRGP"):Show(true)
+		self.wndReass:FindChild("ItemFrame"):Show(true)
+	else
+		self.wndReass:FindChild("ItemFrame"):Show(false)
+	end
+	self.wndReass:FindChild("Proceed"):Enable(false)
+
+	self.wndReass:FindChild("TickGName"):Show(true) 
+	self.wndReass:FindChild("Choose"):Enable(true)
+
+end
+
+function DKP:ReassHide()
+	self.wndReass:Show(false,false)
+end
+
+function DKP:ReassCheckConditions(wndHandler,wndControl,strText)
+	local control = wndControl:GetName()
+	local tickCount = 0
+	if control == "GName" then
+		if self:GetPlayerByIDByName(strText) ~= -1 then 
+			self.wndReass:FindChild("TickGName"):Show(true) 
+			self.wndReass:FindChild("Choose"):Enable(true)
+			if string.lower(prevValidName) ~= string.lower(strText) then
+				self.wndReass:FindChild("ItemFrame"):Show(false)
+			else
+				self.wndReass:FindChild("ItemFrame"):Show(true)
+			end
+			prevValidName = strText
+		else
+			self.wndReass:FindChild("TickGName"):Show(false) 
+			self.wndReass:FindChild("Choose"):Enable(false)
+			self.wndReass:FindChild("ItemFrame"):Show(false)
+		end
+	elseif control == "GGP" then
+		if tonumber(strText) then self.wndReass:FindChild("TickGGP"):Show(true) else self.wndReass:FindChild("TickGGP"):Show(false) end
+	elseif control == "RName" then
+		if self:GetPlayerByIDByName(strText) ~= -1 then self.wndReass:FindChild("TickRName"):Show(true) else self.wndReass:FindChild("TickRName"):Show(false) end
+	elseif control == "RGP" then 
+		if tonumber(strText) then self.wndReass:FindChild("TickRGP"):Show(true) else self.wndReass:FindChild("TickRGP"):Show(false) end
+	end
+
+	for k , child in ipairs(self.wndReass:GetChildren()) do
+		if string.find(child:GetName(),"Tick") and child:IsShown() then tickCount = tickCount + 1 end
+	end
+
+	if tickCount == 4 and self.wndReass:FindChild("ItemFrame"):IsShown() then self.wndReass:FindChild("Proceed"):Enable(true) else self.wndReass:FindChild("Proceed"):Enable(false) end
+end
+
+function DKP:ReassChooseItem()
+	self:LLOpen({[1] = self:GetPlayerByIDByName(self.wndReass:FindChild("GName"):GetText())},"Reass")
+end
+
+function DKP:ReassUpdateItem(wndHandler,wndControl)
+	if not string.find(wndControl:GetName(),"Tile") then return end
+	local item = wndControl:GetData()
+	if item then
+		self.wndReass:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+		self.wndReass:FindChild("ItemFrame"):FindChild("Icon"):SetSprite(item:GetIcon())
+		self.wndReass:FindChild("GGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+		self.wndReass:FindChild("RGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+		Tooltip.GetItemTooltipForm(self,self.wndReass:FindChild("Icon"),item,{})
+		self.wndReass:FindChild("TickGGP"):Show(true)
+		self.wndReass:FindChild("TickRGP"):Show(true)
+		self.wndReass:FindChild("ItemFrame"):Show(true)
+		self.wndReass:ToFront()
+	end
+
+end
+
+
+
+
+function DKP:ReassCommit()
+
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

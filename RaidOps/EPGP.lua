@@ -266,13 +266,6 @@ function DKP:EPGPChangeUI()
 		controls:FindChild("EditBox"):SetAnchorOffsets(25,98,187,144)  -- comment
 		controls:FindChild("ButtonEP"):Show(true,false)
 		controls:FindChild("ButtonGP"):Show(true,false)
-		--Labels
-		local labelTypes = self.wndMain:FindChild("LabelOptions"):FindChild("LabelTypes")
-		labelTypes:FindChild("EP"):Show(true,false)
-		labelTypes:FindChild("GP"):Show(true,false)
-		labelTypes:FindChild("PR"):Show(true,false)
-		labelTypes:FindChild("RealGP"):Show(true,false)
-		self.wndLabelOptions:FindChild("LabelTypes"):ArrangeChildrenVert()
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(true)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(true)
 		
@@ -283,21 +276,6 @@ function DKP:EPGPChangeUI()
 		controls:FindChild("EditBox"):SetAnchorOffsets(25,67,187,146)  -- comment
 		controls:FindChild("ButtonEP"):Show(false,false)
 		controls:FindChild("ButtonGP"):Show(false,false)
-		--Labels
-		local labelTypes = self.wndMain:FindChild("LabelOptions"):FindChild("LabelTypes")
-		labelTypes:FindChild("EP"):Show(false,false)
-		labelTypes:FindChild("GP"):Show(false,false)
-		labelTypes:FindChild("PR"):Show(false,false)
-		labelTypes:FindChild("RealGP"):Show(false,false)
-		if self:LabelGetColumnNumberForValue("EP") ~= -1 then
-			self.tItems["settings"].LabelOptions[self:LabelGetColumnNumberForValue("EP")] = "Nil"
-		end
-		if self:LabelGetColumnNumberForValue("GP") ~= -1 then
-			self.tItems["settings"].LabelOptions[self:LabelGetColumnNumberForValue("GP")] = "Nil"
-		end
-		if self:LabelGetColumnNumberForValue("PR") ~= -1 then
-			self.tItems["settings"].LabelOptions[self:LabelGetColumnNumberForValue("PR")] = "Nil"
-		end
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(false)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(false)
 		if self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then self:UnhookAll() end
