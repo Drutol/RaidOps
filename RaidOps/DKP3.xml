@@ -57,8 +57,10 @@
             <Event Name="ButtonSignal" Function="IBTileMenuReassign"/>
         </Control>
         <Control Class="Button" Base="BK3:btnHolo_ListView_Btm" Font="DefaultButton" ButtonType="PushButton" RadioGroup="LabelSelType" LAnchorPoint="0" LAnchorOffset="14" TAnchorPoint="0" TAnchorOffset="80" RAnchorPoint="0" RAnchorOffset="97" BAnchorPoint="0" BAnchorOffset="112" DT_VCENTER="1" DT_CENTER="1" BGColor="UI_BtnBGDefault" TextColor="UI_BtnTextDefault" NormalTextColor="UI_BtnTextDefault" PressedTextColor="UI_BtnTextDefault" FlybyTextColor="UI_BtnTextDefault" PressedFlybyTextColor="UI_BtnTextDefault" DisabledTextColor="UI_BtnTextDefault" TooltipType="OnCursor" Name="Rem" TooltipColor="" Text="" TextId="CRB_Remove" Tooltip="" TooltipId="" GlobalRadioGroup="">
-            <Event Name="ButtonSignal" Function="LabelCheckType"/>
-            <Event Name="ButtonCheck" Function="LabelTypeChanged"/>
+            <Event Name="ButtonSignal" Function="IBTileMenuRemove"/>
+            <Control Class="Button" Base="BK3:btnHolo_Close" Font="DefaultButton" ButtonType="PushButton" RadioGroup="" LAnchorPoint="0" LAnchorOffset="56" TAnchorPoint="0" TAnchorOffset="-5" RAnchorPoint="0" RAnchorOffset="88" BAnchorPoint="0" BAnchorOffset="27" DT_VCENTER="1" DT_CENTER="1" BGColor="UI_BtnBGDefault" TextColor="UI_BtnTextDefault" NormalTextColor="UI_BtnTextDefault" PressedTextColor="UI_BtnTextDefault" FlybyTextColor="UI_BtnTextDefault" PressedFlybyTextColor="UI_BtnTextDefault" DisabledTextColor="UI_BtnTextDefault" TooltipType="OnCursor" Name="Confirm" TooltipColor="" Visible="0" Tooltip="">
+                <Event Name="ButtonSignal" Function="IBTileMenuRemoveConfirm"/>
+            </Control>
         </Control>
     </Form>
 </Forms>

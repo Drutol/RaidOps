@@ -254,12 +254,21 @@ function DKP:IBTileMenuReassign()
 end
 
 function DKP:IBTileMenuRemove(wndHandler,wndControl)
-	wndControl:FindChild("Confirm"):Show(not wndControl:FindChild("Confirm"):IsShown()))
+	wndControl:FindChild("Confirm"):Show(not wndControl:FindChild("Confirm"):IsShown())
 end
 
 function DKP:IBTileMenuRemoveConfirm(wndHandler,wndControl)
-	self:LLRemLog(string.sub(wndControl:FindChild("Tooltip"):GetData(),1,#wndControl:FindChild("Tooltip"):GetData()-2),wndControl:GetData())
 	wndControl:Show(false)
+	local wndControl = self.wndIBMenu:GetData()
+	local strName = string.sub(wndControl:FindChild("Tooltip"):GetData(),1,#wndControl:FindChild("Tooltip"):GetData()-2)
+	self:LLRemLog(strName,wndControl:GetData())
+	self:UndoAddActivity(string.format("Removed %s from %s",wndControl:GetData():GetName(),strName),string.sub(self:EPGPGetItemCostByID(wndControl:GetData():GetItemId()),36),{[1] = self.tItems[self:GetPlayerByIDByName(strName)]})
+	self.tItems[self:GetPlayerByIDByName(strName)].GP = self.tItems[self:GetPlayerByIDByName(strName)].GP - tonumber(string.sub(self:EPGPGetItemCostByID(wndControl:GetData():GetItemId()),36))
+	self:DetailAddLog("Removed : " .. wndControl:GetData():GetName(),"{GP}",string.sub(self:EPGPGetItemCostByID(wndControl:GetData():GetItemId()),36),self:GetPlayerByIDByName(strName))
+	self:RefreshMainItemList()
+	self:LLPopuplate()
+	self.wndIBMenu:Show(false,false)
+	
 end
 
 function DKP:IBPostItem(wndControl)

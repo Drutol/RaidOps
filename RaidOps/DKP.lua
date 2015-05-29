@@ -125,6 +125,10 @@ local ktUndoActions =
 	["msetgp"] = "{Mass Set GP}",
 	--Raid
 	["raward"] = "{Raid Award}",
+	--Item
+	["itreass"] = "Reassigned %s from %s to %s",
+	["itrem"] = "Removed %s from %s",
+	["maward"] = "Awarded %s with %s",
 
 }
 local ktQual = 
@@ -646,6 +650,16 @@ function DKP:Undo()
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then -- modifications 
 							self.tItems[k] = revertee
+							--[[if string.find(tUndoActions[1].strType,"Reassigned") then
+								local item = Item.GetDataFromId(tUndoActions[1].item)
+								if item then
+									if k == 1 then -- Giver -> Add
+										self
+									elseif k == 2 then -- Recipient -> Rem
+
+									end
+								end
+							end]]
 							break
 						end
 					end
@@ -656,8 +670,6 @@ function DKP:Undo()
 						if player.strName == revertee.strName then table.remove(self.tItems,k) break end
 					end
 				end
-
-
 			end
 			table.remove(tUndoActions,1)
 			self:UndoPopulate()
@@ -2097,7 +2109,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"--") end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"Add EP/GP/DKP") end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			self.wndSelectedListItem = wnd
@@ -2114,7 +2126,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"--") end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"Sub EP/GP/DKP") end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
@@ -2132,7 +2144,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end		
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"--") end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"Set EP/GP/DKP") end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
@@ -5583,7 +5595,12 @@ function DKP:LLAddLog(strPlayer,strItem)
 end
 
 function DKP:LLRemLog(strPlayer,item)
-
+	for k,entry in ipairs(self.tItems[self:GetPlayerByIDByName(strPlayer)].tLLogs) do
+		if entry.itemID == item:GetItemId() then
+			table.remove(self.tItems[self:GetPlayerByIDByName(strPlayer)].tLLogs,k)
+			break
+		end
+	end
 end
 
 function DKP:LLOpen(tIDs,strMode)
@@ -5646,6 +5663,7 @@ function DKP:LLPrepareData()
 		if self.wndLL:GetData().strMode ~= "AllMode" then
 			for k , ID in ipairs(self.wndLL:GetData().tIDs) do 
 				if self.tItems[ID].tLLogs ~= nil then
+					player = self.tItems[ID]
 					tWinnersDictionary[self.tItems[ID].strName] = {}
 					for k , entry in ipairs(self.tItems[ID].tLLogs) do
 						if self.tItems["settings"].LL.strGroup == "GroupName" then
@@ -5661,7 +5679,8 @@ function DKP:LLPrepareData()
 							local item = Item.GetDataFromId(entry.itemID)
 							if item and self:LLMeetsFilters(item,self.tItems[ID],entry.nGP) then
 								if tGrouppedItems[item:GetItemCategoryName()] == nil then tGrouppedItems[item:GetItemCategoryName()] = {} end
-								table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)			
+								table.insert(tGrouppedItems[item:GetItemCategoryName()],entry.itemID)
+								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName() == "" and "Miscellaneous" or item:GetItemCategoryName()})			
 							end
 						else -- Group Date
 							local diff = os.date("*t",(os.time() - entry.nDate)).day
@@ -5669,7 +5688,8 @@ function DKP:LLPrepareData()
 								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
-									table.insert(tGrouppedItems[strDate],entry.itemID)	
+									table.insert(tGrouppedItems[strDate],entry.itemID)
+									table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = strDate})	
 								end
 							end
 						end
@@ -5715,7 +5735,7 @@ function DKP:LLPrepareData()
 			end
 		end
 	end
-	if self.wndLL:GetData().tIDs and #self.wndLL:GetData().tIDs == 1 then tWinnersDictionary = nil end
+	--if self.wndLL:GetData().tIDs and #self.wndLL:GetData().tIDs == 1 then tWinnersDictionary = nil end
 	return tGrouppedItems , tWinnersDictionary
 end
 
@@ -6634,6 +6654,7 @@ function DKP:ReassShow(strName , item)
 		self.wndReass:FindChild("TickGGP"):Show(true)
 		self.wndReass:FindChild("TickRGP"):Show(true)
 		self.wndReass:FindChild("ItemFrame"):Show(true)
+		self.wndReass:SetData(item)
 	else
 		self.wndReass:FindChild("ItemFrame"):Show(false)
 	end
@@ -6697,16 +6718,29 @@ function DKP:ReassUpdateItem(wndHandler,wndControl)
 		self.wndReass:FindChild("TickGGP"):Show(true)
 		self.wndReass:FindChild("TickRGP"):Show(true)
 		self.wndReass:FindChild("ItemFrame"):Show(true)
+		self.wndReass:SetData(item)
 		self.wndReass:ToFront()
 	end
 
 end
 
-
-
-
 function DKP:ReassCommit()
-
+	local GID = self:GetPlayerByIDByName(self.wndReass:FindChild("GName"):GetText())
+	local RID = self:GetPlayerByIDByName(self.wndReass:FindChild("RName"):GetText())
+	local GPsub = tonumber(self.wndReass:FindChild("GGP"):GetText())
+	local GPadd = tonumber(self.wndReass:FindChild("RGP"):GetText())
+	local item = self.wndReass:GetData()
+	if GID and RID and GPadd and GPsub and item then
+		self:UndoAddActivity(string.format(ktUndoActions["itreass"],item:GetName(),self.tItems[GID].strName,self.tItems[RID].strName),GPsub .. " / " .. GPadd,{[1] = self.tItems[GID],[2] = self.tItems[RID]})
+		self.tItems[GID].GP = self.tItems[GID].GP - GPsub
+		self.tItems[RID].GP = self.tItems[RID].GP + GPadd
+		self:DetailAddLog("Removed item : "..item:GetName(),"{GP}",GPsub*-1,GID)
+		self:DetailAddLog("Added item : "..item:GetName(),"{GP}",GPsub,RID)
+		self:OnLootedItem(item,true)
+		self:LLAddLog(self.tItems[RID].strName,item:GetName())
+		self:LLRemLog(self.tItems[GID].strName,item)
+		self:RefreshMainItemList()
+	end
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance
