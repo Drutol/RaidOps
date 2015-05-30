@@ -146,12 +146,18 @@ local ktQual =
 local strChangelog = 
 [===[
 ---RaidOps version 2.12---
-{xx/05/2015}
+{30/05/2015}
 Fixed Loot Logs not showing winners in Miscellaneous tab.
 Added option to reassign item.
 Added option to remove item from logs.
-Reasign , manual award and item removal will result with undo log.
+Added menu to item tile in Loot Logs , right click to show.
+Reasign , manual award and item removal will result in undo log.
 Fixed Mass Edit's recent activity comments.
+Added on-screen notification option in Custom Events + notification length.
+Major visual reorganisation for Custom Events.
+Creating Custom Event successfully will result in notification.
+Added Website information.
+Fixes to alts system.
 ---RaidOps version 2.11---
 {27/05/2015}
 Update missing art.
@@ -457,6 +463,7 @@ function DKP:OnDocLoaded()
 		self:LabelInit()
 		self:ReassInit()
 		self:IBInit()
+		self:WebInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -509,7 +516,7 @@ function DKP:OnDocLoaded()
 end
 
 function DKP:DebugFetch()
-	self:NotificationStart("LOLOLOLOLOLOLO!",10,5)
+	self:AltsBuildDictionary()
 end
 
 function DKP:ChangelogShow()
@@ -528,6 +535,34 @@ end
 
 function DKP:CreditsHide()
 	self.wndCredits:Show(false,false)
+end
+---------------
+-- Delay
+---------------
+local tDelayActions = {}
+local bDelayRunning = false
+function DKP:delay(nSecs,func,args)
+	table.insert(tDelayActions,{func = func , delay = nSecs , args = args})
+	if not bDelayRunning then
+		Apollo.RegisterTimerHandler(1,"DelayTimer",self)
+		self.delayTimer = ApolloTimer.Create(1,true,"DelayTimer",self)
+		bDelayRunning = true
+	end
+end
+
+function DKP:DelayTimer()
+	for k , event in ipairs(tDelayActions) do
+		event.delay = event.delay - 1
+		if event.delay == 0 then
+			event.func(self)
+			table.remove(tDelayActions,k)
+		end
+	end
+
+	if #tDelayActions == 0 then 
+		self.delayTimer:Stop() 
+		bDelayRunning = false
+	end
 end
 
 ---------------
@@ -2082,10 +2117,10 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 	for k,wnd in ipairs(selectedMembers) do 
 		local ID = self:GetPlayerByIDByName(wnd:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
 		if ID ~= -1 then
-			for k,alt in ipairs(self.tItems[ID].alts) do self.tItems["alts"][string.lower(alt)] = nil end
 			table.remove(self.tItems,ID)
 		end
 	end
+	self:AltsBuildDictionary()
 	self:RaidQueueRestore(save)
 	self:RefreshMainItemList()
 end
@@ -2098,6 +2133,36 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 		local player = self.tItems[wnd:GetData()]
 		table.insert(tMembers,player)
 	end
+		local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+		if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+			if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+				if what == "Add" then
+					comment = "Add EP"
+				elseif what == "Sub" then
+					comment = "Subtract EP"
+				elseif what == "Set" then
+					comment = "Set EP"
+				end
+			elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+				if what == "Add" then
+					comment = "Add GP"
+				elseif what == "Sub" then
+					comment = "Subtract GP"
+				elseif what == "Set" then
+					comment = "Set GP"
+				end
+			elseif self.tItems["EPGP"].Enable == 0 then
+				if what == "Add" then
+					comment = "Add DKP"
+				elseif what == "Sub" then
+					comment = "Subtract DKP"
+				elseif what == "Set" then
+					comment = "Set DKP"
+				end
+			end
+		end
+
+
 	if what == "Add" then
 		if self.tItems["EPGP"].Enable == 0 then
 		strType = ktUndoActions["madddkp"]
@@ -2108,8 +2173,9 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 				strType = ktUndoActions["maddep"]
 			end
 		end
+
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"Add EP/GP/DKP") end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			self.wndSelectedListItem = wnd
@@ -2126,7 +2192,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"Sub EP/GP/DKP") end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
@@ -2144,7 +2210,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end		
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,"Set EP/GP/DKP") end 
+		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
@@ -3643,6 +3709,11 @@ function DKP:ExportExport()
 				for k , player in ipairs(tImportedPlayers) do
 					table.insert(self.tItems,player)
 				end
+				self:AltsBuildDictionary()
+				for alt , owner in ipairs(self.tItems["alts"]) do
+					if self:GetPlayerByIDByName(alt) then table.remove(self.tItems,self:GetPlayerByIDByName(alt)) end
+				end
+				self:AltsBuildDictionary()
 			end
 			ChatSystemLib.Command("/reloadui")
 		else
@@ -3661,7 +3732,11 @@ function DKP:ExportExport()
 				self.tItems["EPGP"] = tImportedTables.tEPGP
 				self.tItems["Standby"] = tImportedTables.tStandby
 				self.tItems["CE"] = tImportedTables.tCE
-				
+				self:AltsBuildDictionary()
+				for alt , owner in ipairs(self.tItems["alts"]) do
+					if self:GetPlayerByIDByName(alt) then table.remove(self.tItems,self:GetPlayerByIDByName(alt)) end
+				end
+				self:AltsBuildDictionary()
 				ChatSystemLib.Command("/reloadui")
 			else
 				Print("Error processing database")
@@ -3884,6 +3959,7 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 	if self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "X" or self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "" then return end
 	local newDKP
 	local modifier
+	self:UndoAddActivity(string.format(ktUndoActions["maward"],self.tItems[CurrentPopUpID].strName,PopUpItemQueue[1].strItem),self.wndPopUp:FindChild("EditBoxDKP"):GetText(),{[1] = self.tItems[CurrentPopUpID]},nil,"--")
 	if self.tItems["EPGP"].Enable == 0 then
 		modifier = tonumber(self.tItems[CurrentPopUpID].net)
 		newDKP = tostring(tonumber(self.tItems[CurrentPopUpID].net)-math.abs(tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())))
@@ -4447,7 +4523,7 @@ function DKP:ConRemoveFinal(wndHandler,wndControl)
 	local save = self:RaidQueueSaveRestoreAndClear()
 	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
 	self:UndoAddActivity(ktUndoActions["remp"],"--",{[1] = self.tItems[self.wndContext:GetData()]},true)
-	for k,alt in ipairs(self.tItems[self.wndContext:GetData()].alts) do self.tItems["alts"][string.lower(alt)] = nil end
+	self:AltsBuildDictionary()
 	table.remove(self.tItems,self.wndContext:GetData())
 	self.wndContext:Close()
 	self.wndSelectedListItem = nil
@@ -4570,6 +4646,15 @@ function DKP:AltsDictionaryShow()
 	end	
 	self.wndAltsDict:FindChild("List"):SetText(strAlts)
 	
+end
+
+function DKP:AltsBuildDictionary()
+	self.tItems["alts"] = {}
+	for k , player in ipairs(self.tItems) do
+		for j , alt in ipairs(player.alts) do
+			self.tItems["alts"][string.lower(alt)] =  k
+		end
+	end
 end
 
 function DKP:AltsDictionaryHide()
@@ -4793,8 +4878,8 @@ local tCreatedEvent = {}
 function DKP:CEInit()
 	self.wndCE = Apollo.LoadForm(self.xmlDoc,"CustomEvents",nil,self)
 	
-	self.wndCE:SetSizingMaximum(692,700)
-	self.wndCE:SetSizingMinimum(692,414)
+	--self.wndCE:SetSizingMaximum(692,700)
+	--self.wndCE:SetSizingMinimum(692,414)
 	
 	self.wndCEL = Apollo.LoadForm(self.xmlDoc,"HandledEventsList",nil,self)
 	self.wndCEL:Show(false,true)
@@ -4804,15 +4889,24 @@ function DKP:CEInit()
 	
 	if self.tItems["settings"].CEEnable == nil then self.tItems["settings"].CEEnable = false end
 	if self.tItems["settings"].CERaidOnly == nil then self.tItems["settings"].CERaidOnly = false end
+	if self.tItems["settings"].CENotifyChat == nil then self.tItems["settings"].CENotifyChat = false end
+	if self.tItems["settings"].CENotifyScreen == nil then self.tItems["settings"].CENotifyScreen = true end
+	if self.tItems["settings"].CENotifyScreenTime == nil then self.tItems["settings"].CENotifyScreenTime = 5 end
 	
 	self.wndCE:FindChild("Enable"):SetCheck(self.tItems["settings"].CEEnable)
 	self.wndCE:FindChild("RaidOnly"):SetCheck(self.tItems["settings"].CERaidOnly)
-	self.wndCE:FindChild("Notify"):SetCheck(self.tItems["settings"].CENotify)
-	
+	self.wndCE:FindChild("Notify"):SetCheck(self.tItems["settings"].CENotifyChat)
+	self.wndCE:FindChild("NotifyScreen"):SetCheck(self.tItems["settings"].CENotifyScreen)
+	self.wndCE:FindChild("NotifyLength"):SetText(self.tItems["settings"].CENotifyScreenTime)
+	self.wndCE:FindChild("Success"):SetOpacity(0)
 	if self.tItems["settings"].CEEnable then Apollo.RegisterEventHandler("CombatLogDamage","CEOnUnitDamage", self) end
 	
 	
 	if self.tItems["CE"] == nil then self.tItems["CE"] = {} end
+end
+
+function DKP:CEHideSuccess()
+	self.wndCE:FindChild("Success"):SetOpacity(0)
 end
 
 function DKP:CEShow()
@@ -4826,7 +4920,7 @@ function DKP:CEShow()
 	self:CEPopulate()
 end
 
-function DKP:CEHide()
+function DKP:CEHide(tContext)
 	self.wndCE:Show(false,false)
 end
 
@@ -4851,24 +4945,24 @@ end
 -- Dropdowns
 
 function DKP:CEExpandRecipents()
-	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(138,118,346,232)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(127,87,335,192)
 	self.wndCE:FindChild("RecipentTypeSelection"):SetText("")
 	self.wndCE:FindChild("RecipentTypeSelection"):ToFront()
 end
 
 function DKP:CECollapseRecipents()
-	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(138,118,346,145)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(127,87,335,113)
 	self.wndCE:FindChild("RecipentTypeSelection"):SetText(tCreatedEvent.rType == "RM" and "Raid Members" or "Raid Members + Queue")
 end
 
 function DKP:CEExpandUnits()
-	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(119,71,244,167)
+	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(127,47,252,143)
 	self.wndCE:FindChild("UnitTypeSelection"):SetText("")
 	self.wndCE:FindChild("UnitTypeSelection"):ToFront()
 end
 
 function DKP:CECollapseUnits()
-	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(119,71,244,97)
+	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(127,47,252,73)
 	self.wndCE:FindChild("UnitTypeSelection"):SetText(tCreatedEvent.uType)
 end
 
@@ -4944,8 +5038,11 @@ function DKP:CETriggerEvent(eID)
 				strAwards = strAwards .. event.DKP .. "DKP "
 			end
 			
-			self:NotificationStart(string.format("Award for %s , %s",strMob,strAwards),10,5)
-		if self.tItems["settings"].CENotify then
+		if self.tItems["settings"].CENotifyScreen then
+			self:NotificationStart(string.format("Award for %s , %s",strMob,strAwards),self.tItems["settings"].CENotifyScreenTime,5)
+		end
+		
+		if self.tItems["settings"].CENotifyChat then
 			ChatSystemLib.Command("/party " .. string.format("Award for %s , %s",strMob,strAwards))
 		end
 		
@@ -5009,6 +5106,8 @@ function DKP:CECreate()
 			tCreatedEvent.GP = nil
 			tCreatedEvent.DKP = nil
 			if self.wndCEL:IsShown() then self:CELPopulate() end
+			self.wndCE:FindChild("Success"):SetOpacity(1)
+			self:delay(3,self.CEHideSuccess)
 		end
 	end
 end
@@ -5025,11 +5124,28 @@ function DKP:CERemoveEvent(wndHandler,wndControl)
 end
 
 function DKP:CENotifyEnable()
-	self.tItems["settings"].CENotify = true
+	self.tItems["settings"].CENotifyChat = true
 end
 
 function DKP:CENotifyDisable()
-	self.tItems["settings"].CENotify = false
+	self.tItems["settings"].CENotifyChat = false
+end
+
+function DKP:CENotifyScreenEnable()
+	self.tItems["settings"].CENotifyScreen = true
+end
+
+function DKP:CENotifyScreenDisable()
+	self.tItems["settings"].CENotifyScreen = false
+end
+
+function DKP:CESetNotificationTimer(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.tItems["settings"].CENotifyScreenTime = val
+	else
+		wndControl:SetText(self.tItems["settings"].CENotifyScreenTime)
+	end
 end
 
 function DKP:CELShow()
@@ -5093,7 +5209,7 @@ local tKilledBossesInSession = {
 
 function DKP:CEOnUnitDamage(tArgs)
 	if self.tItems["settings"].CERaidOnly and not GroupLib.InRaid() then return end
-	if  tArgs.bTargetKilled == false then return end
+	if tArgs.bTargetKilled == false then return end
 	if tArgs.unitTarget == nil then return end
 	local tUnits = {}
 	local tBosses = {}
@@ -5102,8 +5218,7 @@ function DKP:CEOnUnitDamage(tArgs)
 		if event.uType == "Unit" then table.insert(tUnits,{strUnit = event.strUnit,ID = k}) else table.insert(tBosses,{bType = event.bType,ID = k}) end
 	end
 
-	local name =tArgs.unitTarget:GetName()
-	
+	local name = tArgs.unitTarget:GetName()
 	
 	-- Counting Council Fights
 	if name == "Phagetech Commander" then tKilledBossesInSession.tech1 = true end
@@ -5598,7 +5713,7 @@ function DKP:LLRemLog(strPlayer,item)
 	for k,entry in ipairs(self.tItems[self:GetPlayerByIDByName(strPlayer)].tLLogs) do
 		if entry.itemID == item:GetItemId() then
 			table.remove(self.tItems[self:GetPlayerByIDByName(strPlayer)].tLLogs,k)
-			break
+			return entry.nGP
 		end
 	end
 end
@@ -6515,6 +6630,7 @@ end
 function DKP:MAProceed()
 	local item = Item.GetDataFromId(tonumber(self.wndMA:FindChild("ID"):GetText()))
 	self:OnLootedItem(item,true)
+	self:LLAddLog(self.wndMA:FindChild("Name"):GetText(),item:GetName())
 	self:PopUpWindowOpen(self.wndMA:FindChild("Name"):GetText(),item:GetName())
 end
 -----------------------------------------------------------------------------------------------
@@ -6590,6 +6706,13 @@ local nOpacityTick
 local nPeak
 
 function DKP:NotificationStart(strMsg,nSecs,nPeakSec)
+	if nSecs > nPeakSec then 
+		nSecs = (nSecs * 10) - (nPeakSec*10)
+		nPeakSec = nPeakSec * 2 
+	else 
+		nSecs = nSecs * 6
+		nPeakSec = 0
+	end
 	local x,y = Apollo.GetScreenSize()
 	local l,t,r,b = self.wndNot:GetAnchorOffsets()
 	self.wndNot:Move( (x/2)-self.wndNot:GetWidth()/2, t, self.wndNot:GetWidth(), self.wndNot:GetHeight())
@@ -6741,6 +6864,27 @@ function DKP:ReassCommit()
 		self:LLRemLog(self.tItems[GID].strName,item)
 		self:RefreshMainItemList()
 	end
+end
+-----------------------------------------------------------------------------------------------
+-- Web
+-----------------------------------------------------------------------------------------------
+function DKP:WebInit()
+	self.wndWebInfo = Apollo.LoadForm(self.xmlDoc,"Website",nil,self)
+	self.wndWebInfo:Show(false)
+end
+
+function DKP:WebShow()
+	
+	if not self.wndWebInfo:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndWebInfo:Move(tCursor.x - 100, tCursor.y - 100, self.wndWebInfo:GetWidth(), self.wndWebInfo:GetHeight())
+	end
+	self.wndWebInfo:Show(true,false)
+	self.wndWebInfo:ToFront()
+end
+
+function DKP:WebClose()
+	self.wndWebInfo:Show(false,false)
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance
