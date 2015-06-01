@@ -279,7 +279,6 @@ function DKP:EPGPChangeUI()
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(false)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(false)
 		if self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then self:UnhookAll() end
-		self:LabelUpdateList()
 	end
 end
 

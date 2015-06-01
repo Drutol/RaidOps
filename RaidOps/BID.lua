@@ -1566,7 +1566,10 @@ function DKP:Bid2SendResumeMessage(itemID)
 end
 
 function DKP:Bid2GetTargetsTable()
-	if not self.strMyName then return "" end
+	if not self.strMyName then 
+		self.strMyName = GameLib.GetPlayerUnit():GetName()
+		return {} 
+	end
 	local targets = {}
 	for k=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetGroupMember(k)

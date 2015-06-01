@@ -361,3 +361,12 @@ function DKP:IBAddTileClickHandler(wndBubble,func)
 		wndBubble:GetData().clickFunc = func
 	end
 end
+
+---------------------------------------------------------------------------------
+--Raid Sessions(summaries) Wnd
+---------------------------------------------------------------------------------
+
+
+function DKP:RSInit()
+	self.wndRS = Apollo.LoadForm(self.xmlDoc3,"RaidSessions",nil,self)
+end

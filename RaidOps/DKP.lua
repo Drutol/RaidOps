@@ -145,6 +145,12 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.13---
+{1/06/2015}
+Fixed rename.
+Fixed various quirks related to Labels.
+Added Label 2nd profile.
+Name field will now resize itself when it takes different spot than the first.
 ---RaidOps version 2.12---
 {30/05/2015}
 Fixed Loot Logs not showing winners in Miscellaneous tab.
@@ -200,19 +206,6 @@ Now each item tile in Loot Logs will display winners only if they belong to the 
 Fixed position of Raid Queue controls.
 New theme of export window.
 Added option to set maximum day difference when grouping by day in loot logs.
-
-
----RaidOps version 2.05---
-{26/04/2015}
-Fixed date format bug.
-Fixed skip random looter not removing skipped looter after assign.
-Added option to invite people when they write for example "!raid"(customizable) in guild channel or whiper this command to you.
-Added small help window in chat bidding depending on mode.
-Removed "save (/reloadui)" button.
-Added option to select players confirmed for raid in MassEdit.
-Slight redesign of Mass Edit tools.
-Default settings tweaked a little bit.
-
  ]===]
 
 -- Localization stuff
@@ -360,7 +353,6 @@ function DKP:OnDocLoaded()
 		self.wndStandby:Show(false,true)
 		self.wndCredits:Show(false,true)
 		self.wndChangelog:Show(false,true)
-		self.wndMain:FindChild("MassEditControls"):Show(false,true)
 		Apollo.RegisterSlashCommand("epgp", "OnDKPOn", self)
 		Apollo.RegisterSlashCommand("sum", "RaidShowMainWindow", self)
 		Apollo.RegisterSlashCommand("rops", "HubShow", self)
@@ -438,6 +430,8 @@ function DKP:OnDocLoaded()
 		self.wndTimeAward = self.wndMain:FindChild("TimeAward")
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
+		self.wndMain:FindChild("MassEditControls"):SetOpacity(0)
+		self.wndMain:FindChild("MassEditControls"):Show(false)
 		-- Inits
 		self:TimeAwardRestore()
 		self:EPGPInit()
@@ -464,6 +458,7 @@ function DKP:OnDocLoaded()
 		self:ReassInit()
 		self:IBInit()
 		self:WebInit()
+		self:RSInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -548,6 +543,7 @@ function DKP:delay(nSecs,func,args)
 		self.delayTimer = ApolloTimer.Create(1,true,"DelayTimer",self)
 		bDelayRunning = true
 	end
+	return #tDelayActions
 end
 
 function DKP:DelayTimer()
@@ -1978,7 +1974,8 @@ function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	selectedMembers = {}
 	self.MassEdit = true
 	self:RefreshMainItemList()
-	self.wndMain:FindChild("MassEditControls"):Show(true,true)
+	self.wndMain:FindChild("MassEditControls"):Show(true,false)
+	self.wndMain:FindChild("MassEditControls"):SetOpacity(1)
 	self:EnableActionButtons()
 end
 
@@ -1986,7 +1983,8 @@ function DKP:MassEditDisable( wndHandler, wndControl, eMouseButton )
 	self.wndSelectedListItem = nil
 	self.MassEdit = false
 	self:RefreshMainItemList()
-	self.wndMain:FindChild("MassEditControls"):Show(false,true)
+	self.wndMain:FindChild("MassEditControls"):SetOpacity(0)
+	self:delay(1,function(tContext) if not self.MassEdit then tContext.wndMain:FindChild("MassEditControls"):Show(false,false) end end)
 	self:EnableActionButtons()
 end
 
@@ -2459,6 +2457,11 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
 			if self.tItems["settings"].LabelOptions[i] == "Name" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.strName)
+				if i ~= 1 then
+					local wnd = playerItem.wnd:FindChild("Stat"..i)
+					local l,t,r,b = wnd:GetAnchorOffsets()
+					wnd:SetAnchorOffsets(l-20,t,r+20,b)
+				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Net" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.net)
 			elseif self.tItems["settings"].LabelOptions[i] == "Tot" then
@@ -2617,10 +2620,58 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Label Setting
 ---------------------------------------------------------------------------------------------------
+local ktDefaultProfiles =
+{
+	[1] = 
+	{
+		[1] = "Name",
+		[2] = "EP",
+		[3] = "GP",
+		[4] = "PR",
+		[5] = "Item",
+		[6] = "Nil",
+		[7] = "Nil",
+		[8] = "Nil",
+		[9] = "Nil",
+	},
+	[2] = 
+	{
+		[1] = "Name",
+		[2] = "Net",
+		[3] = "Tot",
+		[4] = "Item",
+		[5] = "Nil",
+		[6] = "Nil",
+		[7] = "Nil",
+		[8] = "Nil",
+		[9] = "Nil",
+	},
+}
+
 
 function DKP:LabelInit()
 	self.wndLabelMenu = Apollo.LoadForm(self.xmlDoc,"LabelSelection",nil,self)
 	self.wndLabelMenu:Show(false)
+
+	if not self.tItems["settings"].nLabelProfile then self.tItems["settings"].nLabelProfile = 1 end
+	if not self.tItems["settings"].tLabelProfiles then 
+		self.tItems["settings"].tLabelProfiles = ktDefaultProfiles 
+		if self.tItems["settings"].LabelOptions then self.tItems["settings"].tLabelProfiles[1] = self.tItems["settings"].LabelOptions end
+	end
+
+	self.tItems["settings"].LabelOptions = self.tItems["settings"].tLabelProfiles[self.tItems["settings"].nLabelProfile]
+	self.wndMain:FindChild("Prof"..self.tItems["settings"].nLabelProfile):SetCheck(true)
+	
+	self:LabelUpdateList()
+	if not self.currentLabelCount then self:MresOnResize() end
+end
+
+function DKP:LabelProfileChanged(wndHandler,wndControl)
+	self.tItems["settings"].nLabelProfile = tonumber(wndControl:GetText())
+	self.tItems["settings"].LabelOptions = self.tItems["settings"].tLabelProfiles[self.tItems["settings"].nLabelProfile]
+	self.SortedLabel = nil
+	self:LabelHideIndicators()
+	self:LabelUpdateList()
 end
 
 function DKP:LabelMenuOpen(wndHandler,wndControl)
@@ -2644,18 +2695,26 @@ function DKP:LabelCheckType( wndHandler, wndControl, eMouseButton )
 			if self.tItems["settings"].LabelOptions[i] == wndControl:GetName() then
 				 self.tItems["settings"].LabelOptions[i] = "Nil"
 				 if self.SortedLabel == i then self.SortedLabel = self.CurrentlyEditedLabel end
+
 			end
 		end
-
+		self.tItems["settings"].tLabelProfiles[self.tItems["settings"].nLabelProfile][self.CurrentlyEditedLabel] = wndControl:GetName()
 		self.tItems["settings"].LabelOptions[self.CurrentlyEditedLabel] = wndControl:GetName()
 	end
 	if self.SortedLabel == self:LabelGetColumnNumberForValue("Item") then self.SortedLabel = nil end
+	if self.tItems["settings"].LabelOptions[self.SortedLabel] == "Nil" then self.SortedLabel = nil end
+
+
+
+
 	self:LabelUpdateList()
+	self:LabelHideIndicators()
 end
 
 function DKP:LabelUpdateList() 
 	-- Label Bar first
 	for i=1,self.currentLabelCount do
+		if not self.tItems["settings"].LabelOptions[i] then self.tItems["settings"].LabelOptions[i] = "Nil" end
 		self.wndLabelBar:FindChild("Label"..tostring(i)):Show(true,false)
 		self.wndLabelBar:FindChild("Label"..tostring(i)):SetText(self.tItems["settings"].LabelOptions[i])
 		self.wndLabelBar:FindChild("Label"..tostring(i)):SetTooltip(self:LabelAddTooltipByValue(self.tItems["settings"].LabelOptions[i]))
@@ -2689,13 +2748,13 @@ function easyDKPSortPlayerbyLabel(a,b)
 			if DKPInstance.tItems["settings"].LabelSortOrder == "asc" then
 				if sortBy ~= "Name" then
 					return tonumber(a:FindChild(label):GetText()) > tonumber(b:FindChild(label):GetText())
-				else
+				elseif sortBy ~= "Item" then
 					return a:FindChild(label):GetText() > b:FindChild(label):GetText()
 				end
 			else
 				if sortBy ~= "Name" then
 					return tonumber(a:FindChild(label):GetText()) < tonumber(b:FindChild(label):GetText())
-				else
+				elseif sortBy ~= "Item" then
 					return a:FindChild(label):GetText() < b:FindChild(label):GetText()
 				end
 			end
@@ -2939,7 +2998,7 @@ function DKP:LabelHideIndicators()
 end
 
 function DKP:LabelIsSortable(strLabel) 
-	if strLabel == "Item" then return false else return true end
+	if strLabel == "Item" or strLabel == "Nil" then return false else return true end
 end
 
 function DKP:LabelSwapSortIndicator(wnd)
@@ -3711,7 +3770,10 @@ function DKP:ExportExport()
 				end
 				self:AltsBuildDictionary()
 				for alt , owner in ipairs(self.tItems["alts"]) do
-					if self:GetPlayerByIDByName(alt) then table.remove(self.tItems,self:GetPlayerByIDByName(alt)) end
+					for k , player in ipairs(self.tItems) do
+						if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
+						break
+					end
 				end
 				self:AltsBuildDictionary()
 			end
@@ -3734,7 +3796,10 @@ function DKP:ExportExport()
 				self.tItems["CE"] = tImportedTables.tCE
 				self:AltsBuildDictionary()
 				for alt , owner in ipairs(self.tItems["alts"]) do
-					if self:GetPlayerByIDByName(alt) then table.remove(self.tItems,self:GetPlayerByIDByName(alt)) end
+					for k , player in ipairs(self.tItems) do
+						if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
+						break
+					end
 				end
 				self:AltsBuildDictionary()
 				ChatSystemLib.Command("/reloadui")
@@ -6667,15 +6732,16 @@ function DKP:RenameCommit()
 	local ID = self.wndRen:GetData()
 	local strPrevName = self.tItems[ID].strName
 	local strNewName = self.wndRen:FindChild("Name"):GetText()
-
-	self.tItems["Standby"][string.lower(strNewName)] = self.tItems["Standby"][string.lower(strPrevName)]
-	self.tItems["Standby"][string.lower(strNewName)].strName = strNewName
-	self.tItems["Standby"][string.lower(strPrevName)] = nil
-
+	if self.tItems["Standby"][string.lower(strPrevName)] then
+		self.tItems["Standby"][string.lower(strNewName)] = self.tItems["Standby"][string.lower(strPrevName)]
+		self.tItems["Standby"][string.lower(strNewName)].strName = strNewName 
+		self.tItems["Standby"][string.lower(strPrevName)] = nil
+	end
 	if self.wndStandby:IsShown() then self:StandbyListPopulate() end
 
 	self.tItems[ID].strName = strNewName
 	self:RefreshMainItemList()
+	self:AltsBuildDictionary()
 	self:RenameHide()
 end
 
