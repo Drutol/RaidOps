@@ -363,10 +363,195 @@ function DKP:IBAddTileClickHandler(wndBubble,func)
 end
 
 ---------------------------------------------------------------------------------
---Raid Sessions(summaries) Wnd
+--Raid Sessions(summaries) Defs
 ---------------------------------------------------------------------------------
+local ktManipulationEvents = 
+{
+	-->> {nAmount = ?}
+	[1] = "Gained EP",
+	[2] = "Lost EP",
+	[3] = "Gained GP",
+	[4] = "Lost GP",
+	--<<
+}
+local ktRaidEvents =
+{
+	[1] = "Session started.", -- {nCount = ?}
+	[2] = "Player joined.", -- {nID = ?}
+	[3] = "Player left.", -- {nID = ?}
+	[4] = "Boss encounter started.", -- {strBoss = ?}
+	[5] = "Boss encounter finished.", -- {strBoss = ?}
+	[6] = "Session ended.", -- {nCount = ?}
+}
+---------------------------------------------------------------------------------
+--Raid Sessions(summaries) Session and Player class
+---------------------------------------------------------------------------------
+RaidSummarySession = {}
+RaidSummarySession.__index = RaidSummarySession
 
+RaidSummaryPlayer = {}
+RaidSummaryPlayer.__index = RaidSummaryPlayer
+
+function RaidSummaryPlayer.create(nID,tPlayer)
+	local player = {}
+	setmetatable(player,RaidSummaryPlayer) 
+	player.ID = nID
+	player.starting = {}
+	player.starting.EP = tPlayer.EP
+	player.starting.GP = tPlayer.GP
+	player.starting.Hrs = tPlayer.Hrs
+	player.nStart = os.time()
+
+	player.tTimeline = {}
+	return player
+end
+
+function RaidSummaryPlayer.CreateFromTable(tData)
+	local player = {}
+	setmetatable(player,RaidSummaryPlayer) 
+	player.ID = tData.ID
+	player.starting = {}
+	player.starting.EP = tData.starting.EP
+	player.starting.GP = tData.starting.GP
+	player.starting.Hrs = tData.starting.Hrs
+	player.nStart = tData.nStart
+
+	player.tTimeline = {}
+	return player
+end
+
+function RaidSummaryPlayer:RegisterEPManipulation(nAmount)
+	table.insert(self.tTimeline,{eventID = nAmount >= 0 and 1 or 2})
+end
+
+function RaidSummaryPlayer:RegisterGPManipulation(nAmount)
+	table.insert(self.tTimeline,{eventID = nAmount >= 0 and 3 or 4})
+end
+
+function RaidSummaryPlayer:End()
+	self.nEnd = os.time()
+end
+
+function RaidSummaryPlayer:to_t()
+	local table = {}
+	table.ID = self.ID
+	table.starting = {}
+	table.starting.EP = self.EP
+	table.starting.GP = self.GP
+	table.starting.Hrs = self.Hrs
+	table.nStart = self.nStart
+	return table()
+end
+
+
+function RaidSummarySession.create(nZone,tInitialPlayers)
+   local session = {}            
+   setmetatable(session,RaidSummarySession) 
+   session.nZone = nZone    
+   session.tPlayers = {}
+   for k , player in ipairs(tInitialPlayers) do
+   		table.insert(session.tPlayers,RaidSummaryPlayer.create(player.id,player.tContents))
+   end
+   session.nStart = os.time()
+
+   -- Init
+   session:RegisterEvent(1,{nCount = #tInitialPlayers})
+   return session
+end
+
+function RaidSummarySession.resume(tData)
+   local session = {}            
+   setmetatable(session,RaidSummarySession) 
+   session.nZone = tData.nZone    
+   session.tPlayers = {}
+   for k , player in ipairs(tData.tPlayers) do
+   		table.insert(session.tPlayers,RaidSummaryPlayer.CreateFromTable(player))
+   end
+   session.nStart = tData.nStart
+
+   return session
+end
+
+function RaidSummarySession:PlayerJoined(tPlayer)
+	table.insert(self.tPlayers,RaidSummaryPlayer.create(tPlayer.id,tPlayer.tContents))
+	self:RegisterEvent(2,{nID = tPlayer.id})
+end
+
+function RaidSummarySession:PlayerLeft(nID)
+	for k , player in ipairs(self.tPlayers) do
+		if player.ID == tPlayer.id then
+			player.nEnd = os.time()
+		end
+	end
+	self:RegisterEvent(3,{nID = nID})
+end
+
+function RaidSummarySession:RegisterEvent(eID,tArgs)
+	-- Check if args are passed correctly
+	if eID == 1 or eID == 6 then
+		if not tArgs.nCount  then return end
+	elseif eID == 2 or eID == 3 then
+		if not tArgs.nID then return end
+	elseif eID == 4 or eID == 5 then
+		if not tArgs.strBoss then return end
+	end
+	-- insert event to timeline
+	table.insert(self.tTimeline,{eID = eID,tArgs = tArgs,nTime = os.time()})
+end
+
+function RaidSummarySession:GetPlayerByID(nID)
+	for k , player in ipairs(self.tPlayers) do 
+		if player.ID == nID then return player end
+	end
+end
+
+function RaidSummarySession:GetSaveState()
+	local tSave = {}
+	tSave.nZone = self.nZone
+	tSave.nTime = self.nTime
+	tSave.tPlayers = {}
+	for k , player in ipairs(self.tPlayers) do
+		table.insert(tSave.tPlayers,player:to_t())
+	end
+	return tSave
+end
+
+function RaidSummarySession:End(tSample)
+	self.nEnd = os.time()
+	-- Prepare final table
+	local tExport = {}
+	-- DO stuff
+	return tExport
+end
+---------------------------------------------------------------------------------
+--Raid Sessions(summaries) 
+---------------------------------------------------------------------------------
+local bRaidSession = false
+function DKP:RSIsSession()
+	return bRaidSession
+end
 
 function DKP:RSInit()
 	self.wndRS = Apollo.LoadForm(self.xmlDoc3,"RaidSessions",nil,self)
+	Apollo.RegisterEventHandler("ChangeWorld", "RSCheckZone", self)
+end
+
+function DKP:RSIsRaidZone()
+	return true -- TODO
+end
+
+function DKP:RSCheckZone()
+	if not bRaidSession then
+		if self:RSIsRaidZone(ZONEZONE) then -- TODO
+			local players = self:Bid2GetTargetsTable()
+			table.insert(players,GameLib.GetPlayerUnit():GetName())
+			for k , player in ipairs(players) do
+				local tContents = player
+				player = {}
+				player.id = self:GetPlayerByIDByName(tContents.strName)
+				player.tContents = tContents
+			end
+			self.CurrentRaidSession = RaidSummarySession.create(ZONE,players)
+		end 
+	end
 end

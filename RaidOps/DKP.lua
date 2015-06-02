@@ -458,7 +458,7 @@ function DKP:OnDocLoaded()
 		self:ReassInit()
 		self:IBInit()
 		self:WebInit()
-		self:RSInit()
+		--self:RSInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
