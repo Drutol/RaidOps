@@ -5,6 +5,7 @@
  
 require "Window"
  
+local Major, Minor, Patch, Suffix = 1, 15, 0, 0
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMasterLoot Module Definition
 -----------------------------------------------------------------------------------------------
@@ -13,7 +14,7 @@ local RaidOpsMasterLoot = {}
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local Hook = Apollo.GetAddon("MasterLoot")
+local Hook = Apollo.GetAddon("MasterLootDependency")
  
  local ktClassToIcon =
 {
@@ -83,9 +84,10 @@ function RaidOpsMasterLoot:OnDocLoaded()
 
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
 	    
-		if Apollo.GetAddon("RaidOps") or Apollo.GetAddon("MasterLoot") == nil then
+		if Apollo.GetAddon("RaidOps") or Apollo.GetAddon("MasterLootDependency") == nil then
 			Print("[RaidOps MasterLoot] Main addon found or MasterLoot addon not found , disable this addon or figure out which addons you need to disable.")
 			Apollo.AddAddonErrorText(self, "Main addon found or MasterLoot addon not found , disable this addon or figure out which addons you need to disable.")
+			Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOpsMasterLoot", Major, Minor, Patch)
 			return	
 		else self:BeginInit() end
 		
@@ -119,6 +121,7 @@ function RaidOpsMasterLoot:MLSettingsShow()
 end
 
 function RaidOpsMasterLoot:CompleteInit()
+	Hook = Apollo.GetAddon("MasterLootDependency")
 	self.wndResponses = Apollo.LoadForm(self.xmlDoc,"Responses",nil,self)
 	self.wndResponses:Show(false,true)
 	Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
@@ -158,7 +161,11 @@ function RaidOpsMasterLoot:CompleteInit()
 	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc,"InsertMLControls",Hook.wndMasterLoot,self)
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
 	Hook:OnMasterLootUpdate(true)
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
+	--self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,ICCommLib.CodeEnumICCommChannelType.Global)
+	--self.channel:SetReceivedMessageFunction("OnReceivedItem",self)
+	self.strMyName = GameLib.GetPlayerUnit():GetName()
+	-- OneVersion
+	Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOpsMasterLoot", Major, Minor, Patch)
 end
 
 function RaidOpsMasterLoot:ReArr()
@@ -226,6 +233,7 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 		self.tItems["settings"]["ML"].bArrTiles = true
 		self.tItems["settings"]["ML"].bShowValues = true
 	end
+
 	if self.tItems["settings"]["ML"].strChannel == nil then self.tItems["settings"]["ML"].strChannel = "your guild's channel" end
 	if self.tItems["settings"]["ML"].bArrItemTiles == nil then self.tItems["settings"]["ML"].bArrItemTiles = true end
 	if self.tItems["settings"]["ML"].bStandardLayout == nil then self.tItems["settings"]["ML"].bStandardLayout = true end
@@ -240,7 +248,11 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].strGBManager == nil then self.tItems["settings"]["ML"].strGBManager = "" end
 	if self.tItems["settings"]["ML"].bDisplayApplicable == nil then self.tItems["settings"]["ML"].bDisplayApplicable = false end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
-	
+	self.tItems["settings"]["ML"].bShowCurrItemTile = false
+	self.tItems["settings"]["ML"].bShowLastItemTile = true
+	self.tItems["settings"]["ML"].bShowCurrItemBar = false
+
+
 	if self.tItems["settings"]["ML"].bArrTiles then self.wndMLSettings:FindChild("Tiles"):SetCheck(true) else self.wndMLSettings:FindChild("List"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowClass then self.wndMLSettings:FindChild("ShowClass"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bStandardLayout then self.wndMLSettings:FindChild("Horiz"):SetCheck(true) else self.wndMLSettings:FindChild("Vert"):SetCheck(true) end
@@ -303,12 +315,12 @@ function RaidOpsMasterLoot:MLSettingsArrangeLootTypeChanged(wndHandler,wndContro
 end
 
 function RaidOpsMasterLoot:SendRequestsForCurrItem(itemz)
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "GimmeUrEquippedItem",item = itemz}) end
+	if self.channel then self:Bid2PackAndSend({type = "GimmeUrEquippedItem",item = itemz}) end
 end
 
 -- Hook
 function RaidOpsMasterLoot:BidMasterItemSelected()
-	local HookML = Apollo.GetAddon("MasterLoot")
+	local HookML = Apollo.GetAddon("MasterLootDependency")
 	local DKPInstance = Apollo.GetAddon("RaidOpsMasterLoot")
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
@@ -318,13 +330,13 @@ function RaidOpsMasterLoot:BidMasterItemSelected()
 end
 
 function RaidOpsMasterLoot:HookToMasterLootDisp()
-	if not self:IsHooked(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList") then
-		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootLooterList")
-		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnAssignDown")
-		self:RawHook(Apollo.GetAddon("MasterLoot"),"RefreshMasterLootItemList")
-		self:PostHook(Apollo.GetAddon("MasterLoot"),"OnItemCheck","BidMasterItemSelected")
-		self:Hook(Apollo.GetAddon("MasterLoot"),"OnCharacterCheck","BidCharacterChecked")
-		self:RawHook(Apollo.GetAddon("MasterLoot"),"OnLootAssigned")
+	if not self:IsHooked(Apollo.GetAddon("MasterLootDependency"),"RefreshMasterLootLooterList") then
+		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"RefreshMasterLootLooterList")
+		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"OnAssignDown")
+		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"RefreshMasterLootItemList")
+		self:PostHook(Apollo.GetAddon("MasterLootDependency"),"OnItemCheck","BidMasterItemSelected")
+		self:Hook(Apollo.GetAddon("MasterLootDependency"),"OnCharacterCheck","BidCharacterChecked")
+		self:RawHook(Apollo.GetAddon("MasterLootDependency"),"OnLootAssigned")
 	end
 end
 
@@ -374,18 +386,35 @@ function RaidOpsMasterLoot:MLRegisterItemWinner()
 	end
 end
 
-function RaidOpsMasterLoot:OnReceivedItem(channel, tMsg, strSender)
-	if tMsg.type then
+function RaidOpsMasterLoot:Bid2PackAndSend(tData)
+	if not tData.type then return end
+	tData.strSender = strMyName
+	local strData = serpent.dump(tData)
+	self.channel:SendMessage("ROPS" .. strData)
+end
+
+function RaidOpsMasterLoot:Bid2PackAndSendPrivate(tData,strTarget)
+	if not tData.type then return end
+	tData.strSender = strMyName
+	local strData = serpent.dump(tData)
+	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
+end
+
+
+--[[function RaidOpsMasterLoot:OnReceivedItem(channel, strMessage, idMessage)
+	if string.sub(strMessage,1,4) ~= "ROPS" then return end
+	local tMsg = serpent.load(string.sub(strMessage,1,4))
+	if tMsg.type and tMsg.strSender then
 		if tMsg.type == "MyEquippedItem" then
 			local item = Item.GetDataFromId(tMsg.item)
-			self.tEquippedItems[strSender] = {}
-			self.tEquippedItems[strSender][item:GetSlot()] = tMsg.item
-			self:UpdatePlayerTileBar(strSender,item)
+			self.tEquippedItems[tMsg.strSender] = {}
+			self.tEquippedItems[tMsg.strSender][item:GetSlot()] = tMsg.item
+			self:UpdatePlayerTileBar(tMsg.strSender,item)
 		elseif tMsg.type == "Confirmation" then
-			self:AddResponse(strSender)
+			self:AddResponse(tMsg.strSender)
 		end
 	end
-end
+end]]
 
 function RaidOpsMasterLoot:UpdatePlayerTileBar(strPlayer,item)
 	if item == nil then return end
@@ -411,7 +440,7 @@ end
 
 function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
-	if luaCaller ~= Apollo.GetAddon("MasterLoot") then luaCaller = Apollo.GetAddon("MasterLoot") end
+	if luaCaller ~= Apollo.GetAddon("MasterLootDependency") then luaCaller = Apollo.GetAddon("MasterLootDependency") end
 	local DKPInstance = Apollo.GetAddon("RaidOpsMasterLoot")
 	if luaCaller.tMasterLootSelectedItem ~= nil then
 		for idx, tItem in pairs (tMasterLootItemList) do
@@ -755,9 +784,13 @@ function RaidOpsMasterLoot:MLSettingsShowLastItemDisableTile( wndHandler, wndCon
 end
 
 function RaidOpsMasterLoot:SetChannelAndReconnect( wndHandler, wndControl, strText )
-	self.channel = nil
+	if string.len(strText) <= 4 then 
+		wndControl:SetText(self.tItems["settings"]["ML"].strChannel) 
+		return 
+	end
 	self.tItems["settings"]["ML"].strChannel = strText
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,"OnReceivedItem",self)
+	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,ICCommLib.CodeEnumICCommChannelType.Global)
+	self.channel:SetReceivedMessageFunction("OnReceivedItem",self)
 end
 
 function RaidOpsMasterLoot:MLShowGuildBank()
@@ -807,7 +840,7 @@ function RaidOpsMasterLoot:SendRequests( wndHandler, wndControl, eMouseButton )
 	self.wndResponses:Show(true,false)
 	self.wndResponses:ToFront()
 	if self.channel then
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "WantConfirmation"})
+		self:Bid2PackAndSend({type = "WantConfirmation"})
 	end
 end
 

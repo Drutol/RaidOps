@@ -492,7 +492,6 @@ function DKP:BidMasterItemSelected()
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
-		Print(HookML.tMasterLootSelectedItem.itemDrop:GetName())
 		DKPInstance.wndInsertedMasterButton:Enable(true)
 		DKPInstance.wndInsertedMasterButton1:Enable(true)
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
@@ -727,7 +726,7 @@ function DKP:BidProcessMessageRoll(tData)
 	for word in string.gmatch(tData.strMsg,"%S+") do
 		table.insert(words,word)
 	end
-	
+	local strRoller = words[1] .. " " .. words[2]
 	if #words < 5 then 
 		return strReturn
 	end
@@ -737,7 +736,7 @@ function DKP:BidProcessMessageRoll(tData)
 	end
 	
 	
-		local strRoller = words[1] .. " " .. words[2]
+		
 		local ID = self:GetPlayerByIDByName(strRoller)
 		for k,bidder in ipairs(self.CurrentBidSession.Bidders) do
 			if bidder.strName == strRoller then
@@ -1156,7 +1155,8 @@ end
 
 function DKP:BidJoinChannel()
 	if string.len(self.tItems["settings"]["Bid2"].strChannel) < 5 then self.tItems["settings"]["Bid2"].strChannel = "Input Channel Name" end
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Global)
+	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Group)
+	--self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
 	self.channel:SetReceivedMessageFunction("OnRaidResponse",self)
 	self.channel:SetThrottledFunction("OnRaidThrottle",self)
 end
@@ -1167,14 +1167,14 @@ end
 
 function DKP:Bid2PackAndSend(tData)
 	if not tData.type then return end
-	tData.strSender = GameLib.GetPlayerUnit():GetName()
+	tData.strSender = GameLib.GetPlayerUnit():GetName() or ""
 	local strData = serpent.dump(tData)
 	self.channel:SendMessage("ROPS" .. strData)
 end
 
 function DKP:Bid2PackAndSendPrivate(strTarget,tData)
 	if not tData.type then return end
-	tData.strSender = GameLib.GetPlayerUnit():GetName()
+	tData.strSender = GameLib.GetPlayerUnit():GetName() or ""
 	local strData = serpent.dump(tData)
 	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
 end
@@ -2405,6 +2405,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					tables.med = {}
 					tables.sta = {}
 					tables.eng = {}
+					tables.bid = {}
 				else
 					tables.all = {}
 				end
@@ -2498,6 +2499,13 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 							table.insert(tables.sta,unitLooter)
 						elseif class == "Spellslinger" and bWantSpe then
 							table.insert(tables.spe,unitLooter)
+						elseif self.CurrentBidSession and tItem.itemDrop:GetName() == self.CurrentBidSession.strItem  then
+							for k , bidder in ipairs(self.CurrentBidSession.Bidders) do
+								if bidder.strName == unitLooter:GetName() then
+									table.insert(tables.bid,unitLooter)
+									break
+								end
+							end
 						end
 					else
 						class = ktClassToString[unitLooter:GetClassId()]
@@ -2513,6 +2521,13 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 							table.insert(tables.all,unitLooter)
 						elseif class == "Spellslinger" and bWantSpe then
 							table.insert(tables.all,unitLooter)
+						elseif self.CurrentBidSession and tItem.itemDrop:GetName() == self.CurrentBidSession.strItem  then
+							for k , bidder in ipairs(self.CurrentBidSession.Bidders) do
+								if bidder.strName == unitLooter:GetName() then
+									table.insert(tables.all,unitLooter)
+									break
+								end
+							end
 						end
 					end	
 				end

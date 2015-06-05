@@ -4,13 +4,16 @@
 -----------------------------------------------------------------------------------------------
  
 require "Window"
+require "ICComm"
+
+local Major, Minor, Patch, Suffix = 1, 14, 0, 0
  
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMM Module Definition
 -----------------------------------------------------------------------------------------------
 local RaidOpsMM = {} 
  
-local knVersion = 1.92
+local knVersion = 1.94
  
 local kUIBody = "ff39b5d4"
 local ktAuctionHeight = 119
@@ -210,8 +213,9 @@ local delay = 2
 function RaidOpsMM:InitDelay()
 	delay = delay - 1
 	if delay == 0 then 
-		self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ArUaML"})
+		self:Bid2PackAndSend({type = "ArUaML"})
 		self.delayTimer:Stop()
+		Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOpsMM", Major, Minor, Patch)
 		Apollo.RemoveEventHandler("InitDelay",self)
 	end
 end
@@ -326,12 +330,12 @@ end
 
 function RaidOpsMM:FetchActiveAuctions(strML)
 	if self.channel then
-		self.channel:SendPrivateMessage({[1] = strML},{type = "GimmeAuctions"})
+		self:Bid2PackAndSendPrivate(strML,{type = "GimmeAuctions"})
 	end
 end
 
 function RaidOpsMM:FetchOnlineML()
-	if self.channel then self.channel:SendPrivateMessage(self:Bid2GetTargetsTable(),{type = "ArUaML"}) end
+	if self.channel then self:Bid2PackAndSend({type = "ArUaML"}) end
 end
 
 function RaidOpsMM:OnRaidOpsMMOn()
@@ -411,6 +415,10 @@ function RaidOpsMM:AnchorClose( wndHandler, wndControl, eMouseButton )
 end
 
 function RaidOpsMM:SetChannelName( wndHandler, wndControl, strText )
+	if string.len(strText) <= 4 then 
+		wndControl:SetText(self.settings.strChannel) 
+		return 
+	end
 	self.settings.strChannel = strText
 	self:JoinGuildChannel()
 end
@@ -440,20 +448,39 @@ end
 -------------------------------------
 
 function RaidOpsMM:JoinGuildChannel()
-	self.channel = ICCommLib.JoinChannel(self.settings.strChannel ,"OnReceivedRequest",self)
+	if string.len(self.settings.strChannel) < 5 then self.settings.strChannel = "Input Channel Name" end
+	self.channel = ICCommLib.JoinChannel(self.settings.strChannel,ICCommLib.CodeEnumICCommChannelType.Group)
+	self.channel:SetReceivedMessageFunction("OnReceivedRequest",self)
 end
 
-function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
+function RaidOpsMM:Bid2PackAndSend(tData)
+	if not tData.type then return end
+	tData.strSender = GameLib.GetPlayerUnit():GetName()
+	local strData = serpent.dump(tData)
+	self.channel:SendMessage("ROPS" .. strData)
+end
+
+function RaidOpsMM:Bid2PackAndSendPrivate(strTarget,tData)
+	if not tData.type then return end
+	tData.strSender = GameLib.GetPlayerUnit():GetName()
+	local strData = serpent.dump(tData)
+	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
+	
+end
+function RaidOpsMM:OnReceivedRequest(channel, strMessage, idMessage)
+	if string.sub(strMessage, 1, 4)  ~= "ROPS" then return end
+	local tMsg = serpent.load(string.sub(strMessage,5))
+	
 	if tMsg then
 		if tMsg.ver then 
 			self.settings.nReportedVersion = tMsg.ver
 			if self.settings.nReportedVersion > knVersion then Print("[RaidOpsMM]Addon is outdated and therefore errors may arise, please update.Newest reported version is: "..self.settings.nReportedVersion) end
 		end
-		if tMsg.type then
+		if tMsg.type and tMsg.strSender then
 			if tMsg.type == "WantConfirmation" then
 				local msg = {}
 				msg.type = "Confirmation"
-				self.channel:SendPrivateMessage(self:GetMLsTable(),msg)
+				self:Bid2PackAndSend(msg)
 			elseif tMsg.type == "ItemsPackage" then
 				for k,item in pairs(tMsg.items) do
 					self:AddAuction(item.ID,item.GP,item.time,item.offspec)
@@ -472,25 +499,25 @@ function RaidOpsMM:OnReceivedRequest(channel, tMsg, strSender)
 			elseif tMsg.type == "AuctionResumed" then
 				self:OnAuctionResumed(tMsg.item)
 			elseif tMsg.type == "IamML" then
-				self.tMLs[strSender] = 1
+				self.tMLs[tMsg.strSender] = 1
 				self:UpdateMLsTooltip()
-				if #self.tMLs == 1 then self:FetchActiveAuctions(strSender) end
+				if #self.tMLs == 1 then self:FetchActiveAuctions(tMsg.strSender) end
 			elseif tMsg.type == "ActiveAuction" then
 				self:AddAuction(tMsg.item,0,tMsg.duration,true,tMsg.progress)
 			elseif tMsg.type == "SendMeThemChoices" then
-				for k,choice in ipairs(self.MyChoices) do if tMsg.item == choice.item then self.channel:SendPrivateMessage({[1] = strSender},{type = "Choice",item = choice.item,option = choice.option}) break end end
+				for k,choice in ipairs(self.MyChoices) do if tMsg.item == choice.item then self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "Choice",item = choice.item,option = choice.option}) break end end
 			elseif tMsg.type == "AuctionTimeUpdate" then
 				self:OnAuctionPasused(tMsg.item)
 				self:UpdateAuctionProgress(tMsg.item,tMsg.progress)
 			elseif tMsg.type == "GimmeUrEquippedItem" then -- From RaidOpsML
 				local forItem = Item.GetDataFromId(tMsg.item)
-				if forItem and forItem:IsEquippable() then self.channel:SendPrivateMessage({[1] = strSender},{type = "MyEquippedItem",item = forItem:GetEquippedItemForItemType():GetItemId()}) end
+				if forItem and forItem:IsEquippable() and forItem:GetEquippedItemForItemType() then self:Bid2PackAndSendPrivate(tMsg.strSender,{type = "MyEquippedItem",item = forItem:GetEquippedItemForItemType():GetItemId()}) end
 			elseif tMsg.type == "EncodedStandings" then
 				self:StandingsFetched(tMsg.strData)			
 			elseif tMsg.type == "EncodedLogs" then
 				self:LogsFetched(tMsg.strData)
 			elseif tMsg.type == "Choice" then
-				self:RegisterMemberChoice(strSender,tMsg.option,tMsg.item)
+				self:RegisterMemberChoice(tMsg.strSender,tMsg.option,tMsg.item)
 			end
 		end
 	end
@@ -737,8 +764,8 @@ function RaidOpsMM:ItemOptionSelected( wndHandler, wndControl, eMouseButton )
 			msg.option = wndControl:GetName()
 			msg.item = wndControl:GetParent():GetData()
 			local item =  Item.GetDataFromId(wndControl:GetParent():GetData())
-			if item:IsEquippable() then msg.itemCompare = item:GetEquippedItemForItemType():GetItemId() end
-			self.channel:SendMessage(msg)
+			if item:GetEquippedItemForItemType() then msg.itemCompare = item:GetEquippedItemForItemType():GetItemId() end
+			self:Bid2PackAndSend(msg)
 			if msg.option == "Opt4" then 
 				if self.settings.bAutoClose then 
 					self:RemoveAuction(wndControl:GetParent():GetData())
@@ -947,7 +974,7 @@ function RaidOpsMM:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 		if wndControl ~= nil then wndControl:SetCheck(false) end
 		return
 	end
-	if Apollo.GetAddon("RaidOps") then 
+	if Apollo.GetAddon("EasyDKP") then 
 		Print("Master addon already installed")
 		self.settings.tooltips = false
 		if wndControl ~= nil then wndControl:SetCheck(false) end
@@ -1022,11 +1049,11 @@ function RaidOpsMM:StandingsSetDataProvider( wndHandler, wndControl, strText )
 end
 
 function RaidOpsMM:StandingsFetch( wndHandler, wndControl, eMouseButton )
-	if self.channel then self.channel:SendPrivateMessage({[1] = self.settings.strSource},{type = "SendMeThemStandings"}) end
+	if self.channel then self:Bid2PackAndSendPrivate(self.settings.strSource,{type = "SendMeThemStandings"}) end
 end
 
 function RaidOpsMM:LogsFetch()
-	if self.channel then self.channel:SendPrivateMessage({[1] = self.settings.strSource},{type = "SendMeThemLogs"}) end
+	if self.channel then self:Bid2PackAndSendPrivate(self.settings.strSource,{type = "SendMeThemLogs"}) end
 end
 
 function RaidOpsMM:LogsShow()

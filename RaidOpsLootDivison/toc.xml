@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="Drutol Windchaser@Jabbit" APIVersion="10" Name="RaidOpsLootDivison" Description="">
+    <Script Name="RaidOpsLootDivison.lua"/>
+    <Form Name="RaidOpsLootDivison.xml"/>
+    <ReplaceAddon Name="MasterLoot"/>
+</Addon>

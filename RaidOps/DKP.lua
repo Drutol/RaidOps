@@ -2,7 +2,32 @@
 -- Client Lua Script for RaidOps
 -- Copyright (c) Piotr Szymczak 2015 	dogier140@poczta.fm.
 -----------------------------------------------------------------------------------------------
- 
+ --         ^                       ^
+--         |\   \        /        /|
+--        /  \  |\__  __/|       /  \
+--       / /\ \ \ _ \/ _ /      /    \
+--      / / /\ \ {*}\/{*}      /  / \ \
+--      | | | \ \( (00) )     /  // |\ \
+--      | | | |\ \(V""V)\    /  / | || \| 
+--      | | | | \ |^--^| \  /  / || || || 
+--     / / /  | |( WWWW__ \/  /| || || ||
+--    | | | | | |  \______\  / / || || || 
+--    | | | / | | )|______\ ) | / | || ||
+--    / / /  / /  /______/   /| \ \ || ||
+--   / / /  / /  /\_____/  |/ /__\ \ \ \ \
+--   | | | / /  /\______/    \   \__| \ \ \
+--   | | | | | |\______ __    \_    \__|_| \
+--   | | ,___ /\______ _  _     \_       \  |
+--   | |/    /\_____  /    \      \__     \ |    /\
+--   |/ |   |\______ |      |        \___  \ |__/  \
+--   v  |   |\______ |      |            \___/     |
+--      |   |\______ |      |                    __/
+--      \   \________\_    _\               ____/
+--     __/   /\_____ __/   /   )\_,      _____/
+--    /  ___/  \uuuu/  ___/___)    \______/
+--    VVV  V        VVV  V 
+
+-- Beware! Here be dragons!
 
 require "Apollo"
 require "Window"
@@ -12,7 +37,10 @@ require "ICComm"
 -- DKP Module Definition
 -----------------------------------------------------------------------------------------------
 local DKP = {} 
- 
+ ----------------------------------------------------------------------------------------------
+-- OneVersion Support 
+-----------------------------------------------------------------------------------------------
+local Major, Minor, Patch, Suffix = 2, 14, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -145,6 +173,15 @@ local ktQual =
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.14---
+{4/06/2015}
+Reassign window will now fill in the real GP value of item. (the one that recipient has gained).
+Fixed bug concerning networking.
+People who are bidding (chat) are now added to the loot window regardless of class filtering.
+Fixed LUA error when player rolled in chat bidding with range different than 1-100.
+Added "OneVersion" (nifty addon on curse) support.
+Loot logs' minimum GP setting now properly fills in itsef on startup.
+Loot logs' "Equippable" filter now also includes tokens.
 ---RaidOps version 2.13---
 {1/06/2015}
 Fixed rename.
@@ -506,7 +543,9 @@ function DKP:OnDocLoaded()
 		end
 		self.wndMain:FindChild("ButtonNB"):Enable(false)
 		self.wndHub:FindChild("NetworkBidding"):Enable(false)
-		
+
+		--OneVersion
+		self:delay(2,function() Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOps", Major, Minor, Patch) end)
 	end
 end
 
@@ -764,7 +803,6 @@ end
 
 
 local tGuildRoster
-local uGuild
 local tAcceptedRanks = {}
 
 function DKP:CloseBigPOPUP()
@@ -794,8 +832,8 @@ function DKP:GIClose()
 end
 
 function DKP:GIPopulateRanks()
-	if uGuild then
-		local tRanks = uGuild:GetRanks()
+	if self.uGuild then
+		local tRanks = self.uGuild:GetRanks()
 		for k,rank in ipairs(tRanks) do
 			if k > 10 then break end
 			self.wndGuildImport:FindChild(tostring(k)):SetText(rank.strName)
@@ -863,7 +901,7 @@ function DKP:ImportFromGuild()
 	for k,guild in ipairs(guilds) do 
 		if guild:GetType() == GuildLib.GuildType_Guild then
 			guild:RequestMembers()
-			uGuild = guild
+			self.uGuild = guild
 			break
 		end
 	end
@@ -1810,7 +1848,7 @@ function DKP:TimeAwardRefresh()
 		self.wndTimeAward:FindChild("StateFrame"):FindChild("State"):SetSprite("achievements:sprAchievements_Icon_Complete")
 		local diff =  os.date("*t",self.NextAward)
 		if diff ~= nil then
-			self.wndTimeAward:FindChild("CountDown"):SetText((diff.hour-1 <=9 and "0" or "" ) .. diff.hour-1 .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
+			self.wndTimeAward:FindChild("CountDown"):SetText((diff.hour-1 <=9 and "0" or "" ) .. (diff.hour-1 < 0 and "0" or diff.hour-1) .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
 		else
 			self.wndTimeAward:FindChild("CountDown"):SetText("--:--:--")
 		end
@@ -5634,6 +5672,7 @@ function DKP:LLInit()
 	
 	self.wndLLM:FindChild("Only"):FindChild("Equip"):SetCheck(self.tItems["settings"].LL.bEquippable)
 	self.wndLLM:FindChild("Only"):FindChild("MinLvl"):SetText(self.tItems["settings"].LL.nLevel)
+	self.wndLLM:FindChild("Only"):FindChild("MinGP"):SetText(self.tItems["settings"].LL.nGP)
 	
 	for k,slot in pairs(self.tItems["settings"].LL.tSlots) do
 		local wnd = self.wndLLM:FindChild("Only"):FindChild("SlotsTab"):FindChild(k)
@@ -5945,7 +5984,7 @@ function DKP:LLMeetsFilters(item,player,nGP)
 	
 	
 	--Equippable
-	if self.tItems["settings"].LL.bEquippable and not item:IsEquippable() then return false end
+	if self.tItems["settings"].LL.bEquippable and not item:IsEquippable() and not string.find(item:GetName(),"Imprint") then return false end
 	--Slots
 	if not bMeetSlot then
 		local strSlot
@@ -6835,10 +6874,22 @@ function DKP:ReassShow(strName , item)
 	end
 
 	if item then
+		local nGP
 		self.wndReass:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
 		self.wndReass:FindChild("ItemFrame"):FindChild("Icon"):SetSprite(item:GetIcon())
-		self.wndReass:FindChild("GGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
-		self.wndReass:FindChild("RGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+		for k , entry in ipairs(self.tItems[self:GetPlayerByIDByName(string.sub(strName,1,#strName-2))].tLLogs) do
+			if entry.itemID == item:GetItemId() then
+				nGP = entry.nGP
+				break
+			end
+		end
+		if nGP then
+			self.wndReass:FindChild("GGP"):SetText(nGP)
+			self.wndReass:FindChild("RGP"):SetText(nGP)
+		else
+			self.wndReass:FindChild("GGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+			self.wndReass:FindChild("RGP"):SetText(string.sub(self:EPGPGetItemCostByID(item:GetItemId()),36))
+		end
 		Tooltip.GetItemTooltipForm(self,self.wndReass:FindChild("Icon"),item,{})
 		self.wndReass:FindChild("TickGGP"):Show(true)
 		self.wndReass:FindChild("TickRGP"):Show(true)
