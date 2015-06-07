@@ -43,6 +43,7 @@ local ML = {}
 -----------------------------------------------------------------------------------------------
 local knItemTileWidth = 76
 local knItemTileHeight = 76
+
 local knItemTileHorzSpacing = 8
 local knItemTileVertSpacing = 8
  
@@ -51,6 +52,12 @@ local knBubbleDefHeight = 43
 
 local knRecipientHorzSpacing = 10
 local knRecipientVertSpacing = 20
+
+local knRecipientTileWidth = 52
+local knRecipientTileHeight = 52
+
+local knRecipientEntryWidth = 221
+local knRecipientEntryHeight = 86
 
 local ktStringToNewIconOrig =
 {
@@ -150,8 +157,9 @@ function ML:OnDocLoaded()
 		self:DrawRecipients()
 		self:ArrangeTiles(self.wndLooterList)
 		--Debug
-		local wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",self.wndLootList,self)
-		wnd:SetData({itemDrop = Item.GetDataFromId(45323),nLootId = 24})
+		--local wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",self.wndLootList,self)
+		--wnd:SetData({itemDrop = Item.GetDataFromId(45323),nLootId = 24})
+		self:CreateLootTable()
 	end
 end
 
@@ -166,6 +174,8 @@ end
 
 function ML:CreateLootTable()
 	local tLootPool = GameLib.GetMasterLoot()
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24})
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25})
 	for k , entry in ipairs(tLootPool or {}) do
 		if not tCachedItems[entry.nLootId] then
 			local cache = {}
@@ -175,24 +185,22 @@ function ML:CreateLootTable()
 			tCachedItems[entry.nLootId] = cache
 		end
 	end
+	self:DrawItems()
 end
 
 function ML:DrawItems()
 	for nLootId , entry in pairs(tCachedItems) do
 		if not entry.wnd or entry.currentLocation ~= entry.destination then
 			if entry.wnd then entry.wnd:Destroy() end
-			
+			local wndTarget = entry.destination == 1 and self.wndLootList or self.wndRandomList
 			if entry.destination == 1 or entry.destination == 2 then
-				entry.wnd = Apollo.LoadForm(entry.xmlDoc,"BubbleItemTile",wndParent,entry)
-				wnd:FindChild("ItemFrame"):SetSprite(entry:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
-				wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
-			else
-				entry.wnd = Apollo.LoadForm(entry.xmlDoc,"PlayerItemTile",wndParent,entry)
-				entry.wnd:FindChild("Icon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
+				entry.wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",wndTarget,self)
+				entry.wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
+				entry.wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
+				wndTarget:ArrangeChildrenHorz()
+				entry.wnd:SetData(entry.lootEntry)
 			end
-			wnd:SetData(nLootId)
-			entry.currentLocation = entry.destination
-
+				entry.currentLocation = entry.destination
 		end
 	end
 end
@@ -229,10 +237,12 @@ function ML:CreateRecipients()
 		for k , player in ipairs(targets) do
 			local ID = EPGPHook:GetPlayerByIDByName(player.strName)
 			if ID ~= -1 then 
+				player.role = EPGPHook.tItems[ID].role
+				player.offrole = EPGPHook.tItems[ID].offrole
+				player.class = EPGPHook.tItems[ID].class
 
-				player = EPGPHook.tItems[ID]
-				player.ID = ID
-				player.PR = EPGPHook:EPGPGetPRByID(ID) 
+				player.ID = ID 
+				player.PR = EPGPHook:EPGPGetPRByID(ID)
 				player.tItemsToBeAssigned = {}
 				player.tItemsAssigned = {}
 				targets[k] = player
@@ -291,9 +301,12 @@ function ML:AddRecipient(tMember)
 		local EPGPHook =  Apollo.GetAddon("RaidOps")
 		local ID = EPGPHook:GetPlayerByIDByName(tRecipient.strName)
 		if ID ~= -1 then 
-			player = EPGPHook.tItems[ID]
+			player.role = EPGPHook.tItems[ID].role
+			player.offrole = EPGPHook.tItems[ID].offrole
+			player.class = EPGPHook.tItems[ID].class
+
 			player.ID = ID 
-			player.PR = EPGPHook:EPGPGetPRByName(tRecipient.strName)
+			player.PR = EPGPHook:EPGPGetPRByID(ID)
 			player.tItemsToBeAssigned = {}
 			player.tItemsAssigned = {}
 		end
@@ -306,19 +319,58 @@ function ML:DrawRecipients()
 	for k , recipient in ipairs(self.tRecipients) do
 		if not recipient.wnd then
 			recipient.wnd = Apollo.LoadForm(self.xmlDoc,"RecipientEntry",self.wndLooterList,self)
-			self:UpdateRecipientWnd(recipient)
+			self:UpdateRecipientWnd(recipient,true)
 		end
 	end
 end
 
-function ML:UpdateRecipientWnd(tRecipient)
+function ML:UpdateRecipientWnd(tRecipient,bSuppressArr)
+	if not tRecipient then return end
+
 	tRecipient.wnd:FindChild("ClassIcon"):SetSprite(ktStringToNewIconOrig[tRecipient.class])
 	tRecipient.wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[tRecipient.role])
 	tRecipient.wnd:FindChild("PlayerName"):SetText(tRecipient.strName)
 	if tRecipient.offrole then
 		tRecipient.wnd:FindChild("OffRoleIcon"):SetSprite(ktRoleStringToIcon[tRecipient.offrole])
 	end
+	
 	tRecipient.wnd:FindChild("HookValue"):SetText(tRecipient.PR)
+
+	if tRecipient.wnd:FindChild("ItemsContainer"):GetData() ~= #tRecipient.tItemsToBeAssigned then
+		tRecipient.wnd:FindChild("ItemsContainer"):DestroyChildren()
+
+		if #tRecipient.tItemsToBeAssigned > 1 then
+			local l,t,r,b = tRecipient.wnd:GetAnchorOffsets()
+			tRecipient.wnd:SetAnchorOffsets(l,t,l+knRecipientEntryWidth+knRecipientTileWidth*(#tRecipient.tItemsToBeAssigned-1)+10,b)
+			if not bSuppressArr then self:ArrangeTiles(self.wndLooterList,true) end
+		elseif #tRecipient.tItemsToBeAssigned <= 1 then
+			local l,t,r,b = tRecipient.wnd:GetAnchorOffsets()
+			tRecipient.wnd:SetAnchorOffsets(l,t,l+knRecipientEntryWidth+10,b)
+			if not bSuppressArr then self:ArrangeTiles(self.wndLooterList,true) end
+		end
+
+		for k , item in ipairs(tRecipient.tItemsToBeAssigned) do
+			local wnd = Apollo.LoadForm(self.xmlDoc,"PlayerItemTile",tRecipient.wnd:FindChild("ItemsContainer"),self)
+			wnd:FindChild("Icon"):SetSprite(tCachedItems[item].lootEntry.itemDrop:GetIcon())
+			wnd:FindChild("Frame"):SetSprite(self:GetSlotSpriteByQualityRectangle(tCachedItems[item].lootEntry.itemDrop:GetItemQuality()))
+			Tooltip.GetItemTooltipForm(self,wnd, tCachedItems[item].lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
+			wnd:SetData(tCachedItems[item])
+		end
+
+		if #tRecipient.tItemsToBeAssigned == 0 then
+			local wnd = Apollo.LoadForm(self.xmlDoc,"PlayerItemTile",tRecipient.wnd:FindChild("ItemsContainer"),self)
+			wnd:FindChild("Icon"):SetSprite("Contracts:sprContracts_Type03")
+		end
+
+
+
+		tRecipient.wnd:FindChild("ItemsContainer"):SetData(#tRecipient.tItemsToBeAssigned)
+
+		tRecipient.wnd:FindChild("ItemsContainer"):ArrangeChildrenHorz()
+
+	end
+
+	tRecipient.wnd:SetData(tRecipient)
 end
 
 function ML.sortByClass(a,b)
@@ -364,32 +416,12 @@ function ML:ExpandRandomPool()
 	self:ToggleResize(self.wndMasterLoot:FindChild("RandomPool"))
 end
 
-function ML:ExpandPlayerPool()
-
-end
-
 function ML:CollapseLootPool()
 	self:ToggleResize(self.wndMasterLoot:FindChild("ItemPool"))
 end
 
 function ML:CollapseRandomPool()
 	self:ToggleResize(self.wndMasterLoot:FindChild("RandomPool"))
-end
-
-function ML:CollapsePlayerPool()
-	self:ToggleResize(self.wndMasterLoot:FindChild("LooterPool"))
-end
-
-function ML:PopulateLoot()
-
-end
-
-function ML:PopulateRandom()
-
-end
-
-function ML:PopulateRecipients()
-
 end
 
 function ML:ToggleResize(wnd)
@@ -408,8 +440,8 @@ end
 
 
 local tPrevOffsets = {}
-function ML:ArrangeTiles(wndList)
-	if tPrevOffsets[wndList] then
+function ML:ArrangeTiles(wndList,bForce)
+	if tPrevOffsets[wndList] and not bForce then
 		if tPrevOffsets[wndList] == wndList:GetAnchorOffsets() then return end
 		tPrevOffsets[wndList] = wndList:GetAnchorOffsets()
 	else
@@ -420,7 +452,7 @@ function ML:ArrangeTiles(wndList)
 	local highestInRow = {}
 	local tRows = {}
 	for k,child in ipairs(wndList:GetChildren()) do
-		child:SetAnchorOffsets(knRecipientHorzSpacing,0,child:GetWidth(),child:GetHeight())
+		child:SetAnchorOffsets(knRecipientHorzSpacing,0,child:GetWidth()+knRecipientHorzSpacing,child:GetHeight())
 	end
 	
 	for k,child in ipairs(wndList:GetChildren()) do
@@ -472,12 +504,40 @@ end
 -- Drag&Drop
 -----------------------------------------------------------------------------------------------
 
-
 function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
-	
+	local tData = wndSource:GetName() == "BubbleItemTile" and wndSource:GetData() or wndSource:GetData().lootEntry
+	Print(tCachedItems[tData.nLootId].currentLocation)
+	if tCachedItems[tData.nLootId].currentLocation == 3 then
+		for k , recipient in ipairs(self.tRecipients) do
+			if recipient.strName == tCachedItems[tData.nLootId].strRecipient then
+				for j , item in ipairs(recipient.tItemsToBeAssigned) do
+					if item == tData.nLootId then  table.remove(recipient.tItemsToBeAssigned,j) self:UpdateRecipientWnd(recipient)end
+				end
+			end
+		end
+	end
+	if wndHandler:GetName() == "RandomPool" then
+		tCachedItems[tData.nLootId].destination = 2
+	elseif wndHandler:GetName() == "ItemPool" then
+		tCachedItems[tData.nLootId].destination = 1
+	elseif wndHandler:GetName() == "RecipientEntry" then	
+		tCachedItems[tData.nLootId].destination = 3
+		tCachedItems[tData.nLootId].strRecipient = wndHandler:GetData().strName
+		for k , player in ipairs(self.tRecipients) do
+			if player.strName == wndHandler:GetData().strName then
+				table.insert(player.tItemsToBeAssigned,tData.nLootId)
+				self:UpdateRecipientWnd(player)
+				break
+			end
+		end
+
+	end
+
+	self:DrawItems()
 end
 
 function ML:OnQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if wndHandler:GetName() == "PlayerItemTile" then wndHandler = wndHandler:GetParent():GetParent() end
 	if string.find(wndHandler:GetName(),"Pool") or wndHandler:GetName() == "RecipientEntry" then
 		wndHandler:FindChild("Highlight"):Show(true)
 		return Apollo.DragDropQueryResult.Accept
@@ -495,7 +555,11 @@ end
 
 function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
 	if wndHandler ~= wndControl then return end
-	Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().itemDrop:GetIcon(), wndControl:GetData().nLootId)
+	if wndControl:GetName() == "BubbleItemTile" then
+		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().itemDrop:GetIcon(), wndControl:GetData().nLootId)
+	elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
+		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().lootEntry.itemDrop:GetIcon(), wndControl:GetData().lootEntry.nLootId)
+	end
 end
 -----------------------------------------------------------------------------------------------
 -- Helpers
@@ -523,6 +587,16 @@ function ML:GetExpandValue(nItems,nWidth)
 
 
 	return nHeight
+end
+
+function ML:GetSlotSpriteByQualityRectangle(ID)
+	if ID == 5 then return "BK3:UI_BK3_ItemQualityPurple"
+	elseif ID == 6 then return "BK3:UI_BK3_ItemQualityOrange"
+	elseif ID == 4 then return "BK3:UI_BK3_ItemQualityBlue"
+	elseif ID == 3 then return "BK3:UI_BK3_ItemQualityGreen"
+	elseif ID == 2 then return "BK3:UI_BK3_ItemQualityWhite"
+	else return "BK3:UI_BK3_ItemQualityGrey"
+	end
 end
 
 
