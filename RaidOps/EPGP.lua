@@ -546,7 +546,8 @@ function DKP:EPGPSetBaseGP( wndHandler, wndControl, strText )
 	end
 end
 
-function DKP:EPGPGetItemCostByID(itemID)
+function DKP:EPGPGetItemCostByID(itemID,bCut)
+	if not bCut then bCut = false end
 	local item = Item.GetDataFromId(itemID)
 	if string.find(item:GetName(),"Imprint") then
 		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
@@ -559,7 +560,9 @@ function DKP:EPGPGetItemCostByID(itemID)
 			slot = item:GetSlot()
 		end
 		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
-		return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+		if not bCut then 
+			return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+		else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
 	else return "" end
 end
 
@@ -567,6 +570,17 @@ end
 
 function DKP:EPGPGetPRByName(strName)
 	local ID = self:GetPlayerByIDByName(strName)
+	if ID ~= -1 then
+		if self.tItems[ID].GP ~= 0 then
+			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].GP))
+		else
+			return "0"
+		end
+	else return "0" end
+end
+
+function DKP:EPGPGetPRByID(ID)
+	if not self.tItems[ID] then return 0 end
 	if ID ~= -1 then
 		if self.tItems[ID].GP ~= 0 then
 			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].GP))

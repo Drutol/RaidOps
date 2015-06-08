@@ -170,9 +170,32 @@ local ktQual =
 	["Pink"] = true,
 }
 
+		
+local RAID_GA = 0
+local RAID_DS = 1
+local RAID_Y = 2
+
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.15---
+{8/06/2015}
+Added attendance module.
+Added attendance settings.
+Added raid session sub-module.
+Added following attendance labels:
+	- %GA
+	- %DS
+	- %Y    (Y-83)
+	- %Total
+	- GA
+	- DS
+	- Y     (Y-83)
+	- Total
+Now 2nd default label profile will contain all attendance labels.
+Added Raid Session toolbar.
+Added Raid Session pop-up prompt.
+Fixed bug where I attepted to use uninitialized data.
 ---RaidOps version 2.14---
 {4/06/2015}
 Reassign window will now fill in the real GP value of item. (the one that recipient has gained).
@@ -381,6 +404,7 @@ function DKP:OnDocLoaded()
 			self.tItems.wndPopUpLoc = nil
 		end
 
+
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
 		self.wndMain:Show(false, true)
@@ -470,6 +494,9 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("MassEditControls"):SetOpacity(0)
 		self.wndMain:FindChild("MassEditControls"):Show(false)
 		-- Inits
+
+
+
 		self:TimeAwardRestore()
 		self:EPGPInit()
 		self:RaidOpsInit()
@@ -495,6 +522,7 @@ function DKP:OnDocLoaded()
 		self:ReassInit()
 		self:IBInit()
 		self:WebInit()
+		self:AttInit()
 		--self:RSInit()
 		-- Colors
 	
@@ -1206,6 +1234,7 @@ function DKP:OnSave(eLevel)
 				tSave[k].role = player.role
 				tSave[k].offrole = player.offrole
 				tSave[k].tLLogs = player.tLLogs
+				tSave[k].tAtt = player.tAtt
 			end
 			if self.tItems["alts"] ~= nil then
 				tSave["alts"]=self.tItems["alts"]
@@ -1223,10 +1252,13 @@ function DKP:OnSave(eLevel)
 			tSave["MyChoices"] = self.MyChoices
 			tSave["MyVotes"] = self.MyVotes
 			tSave["CE"] = self.tItems["CE"]
+			tSave.tRaids = self.tItems.tRaids
 			if self.tItems["settings"].bSaveUndo then tSave["ALogs"] = tUndoActions end
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
 			tSave.wndLLLoc = self.wndLL:GetLocation():ToTable()
+			tSave.wndSessionToolbarLoc = self.wndSessionToolbar:GetLocation():ToTable()
+			tSave.raidSession = self:AttGetSavePackage()
 			if self.wndBid2 then
 				tSave.wndNBLoc = self.wndBid2:GetLocation():ToTable()
 			end
@@ -2491,6 +2523,20 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	if self.tItems["settings"].GroupByClass then
 		if k and k == 1 or bAddedClass == false then playerItem.wnd:FindChild("NewClass"):Show(true,false) end
 	end
+
+	local nGAs = 0
+	local nDSs = 0
+	local nYs = 0
+	local totalRaids = self.tItems.tRaids and #self.tItems.tRaids or 0
+
+	for k, raid in ipairs(self.tItems.tRaids or {}) do
+		if raid.raidType == RAID_GA then nGAs = nGAs + 1
+		elseif raid.raidType == RAID_DS then nDSs = nDSs + 1
+		elseif raid.raidType == RAID_Y then nYs = nYs + 1
+		end
+	end
+
+
 	for i=1,self.currentLabelCount do
 		if self.tItems["settings"].LabelOptions[i] ~= "Nil" then
 			if self.tItems["settings"].LabelOptions[i] == "Name" then
@@ -2537,6 +2583,58 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(self:EPGPGetPRByName(playerItem.strName))
 			elseif self.tItems["settings"].LabelOptions[i] == "RealGP" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP - self.tItems["EPGP"].BaseGP))
+			--Att
+			elseif self.tItems["settings"].LabelOptions[i] == "%GA" then
+				local raidCount = 0
+				for k , att in ipairs(playerItem.tAtt or {}) do
+					if att.raidType == RAID_GA then raidCount = raidCount + 1 end
+				end
+				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount == 0 and "--" or (nGAs > 0 and string.format("%.2f",(raidCount*100)/nGAs).. "%" or "--"))
+			elseif self.tItems["settings"].LabelOptions[i] == "%DS" then
+				local raidCount = 0
+				for k , att in ipairs(playerItem.tAtt or {}) do
+					if att.raidType == RAID_DS then raidCount = raidCount + 1 end
+				end
+				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount == 0 and "--" or (nDSs > 0 and  string.format("%.2f",(raidCount*100)/nDSs).. "%" or "--"))
+			elseif self.tItems["settings"].LabelOptions[i] == "%Y" then
+				local raidCount = 0
+				for k , att in ipairs(playerItem.tAtt or {}) do
+					if att.raidType == RAID_Y then raidCount = raidCount + 1 end
+				end
+				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount == 0 and "--" or (nYs > 0 and  string.format("%.2f",(raidCount*100)/nYs).. "%" or "--"))
+			elseif self.tItems["settings"].LabelOptions[i] == "%Total" then
+				local raidCount = playerItem.tAtt and #playerItem.tAtt or 0
+				if totalRaids > 0 then
+					playerItem.wnd:FindChild("Stat"..i):SetText(string.format("%.2f",(raidCount*100)/totalRaids).."%")
+				else
+					playerItem.wnd:FindChild("Stat"..i):SetText("--")
+				end
+			elseif self.tItems["settings"].LabelOptions[i] == "GA" then
+				local raidCount = 0
+				for k , att in ipairs(playerItem.tAtt or {}) do
+					if att.raidType == RAID_GA then raidCount = raidCount + 1 end
+				end
+				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount .. " / " .. nGAs)
+			elseif self.tItems["settings"].LabelOptions[i] == "DS" then
+								local raidCount = 0
+				for k , att in ipairs(playerItem.tAtt or {}) do
+					if att.raidType == RAID_DS then raidCount = raidCount + 1 end
+				end
+				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount .. " / " .. nDSs)
+			elseif self.tItems["settings"].LabelOptions[i] == "Y" then
+				local raidCount = 0
+				for k , att in ipairs(playerItem.tAtt or {}) do
+					if att.raidType == RAID_Y then raidCount = raidCount + 1 end
+				end
+				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount .. " / " .. nYs)
+			elseif self.tItems["settings"].LabelOptions[i] == "Total" then
+				local raidCount = playerItem.tAtt and #playerItem.tAtt or 0
+				if totalRaids > 0 then
+					playerItem.wnd:FindChild("Stat"..i):SetText(raidCount.. " / " .. totalRaids)
+				else
+					playerItem.wnd:FindChild("Stat"..i):SetText("0 / 0")
+				end
+				
 			end
 		end
 		if self.SortedLabel and i == self.SortedLabel then playerItem.wnd:FindChild("Stat"..i):SetTextColor("ChannelAdvice") else playerItem.wnd:FindChild("Stat"..i):SetTextColor("white") end
@@ -2675,14 +2773,14 @@ local ktDefaultProfiles =
 	[2] = 
 	{
 		[1] = "Name",
-		[2] = "Net",
-		[3] = "Tot",
-		[4] = "Item",
-		[5] = "Nil",
-		[6] = "Nil",
-		[7] = "Nil",
-		[8] = "Nil",
-		[9] = "Nil",
+		[2] = "%GA",
+		[3] = "%DS",
+		[4] = "%Y",
+		[5] = "%Total",
+		[6] = "GA",
+		[7] = "DS",
+		[8] = "Y",
+		[9] = "Total",
 	},
 }
 
@@ -2783,15 +2881,21 @@ function easyDKPSortPlayerbyLabel(a,b)
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
 		local label = "Stat"..DKPInstance.SortedLabel
 		if a:FindChild(label) and b:FindChild(label) then
+			local val1 = tonumber(a:FindChild(label):GetText())
+			local val2 = tonumber(b:FindChild(label):GetText())
+			if not val1 then val1 = tonumber(string.sub(a:FindChild(label):GetText(),1,#a:FindChild(label):GetText()-1)) end
+			if not val2 then val2 = tonumber(string.sub(b:FindChild(label):GetText(),1,#b:FindChild(label):GetText()-1)) end
 			if DKPInstance.tItems["settings"].LabelSortOrder == "asc" then
+				if not val1 or not val2 then return a:FindChild(label):GetText() > b:FindChild(label):GetText() end
 				if sortBy ~= "Name" then
-					return tonumber(a:FindChild(label):GetText()) > tonumber(b:FindChild(label):GetText())
+					return val1 > val2
 				elseif sortBy ~= "Item" then
 					return a:FindChild(label):GetText() > b:FindChild(label):GetText()
 				end
 			else
+				if not val1 or not val2 then return a:FindChild(label):GetText() < b:FindChild(label):GetText() end
 				if sortBy ~= "Name" then
-					return tonumber(a:FindChild(label):GetText()) < tonumber(b:FindChild(label):GetText())
+					return val1 < val2
 				elseif sortBy ~= "Item" then
 					return a:FindChild(label):GetText() < b:FindChild(label):GetText()
 				end
@@ -2820,6 +2924,10 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 			elseif sortBy == "EP" then return a.EP > b.EP
 			elseif sortBy == "GP" then return a.GP > b.GP
 			elseif sortBy == "PR" then return  tonumber(DKPInstance:EPGPGetPRByName(a.strName)) > tonumber(DKPInstance:EPGPGetPRByName(b.strName))
+			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
+			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
+			elseif sortBy == "%Y" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_Y) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_Y)
+			elseif sortBy == "%Total" then return (a.tAtt and #a.tAtt or 0) > (b.tAtt and #b.tAtt or 0)
 			end
 		else
 			if sortBy == "Name" then return a.strName < b.strName 
@@ -2836,9 +2944,21 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 			elseif sortBy == "EP" then return a.EP < b.EP
 			elseif sortBy == "GP" then return a.GP < b.GP
 			elseif sortBy == "PR" then return  tonumber(DKPInstance:EPGPGetPRByName(a.strName)) < tonumber(DKPInstance:EPGPGetPRByName(b.strName))
+			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
+			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
+			elseif sortBy == "%Y" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_Y) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_Y)
+			elseif sortBy == "%Total" then return (a.tAtt and #a.tAtt or 0) < (b.tAtt and #b.tAtt or 0)
 			end
 		end
 	end
+end
+
+function DKP:GetRaidTypeCount(tAtt,nType)
+	local counter = 0
+	for k , att in ipairs(tAtt or {}) do
+		if tAtt.raidType == nType then counter = counter + 1 end
+	end
+	return counter
 end
 
 function DKP:RefreshMainItemListAndGroupByClass()
@@ -3036,7 +3156,7 @@ function DKP:LabelHideIndicators()
 end
 
 function DKP:LabelIsSortable(strLabel) 
-	if strLabel == "Item" or strLabel == "Nil" then return false else return true end
+	if strLabel == "Item" or strLabel == "Nil" or strLabel == "GA" or strLabel == "DS" or strLabel == "Y" or strLabel == "Total" then return false else return true end
 end
 
 function DKP:LabelSwapSortIndicator(wnd)
@@ -3850,11 +3970,13 @@ function DKP:ExportExport()
 	if self.wndExport:FindChild("WebExport"):IsChecked() then
 		local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 		local tTestTable = {}
+		tTestTable['tMembers'] = {}
+		tTestTable['tRaids'] = self.tItems.tRaids
 		for k , player in ipairs(self.tItems) do
-			table.insert(tTestTable,player)
-			tTestTable[#tTestTable].wnd = nil
-			if tTestTable[#tTestTable].tLLogs then
-				for k , entry in ipairs(tTestTable[#tTestTable].tLLogs) do
+			table.insert(tTestTable['tMembers'],player)
+			tTestTable['tMembers'][#tTestTable['tMembers']].wnd = nil
+			if tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs then
+				for k , entry in ipairs(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs) do
 					if not entry.nGP then
 						entry.nGP = tonumber(string.sub(self:EPGPGetItemCostByID(entry.itemID),36))
 					end 

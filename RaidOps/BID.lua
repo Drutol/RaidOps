@@ -1167,14 +1167,18 @@ end
 
 function DKP:Bid2PackAndSend(tData)
 	if not tData.type then return end
-	tData.strSender = GameLib.GetPlayerUnit():GetName() or ""
+	local myUnit = GameLib.GetPlayerUnit() 
+	if not myUnit then return end
+	tData.strSender = myUnit:GetName()
 	local strData = serpent.dump(tData)
 	self.channel:SendMessage("ROPS" .. strData)
 end
 
 function DKP:Bid2PackAndSendPrivate(strTarget,tData)
 	if not tData.type then return end
-	tData.strSender = GameLib.GetPlayerUnit():GetName() or ""
+	local myUnit = GameLib.GetPlayerUnit() 
+	if not myUnit then return end
+	tData.strSender = myUnit:GetName()
 	local strData = serpent.dump(tData)
 	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
 end

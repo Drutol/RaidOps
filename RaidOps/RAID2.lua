@@ -34,7 +34,13 @@ local ktItemCategories = {
 	[3] = "Medium Armor",
 	[4] = "Heavy Armor",
 }
+local RAID_GA = 0
+local RAID_DS = 1
+local RAID_Y = 2
 
+local SESSION_RUN = 0
+local SESSION_PAUSE = 1
+local SESSION_STOP = 2
 
 
 ----
@@ -526,7 +532,13 @@ end
 ---------------------------------------------------------------------------------
 --Raid Sessions(summaries) 
 ---------------------------------------------------------------------------------
-local bRaidSession = false
+local nRaidTime = 0
+local tPlayersInSession = {}
+local nRaidType = nil
+local nRaidSessionStatus = 2
+local nTimeFromLastUpdate = 0
+
+
 function DKP:RSIsSession()
 	return bRaidSession
 end
@@ -534,15 +546,26 @@ end
 function DKP:RSInit()
 	self.wndRS = Apollo.LoadForm(self.xmlDoc3,"RaidSessions",nil,self)
 	Apollo.RegisterEventHandler("ChangeWorld", "RSCheckZone", self)
+	
+
 end
 
-function DKP:RSIsRaidZone()
-	return true -- TODO
+function DKP:RSIsRaidZone(id)
+	if id == 105 or id == 148 or id == 149 then return true else return false end
 end
 
 function DKP:RSCheckZone()
 	if not bRaidSession then
-		if self:RSIsRaidZone(ZONEZONE) then -- TODO
+		local tMap = GameLib.GetCurrentZoneMap()
+		if self:RSIsRaidZone(tMap.id) then
+			local players = self:Bid2GetTargetsTable()
+			table.insert(players,GameLib.GetPlayerUnit():GetName())
+			for k ,player in ipairs(players) do
+				player.nSecs = 0
+			end
+
+		end
+		--[[if self:RSIsRaidZone(ZONEZONE) then -- TODO
 			local players = self:Bid2GetTargetsTable()
 			table.insert(players,GameLib.GetPlayerUnit():GetName())
 			for k , player in ipairs(players) do
@@ -552,6 +575,328 @@ function DKP:RSCheckZone()
 				player.tContents = tContents
 			end
 			self.CurrentRaidSession = RaidSummarySession.create(ZONE,players)
-		end 
+		end]] 
+	end
+end
+
+function DKP:AttInit()
+	self.wndSessionPopUp = Apollo.LoadForm(self.xmlDoc3,"AttendancePopup",nil,self)
+	self.wndSessionToolbar = Apollo.LoadForm(self.xmlDoc3,"SessionToolbar",nil,self)
+	self.wndSessionPopUp:Show(false)
+	self.wndSessionToolbar:Show(false)
+	Apollo.RegisterEventHandler("ChangeWorld", "AttCheckZone", self)
+	Apollo.RegisterTimerHandler(30,"AttAddTime",self)
+	Apollo.RegisterTimerHandler(1,"AttCheckTime",self)
+
+
+
+	if self.tItems.wndSessionToolbarLoc ~= nil and self.tItems.wndSessionToolbarLoc.nOffsets[1] ~= 0 then 
+		self.wndSessionToolbar:MoveToLocation(WindowLocation.new(self.tItems.wndSessionToolbarLoc))
+		self.tItems.wndSessionToolbarLoc = nil
+	end
+
+	nRaidSessionStatus = SESSION_STOP
+
+
+	self.wndAttSettings = Apollo.LoadForm(self.xmlDoc3,"AttSettings",nil,self)
+	self.wndAttSettings:Show(false)
+
+
+	if self.tItems["settings"].bAttAllowPopUp == nil then self.tItems["settings"].bAttAllowPopUp = true end
+	if not self.tItems["settings"].nTimePer then self.tItems["settings"].nTimePer = 75 end
+	if not self.tItems["settings"].nReset then self.tItems["settings"].nReset = 14 end
+	if not self.tItems["settings"].strResetType then self.tItems["settings"].strResetType = "D" end
+
+	self.wndAttSettings:FindChild("AllowPopUp"):SetCheck(self.tItems["settings"].bAttAllowPopUp)
+	self.wndAttSettings:FindChild("Min"):SetText(self.tItems["settings"].nTimePer)
+	self.wndAttSettings:FindChild("Reset"):SetText(self.tItems["settings"].nReset)
+	self.wndAttSettings:FindChild(self.tItems["settings"].strResetType == "D" and "D" or "E")
+
+
+
+	self:AttRestore(self.tItems.raidSession)
+	self.tItems.raidSession = nil 
+	self:AttUpdateToolbar()
+	self:AttCheckReset()
+	self:AttCheckZone()
+end
+
+function DKP:AttCheckZone(lol)
+	--local tMap = GameLib.GetCurrentZoneMap()
+	local tMap = {id = lol}
+	if self:RSIsRaidZone(tMap.id) then
+		
+		if tMap.id == 148 or tMap.id == 149 then nRaidType = RAID_GA
+		elseif tMap.id == 105 then nRaidType = RAID_DS
+		elseif tMap.id == 9999 then nRaidType = RAID_Y
+		end
+
+		if nRaidSessionStatus == SESSION_STOP then
+			self:AttInvokePopUp("Would you like to start raid session?","Yes","No") 
+		elseif nRaidSessionStatus == SESSION_PAUSE then
+			self:AttInvokePopUp("Would you like to resume raid session?","Yes","No") 
+		end
+	elseif nRaidSessionStatus == SESSION_PAUSE or nRaidSessionStatus == SESSION_RUN then
+		if nRaidSessionStatus == SESSION_RUN then nRaidSessionStatus = SESSION_PAUSE self:AttPause() end 
+		self:AttInvokePopUp("What do you want to do with current session?","Resume","End")
+	end
+end
+
+function DKP:AttSettingsSetResetType(wndHandler,wndControl)
+	self.tItems["settings"].strResetType = wndControl:GetName()
+	self:AttCheckReset()
+end
+
+function DKP:AttSetResetValue(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.tItems["settings"].nReset = val
+		self:AttCheckReset()
+	else
+		wndControl:SetText(self.tItems["settings"].nReset)
+	end
+end
+
+function DKP:AttPopUpEnable()
+	self.tItems["settings"].bAttAllowPopUp = true
+end
+
+function DKP:AttPopUpDisable()
+	self.tItems["settings"].bAttAllowPopUp = false
+end
+
+function DKP:AttSettingsShow()
+	self.wndAttSettings:Show(true,false)
+end
+
+function DKP:AttCheckReset()
+	if self.tItems["settings"].strResetType == "D" then
+		for k , player in ipairs(self.tItems) do
+			for j , entry in ipairs(player.tAtt or {}) do
+				local diff = os.date("*t",os.time()-entry.nTime)
+				if diff.days > self.tItems["settings"].nReset then
+					table.remove(player.tAtt,k)
+				end
+			end
+		end
+		for k , raid in ipairs(self.tItems.tRaids or {}) do
+			local diff = os.date("*t",os.time()-raid.finishTime)
+			if diff.days > self.tItems["settings"].nReset then
+				table.remove(player.tAtt,k)
+			end
+		end
+	else
+		if #self.tItems.tRaids > self.tItems["settings"].nReset then
+			for j = self.tItems["settings"].nReset,#self.tItems.tRaids or 0 do
+				local raid = self.tItems.tRaids[j]
+				if raid then
+					for i , player in ipairs(self.tItems) do
+						for l , entry in ipairs(player.tAtt or {}) do
+							if entry.nTime == raid.finishTime then table.remove(player.tAtt,l) break end
+						end
+					end
+					table.remove(self.tItems.tRaids,self.tItems["settings"].nReset)
+				end
+			end
+		end
+	end
+	self:RefreshMainItemList()
+end
+
+function DKP:AttInvokePopUp(strQ,strOk,strNo)
+	self.wndSessionPopUp:FindChild("Q"):SetText(strQ)
+	self.wndSessionPopUp:FindChild("OK"):SetText(strOk)
+	self.wndSessionPopUp:FindChild("NOPE"):SetText(strNo)
+
+
+	local x,y = Apollo.GetScreenSize()
+	local l,t,r,b = self.wndSessionPopUp:GetAnchorOffsets()
+	self.wndSessionPopUp:Move( (x/2)-self.wndSessionPopUp:GetWidth()/2, t, self.wndSessionPopUp:GetWidth(), self.wndSessionPopUp:GetHeight())
+
+	self.wndSessionPopUp:Show(true,false)
+end
+
+function DKP:AttToggleToolbar()
+	self.wndSessionToolbar:Show(not self.wndSessionToolbar:IsShown())
+end
+
+function DKP:AttOnAccept(wndHandler,wndControl)
+	if nRaidSessionStatus == SESSION_RUN then
+		self:AttEndSession()
+	elseif nRaidSessionStatus == SESSION_PAUSE then
+		self:AttResume()
+	elseif nRaidSessionStatus == SESSION_STOP then
+		self:AttStart()
+	end
+	self.wndSessionPopUp:Show(false,false)
+end
+
+function DKP:AttOnReject(wndHandler,wndControl)
+	if nRaidSessionStatus == SESSION_RUN then
+		self:AttEndSession()
+	elseif nRaidSessionStatus == SESSION_PAUSE then
+		self:AttEndSession()
+	elseif nRaidSessionStatus == SESSION_STOP then
+		self:AttStart()
+	end
+	self.wndSessionPopUp:Show(false,false)
+end
+
+function DKP:AttPopUpClose()
+	self.wndSessionPopUp:Show(false,false)
+end
+
+function DKP:AttStart()
+	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap().id) then
+		local players = self:Bid2GetTargetsTable()
+		for k=1,10 do
+			table.insert(players,self.tItems[math.random(1,40)].strName)
+		end
+		table.insert(players,GameLib.GetPlayerUnit():GetName())
+		for k ,player in ipairs(players) do
+			players[k] = {strName = player,nSecs = 0}
+		end
+		
+		tPlayersInSession = players
+		nRaidSessionStatus = SESSION_RUN
+		nRaidTime = 0
+
+		self.wndSessionToolbar:Show(true,false)
+
+		self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)	
+		self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
+	else
+		self:NotificationStart("You are not in raid zone",3,2)
+	end
+end
+
+function DKP:AttPause()
+	nRaidSessionStatus = SESSION_PAUSE
+	for k,player in ipairs(tPlayersInSession) do
+		player.nSecs = player.nSecs + nTimeFromLastUpdate
+	end
+	nRaidTime = nRaidTime + nTimeFromLastUpdate
+	nTimeFromLastUpdate = 0
+
+	self.raidTimer:Stop()
+	self.raidPreciseTimer:Stop()
+	self:AttUpdateToolbar()
+end
+
+function DKP:AttResume()
+	nRaidSessionStatus = SESSION_RUN
+	self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
+	self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
+end
+
+function DKP:AttAddTime()
+	for k,player in ipairs(tPlayersInSession) do
+		player.nSecs = player.nSecs + 30
+	end
+	nRaidTime = nRaidTime + 30
+	nTimeFromLastUpdate = 0
+end
+
+function DKP:AttCheckTime()
+	nTimeFromLastUpdate = nTimeFromLastUpdate + 1
+	self:AttUpdateToolbar()
+end
+
+function DKP:AttEndSession()
+	nRaidTime = nRaidTime + nTimeFromLastUpdate
+	for k,player in ipairs(tPlayersInSession) do
+		player.nSecs = player.nSecs + nTimeFromLastUpdate
+	end
+	nTimeFromLastUpdate = 0
+
+	local time = os.time()
+
+	for k,player in ipairs(tPlayersInSession) do
+		
+		Print((player.nSecs * 100) / nRaidTime)
+		if (player.nSecs * 100) / nRaidTime > 75 then
+			local ID = self:GetPlayerByIDByName(player.strName)
+			if ID ~= -1 then
+				if not self.tItems[ID].tAtt then self.tItems[ID].tAtt = {} end
+				table.insert(self.tItems[ID].tAtt,{raidType = nRaidType,nSecs = player.nSecs,nTime = time})
+			end
+		end
+	end
+
+	nRaidSessionStatus = SESSION_STOP
+	self.raidTimer:Stop()
+	self.raidPreciseTimer:Stop()
+	self:AttUpdateToolbar()
+	if not self.tItems.tRaids then self.tItems.tRaids = {} end
+
+	table.insert(self.tItems.tRaids,{raidType = nRaidType,finishTime = time,length = nRaidTime})
+end
+
+function DKP:AttGetSavePackage()
+	if nRaidSessionStatus == SESSION_RUN or nRaidSessionStatus == SESSION_PAUSE then 
+		local pkg = {}
+		pkg.players = tPlayersInSession
+		pkg.nRaidTime = nRaidTime + nTimeFromLastUpdate
+		pkg.nRaidType = nRaidType
+		pkg.nRaidSessionStatus = nRaidSessionStatus
+		pkg.time = os.time()
+		return pkg
+	end
+end
+
+function DKP:AttRestore(pkg)
+	if not pkg then return end
+	local timeDiff = os.time() - pkg.time
+	
+
+	tPlayersInSession = pkg.players
+	nRaidType = pkg.nRaidType
+	nRaidTime = pkg.nRaidTime 
+	nRaidSessionStatus = pkg.nRaidSessionStatus
+
+	for k,player in ipairs(tPlayersInSession) do
+		player.nSecs = player.nSecs + timeDiff
+		nRaidTime = nRaidTime + timeDiff
+	end
+	if self:RSIsRaidZone(148--[[GameLib.GetCurrentZoneMap().id]]) then
+		--self:NotificationStart("Raid Session resumed , time difference : " .. timeDiff,10,5)
+		
+		self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
+		self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
+	else
+		self:AttInvokePopUp("What do you want to do with current session?","Pause","End")
+	end
+end
+
+function DKP:AttUpdateToolbar()
+	if self.wndSessionToolbar:IsShown() then
+		self.wndSessionToolbar:FindChild("Running"):Show(nRaidSessionStatus == SESSION_RUN and true or false)
+		local diff = os.date("*t",nRaidTime+nTimeFromLastUpdate)
+		self.wndSessionToolbar:FindChild("Timer"):SetText((diff.hour-1 <=9 and "0" or "" ) .. (diff.hour-1 < 0 and "0" or diff.hour-1) .. ":" .. (diff.min <=9 and "0" or "") .. diff.min .. ":".. (diff.sec <=9 and "0" or "") .. diff.sec)
+		
+		if nRaidSessionStatus == SESSION_PAUSE then
+			self.wndSessionToolbar:FindChild("PauseResume"):SetText("Resume")
+		elseif nRaidSessionStatus == SESSION_RUN then
+			self.wndSessionToolbar:FindChild("PauseResume"):SetText("Pause")
+		end
+
+		if nRaidSessionStatus == SESSION_STOP then
+			self.wndSessionToolbar:FindChild("Stop"):Enable(false)
+			self.wndSessionToolbar:FindChild("Start"):Enable(true)
+			self.wndSessionToolbar:FindChild("Running"):Show(false)
+		elseif nRaidSessionStatus == SESSION_RUN then
+			self.wndSessionToolbar:FindChild("Start"):Enable(false)
+			self.wndSessionToolbar:FindChild("Stop"):Enable(true)
+			self.wndSessionToolbar:FindChild("Running"):Show(true)
+		end
+
+	end
+end
+
+function DKP:AttPauseResume()
+	if nRaidSessionStatus == SESSION_PAUSE then
+		self:AttResume()
+	elseif nRaidSessionStatus == SESSION_RUN then
+		self:AttPause()
 	end
 end

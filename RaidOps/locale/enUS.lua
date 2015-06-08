@@ -221,5 +221,12 @@ L["#wndSettings:SkipBidWinner"] = "Hide Pop-up window if recipient won through b
 L["#wndBid:Modes:AutoStart"] = "Start auction automatically."
 --v2.05
 L["#wndSettings:RaidInvites"] = "Raid invites."
-
-
+--v2.15
+L["#LabelTooltips:%GA"] = "Percentage of attended GA raids."
+L["#LabelTooltips:%DS"] = "Percentage of attended DS raids."
+L["#LabelTooltips:%Y"] = "Percentage of attended Y-83 raids."
+L["#LabelTooltips:%Total"] = "Percentage of all attended raids."
+L["#LabelTooltips:GA"] = "Ratio of attended GA raids to all GA sessions."
+L["#LabelTooltips:DS"] = "Ratio of attended GA raids to all DS sessions."
+L["#LabelTooltips:Y"] = "Ratio of attended GA raids to all Y-83 sessions."
+L["#LabelTooltips:Total"] = "Ratio of all attended raids to all sessions."
