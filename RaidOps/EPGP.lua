@@ -301,7 +301,6 @@ function DKP:EPGPAdd(strName,EP,GP)
 	if ID ~= -1 then
 		if EP ~= nil then
 			self.tItems[ID].EP = self.tItems[ID].EP + EP
-			self:RaidRegisterEPManipulation(strName,EP)
 		end
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP + GP
@@ -319,7 +318,6 @@ function DKP:EPGPSubtract(strName,EP,GP)
 			if self.tItems[ID].EP < self.tItems["EPGP"].MinEP then
 				self.tItems[ID].EP = self.tItems["EPGP"].MinEP
 			end
-			self:RaidRegisterEPManipulation(strName,EP)
 		end
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP - GP

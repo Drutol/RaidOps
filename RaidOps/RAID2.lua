@@ -27,13 +27,6 @@ local knBubbleHorzSpacing = 3
 local knBubbleVertSpacing = 3
 
 --
-
-local ktItemCategories = {
-	[1] = "Weapon",
-	[2] = "Light Armor",
-	[3] = "Medium Armor",
-	[4] = "Heavy Armor",
-}
 local RAID_GA = 0
 local RAID_DS = 1
 local RAID_Y = 2
@@ -51,34 +44,6 @@ function raidOpsSortBubble(a,b)
 	if a:GetData():GetSlot() == nil then return false end
 	if b:GetData():GetSlot() == nil then return true end
 	return a:GetData():GetSlot() < b:GetData():GetSlot()
-end
-
-function DKP:IBDebugInit()
-	--self.wndIBD = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",nil,self)
-	--self.wndIBD:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 0,nHeightMod = 0})
-
-	
-	self.wndInventory = Apollo.LoadForm(self.xmlDoc3,"InventoryItemType",nil,self)
-	
-	self.wndIBD1 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD1:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD2 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD2:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD3 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD3:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD4 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD4:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD5 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD5:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD6 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD6:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD7 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD7:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-	self.wndIBD8 = Apollo.LoadForm(self.xmlDoc3,"InventoryItemBubble",self.wndInventory:FindChild("List"),self)
-	self.wndIBD8:SetData({bExpanded = false,bPopulated = false,strPlayer = "Drutol Windchaser",eItemCategory = "Weapon",nWidthMod = 1,nHeightMod = 0})
-
-	self:RIRequestRearrange(self.wndInventory:FindChild("List"))
-	
 end
 
 function DKP:RSDebugInit()
@@ -286,14 +251,6 @@ end
 ----
 --Raid Inventory
 ----
-
-function DKP:RIRequestLootForBubble(tBubbleData)
-	local tDebug = {}
-	for k=1,math.random(1,10) do
-		table.insert(tDebug,math.random(1,60000))
-	end
-	return tDebug
-end
 
 local tPrevOffsets = {}
 function DKP:RIRequestRearrange(wndList)
@@ -538,45 +495,72 @@ local nRaidType = nil
 local nRaidSessionStatus = 2
 local nTimeFromLastUpdate = 0
 
-
-function DKP:RSIsSession()
-	return bRaidSession
-end
-
 function DKP:RSInit()
 	self.wndRS = Apollo.LoadForm(self.xmlDoc3,"RaidSessions",nil,self)
-	Apollo.RegisterEventHandler("ChangeWorld", "RSCheckZone", self)
-	
+	self.wndRS:Show(false)
+end
 
+function DKP:RSShow()
+	self.wndRS:Show(true,false)
+	self.wndRS:ToFront()
+	self:RSPopulate()
+end
+
+function DKP:RSHide()
+	self.wndRS:Show(false,false)
+end
+
+function DKP:RSPopulate()
+	local list = self.wndRS:FindChild("SessionsList")
+	list:DestroyChildren()
+	for k , raid in ipairs(self.tItems.tRaids or {}) do
+		local wnd = Apollo.LoadForm(self.xmlDoc3,"SessionEntry",list,self)
+		wnd:FindChild("Date"):SetText(self:ConvertDate(os.date("%x",raid.finishTime)))
+		wnd:FindChild("Date"):SetTooltip(os.date("%X",raid.finishTime-raid.length) .. " - " ..  os.date("%X",raid.finishTime))
+		if raid.raidType == RAID_GA then wnd:FindChild("Type"):SetText("GA")
+		elseif raid.raidType == RAID_DS then wnd:FindChild("Type"):SetText("DS")
+		elseif raid.raidType == RAID_Y then wnd:FindChild("Type"):SetText("Y-83")
+		end
+
+		if raid.name then wnd:FindChild("SessionName"):SetText(raid.name) else
+			raid.name = "Raid Session #"..k
+			wnd:FindChild("SessionName"):SetText(raid.name)
+		end
+
+		wnd:SetData({raid = raid,id = k})
+
+	end
+	list:ArrangeChildrenVert()
+end
+
+function DKP:RSSetRaidName(wndHandler,wndControl,strText)
+	if #strText < 20 then
+		self.tItems.tRaids[wndControl:GetParent():GetParent():GetData().id].name = strText
+	else
+		wndControl:SetText(self.tItems.tRaids[wndControl:GetParent():GetParent():GetData().id].name)
+		wndControl:SetSel(#wndControl:GetText(),#wndControl:GetText())
+	end
+end
+
+function DKP:RSShowAttendees(wndHandler,wndControl)
+	local raid = wndControl:GetParent():GetData().raid
+	local tIDs = {}
+
+	for k , player in ipairs(self.tItems) do
+		for j , att in ipairs(player.tAtt or {}) do
+			if att.nTime == raid.finishTime then table.insert(tIDs,k) break end
+		end
+	end
+	self:AddFilterRule(tIDs)
+end
+
+function DKP:RSShowLoot(wndHandler,wndControl)
+	local tData = wndControl:GetParent():GetData().raid
+	self:LLOpenRaid(tData.finishTime-tData.length,tData.finishTime,tData.name)
 end
 
 function DKP:RSIsRaidZone(id)
-	if id == 105 or id == 148 or id == 149 then return true else return false end
-end
-
-function DKP:RSCheckZone()
-	if not bRaidSession then
-		local tMap = GameLib.GetCurrentZoneMap()
-		if self:RSIsRaidZone(tMap.id) then
-			local players = self:Bid2GetTargetsTable()
-			table.insert(players,GameLib.GetPlayerUnit():GetName())
-			for k ,player in ipairs(players) do
-				player.nSecs = 0
-			end
-
-		end
-		--[[if self:RSIsRaidZone(ZONEZONE) then -- TODO
-			local players = self:Bid2GetTargetsTable()
-			table.insert(players,GameLib.GetPlayerUnit():GetName())
-			for k , player in ipairs(players) do
-				local tContents = player
-				player = {}
-				player.id = self:GetPlayerByIDByName(tContents.strName)
-				player.tContents = tContents
-			end
-			self.CurrentRaidSession = RaidSummarySession.create(ZONE,players)
-		end]] 
-	end
+	if id == 105 or id == 148 or id == 149 or id == 475 then return true else return false end
 end
 
 function DKP:AttInit()
@@ -605,12 +589,16 @@ function DKP:AttInit()
 	if self.tItems["settings"].bAttAllowPopUp == nil then self.tItems["settings"].bAttAllowPopUp = true end
 	if not self.tItems["settings"].nTimePer then self.tItems["settings"].nTimePer = 75 end
 	if not self.tItems["settings"].nReset then self.tItems["settings"].nReset = 14 end
-	if not self.tItems["settings"].strResetType then self.tItems["settings"].strResetType = "D" end
+	if not self.tItems["settings"].nMinTime then self.tItems["settings"].nMinTime = 5 end
+	if not self.tItems["settings"].strResetType then self.tItems["settings"].strResetType = "E" end
+	if self.tItems["settings"].bAttRaidQueue == nil then self.tItems["settings"].bAttRaidQueue = true end
 
 	self.wndAttSettings:FindChild("AllowPopUp"):SetCheck(self.tItems["settings"].bAttAllowPopUp)
 	self.wndAttSettings:FindChild("Min"):SetText(self.tItems["settings"].nTimePer)
 	self.wndAttSettings:FindChild("Reset"):SetText(self.tItems["settings"].nReset)
-	self.wndAttSettings:FindChild(self.tItems["settings"].strResetType == "D" and "D" or "E")
+	self.wndAttSettings:FindChild(self.tItems["settings"].strResetType == "D" and "D" or "E"):SetCheck(true)
+	self.wndAttSettings:FindChild("MinTime"):SetText(self.tItems["settings"].nMinTime)
+	self.wndAttSettings:FindChild("AttRaidQueue"):SetCheck(self.tItems["settings"].bAttRaidQueue)
 
 
 
@@ -621,25 +609,45 @@ function DKP:AttInit()
 	self:AttCheckZone()
 end
 
-function DKP:AttCheckZone(lol)
-	--local tMap = GameLib.GetCurrentZoneMap()
-	local tMap = {id = lol}
-	if self:RSIsRaidZone(tMap.id) then
+function DKP:AttCheckZone()
+	local tMap = GameLib.GetCurrentZoneMap()
+	if tMap and self:RSIsRaidZone(tMap.id) then
 		
 		if tMap.id == 148 or tMap.id == 149 then nRaidType = RAID_GA
 		elseif tMap.id == 105 then nRaidType = RAID_DS
-		elseif tMap.id == 9999 then nRaidType = RAID_Y
+		elseif tMap.id == 475 then nRaidType = RAID_Y
 		end
 
 		if nRaidSessionStatus == SESSION_STOP then
 			self:AttInvokePopUp("Would you like to start raid session?","Yes","No") 
-		elseif nRaidSessionStatus == SESSION_PAUSE then
-			self:AttInvokePopUp("Would you like to resume raid session?","Yes","No") 
 		end
 	elseif nRaidSessionStatus == SESSION_PAUSE or nRaidSessionStatus == SESSION_RUN then
 		if nRaidSessionStatus == SESSION_RUN then nRaidSessionStatus = SESSION_PAUSE self:AttPause() end 
 		self:AttInvokePopUp("What do you want to do with current session?","Resume","End")
 	end
+end
+
+function DKP:AttUpdatePlayers(nTime)
+	local currentPlayers = self:Bid2GetTargetsTable()
+	if self.tItems["settings"].bAttRaidQueue then
+		for k , player in ipairs(self.tItems.tQueuedPlayers or {}) do
+			table.insert(currentPlayers,self.tItems[player].strName)
+		end
+	end
+	table.insert(currentPlayers,GameLib.GetPlayerUnit():GetName())
+
+	for k , player in ipairs(currentPlayers) do
+		local bFound = false 
+		for j , attendee in ipairs(tPlayersInSession) do
+			if attendee.strName == player then 
+			attendee.nSecs = attendee.nSecs + nTime 
+			bFound = true end
+		end
+		if not bFound then
+			table.insert(tPlayersInSession,{strName = player,nSecs = nTime})
+		end
+	end
+
 end
 
 function DKP:AttSettingsSetResetType(wndHandler,wndControl)
@@ -657,6 +665,17 @@ function DKP:AttSetResetValue(wndHandler,wndControl,strText)
 	end
 end
 
+function DKP:AttRemoveRaid(wndHandler,wndControl)
+	local raid = wndControl:GetParent():GetData().raid
+	for k , player in ipairs(self.tItems) do 
+		for j , att in ipairs(player.tAtt or {}) do
+			if att.nTime == raid.finishTime then table.remove(player.tAtt,j) end
+		end
+	end
+	table.remove(self.tItems.tRaids,wndControl:GetParent():GetData().id)
+	self:RSPopulate()
+end
+
 function DKP:AttPopUpEnable()
 	self.tItems["settings"].bAttAllowPopUp = true
 end
@@ -665,8 +684,39 @@ function DKP:AttPopUpDisable()
 	self.tItems["settings"].bAttAllowPopUp = false
 end
 
+function DKP:AttRaidQueueEnable()
+	self.tItems["settings"].bAttRaidQueue = true
+end
+
+function DKP:AttRaidQueueDisable()
+	self.tItems["settings"].bAttRaidQueue = false
+end
+
+function DKP:AttSetMinTime(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.tItems["settings"].nMinTime = val
+	else
+		wndControl:SetText(self.tItems["settings"].nMinTime)
+	end
+end
+
 function DKP:AttSettingsShow()
 	self.wndAttSettings:Show(true,false)
+	self.wndAttSettings:ToFront()
+end
+
+function DKP:AttSettingsHide()
+	self.wndAttSettings:Show(false,false)
+end
+
+function DKP:AttSetMiniumTime(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val >= 0 and val <= 100 then
+		self.tItems["settings"].nTimePer = val
+	else
+		wndControl:SetText(self.tItems["settings"].nTimePer)
+	end
 end
 
 function DKP:AttCheckReset()
@@ -674,28 +724,29 @@ function DKP:AttCheckReset()
 		for k , player in ipairs(self.tItems) do
 			for j , entry in ipairs(player.tAtt or {}) do
 				local diff = os.date("*t",os.time()-entry.nTime)
-				if diff.days > self.tItems["settings"].nReset then
+				if diff.day > self.tItems["settings"].nReset then
 					table.remove(player.tAtt,k)
 				end
 			end
 		end
 		for k , raid in ipairs(self.tItems.tRaids or {}) do
 			local diff = os.date("*t",os.time()-raid.finishTime)
-			if diff.days > self.tItems["settings"].nReset then
+			if diff.day > self.tItems["settings"].nReset then
 				table.remove(player.tAtt,k)
 			end
 		end
 	else
-		if #self.tItems.tRaids > self.tItems["settings"].nReset then
-			for j = self.tItems["settings"].nReset,#self.tItems.tRaids or 0 do
-				local raid = self.tItems.tRaids[j]
-				if raid then
-					for i , player in ipairs(self.tItems) do
-						for l , entry in ipairs(player.tAtt or {}) do
-							if entry.nTime == raid.finishTime then table.remove(player.tAtt,l) break end
+		if self.tItems.tRaids and #self.tItems.tRaids > self.tItems["settings"].nReset then
+			for k , raid in ipairs(self.tItems.tRaids or {}) do
+				if k > self.tItems["settings"].nReset then
+					if raid then
+						for i , player in ipairs(self.tItems) do
+							for l , entry in ipairs(player.tAtt or {}) do
+								if entry.nTime == raid.finishTime then table.remove(player.tAtt,l) end
+							end
 						end
+						table.remove(self.tItems.tRaids,k)
 					end
-					table.remove(self.tItems.tRaids,self.tItems["settings"].nReset)
 				end
 			end
 		end
@@ -704,10 +755,12 @@ function DKP:AttCheckReset()
 end
 
 function DKP:AttInvokePopUp(strQ,strOk,strNo)
+	if not self.tItems["settings"].bAttAllowPopUp then return end
 	self.wndSessionPopUp:FindChild("Q"):SetText(strQ)
 	self.wndSessionPopUp:FindChild("OK"):SetText(strOk)
 	self.wndSessionPopUp:FindChild("NOPE"):SetText(strNo)
 
+	self.wndSessionPopUp:ToFront()
 
 	local x,y = Apollo.GetScreenSize()
 	local l,t,r,b = self.wndSessionPopUp:GetAnchorOffsets()
@@ -718,11 +771,12 @@ end
 
 function DKP:AttToggleToolbar()
 	self.wndSessionToolbar:Show(not self.wndSessionToolbar:IsShown())
+	self:AttUpdateToolbar()
 end
 
 function DKP:AttOnAccept(wndHandler,wndControl)
 	if nRaidSessionStatus == SESSION_RUN then
-		self:AttEndSession()
+		self:AttPause()
 	elseif nRaidSessionStatus == SESSION_PAUSE then
 		self:AttResume()
 	elseif nRaidSessionStatus == SESSION_STOP then
@@ -737,7 +791,7 @@ function DKP:AttOnReject(wndHandler,wndControl)
 	elseif nRaidSessionStatus == SESSION_PAUSE then
 		self:AttEndSession()
 	elseif nRaidSessionStatus == SESSION_STOP then
-		self:AttStart()
+		--
 	end
 	self.wndSessionPopUp:Show(false,false)
 end
@@ -749,8 +803,10 @@ end
 function DKP:AttStart()
 	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap().id) then
 		local players = self:Bid2GetTargetsTable()
-		for k=1,10 do
-			table.insert(players,self.tItems[math.random(1,40)].strName)
+		if self.tItems["settings"].bAttRaidQueue then
+			for k , player in ipairs(self.tItems.tQueuedPlayers or {}) do
+				table.insert(players,self.tItems[player].strName)
+			end
 		end
 		table.insert(players,GameLib.GetPlayerUnit():GetName())
 		for k ,player in ipairs(players) do
@@ -785,14 +841,13 @@ end
 
 function DKP:AttResume()
 	nRaidSessionStatus = SESSION_RUN
+	self.wndSessionToolbar:Show(true,false)
 	self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
 	self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
 end
 
 function DKP:AttAddTime()
-	for k,player in ipairs(tPlayersInSession) do
-		player.nSecs = player.nSecs + 30
-	end
+	self:AttUpdatePlayers(30)
 	nRaidTime = nRaidTime + 30
 	nTimeFromLastUpdate = 0
 end
@@ -804,17 +859,32 @@ end
 
 function DKP:AttEndSession()
 	nRaidTime = nRaidTime + nTimeFromLastUpdate
+	if  nRaidTime < self.tItems["settings"].nMinTime * 60  then 
+		nRaidSessionStatus = SESSION_STOP
+		self.raidTimer:Stop()
+		self.raidPreciseTimer:Stop()
+		self:AttUpdateToolbar()
+		self.wndSessionToolbar:FindChild("Timer"):SetText("00:00:00")
+		return 
+	end
 	for k,player in ipairs(tPlayersInSession) do
 		player.nSecs = player.nSecs + nTimeFromLastUpdate
 	end
 	nTimeFromLastUpdate = 0
 
+	if not nRaidType then
+		local tMap = GameLib.GetCurrentZoneMap()
+		if tMap.id == 148 or tMap.id == 149 then nRaidType = RAID_GA
+		elseif tMap.id == 105 then nRaidType = RAID_DS
+		elseif tMap.id == 475 then nRaidType = RAID_Y
+		end
+	end
+
 	local time = os.time()
 
 	for k,player in ipairs(tPlayersInSession) do
 		
-		Print((player.nSecs * 100) / nRaidTime)
-		if (player.nSecs * 100) / nRaidTime > 75 then
+		if (player.nSecs * 100) / nRaidTime >= self.tItems["settings"].nTimePer then
 			local ID = self:GetPlayerByIDByName(player.strName)
 			if ID ~= -1 then
 				if not self.tItems[ID].tAtt then self.tItems[ID].tAtt = {} end
@@ -827,9 +897,11 @@ function DKP:AttEndSession()
 	self.raidTimer:Stop()
 	self.raidPreciseTimer:Stop()
 	self:AttUpdateToolbar()
+	self.wndSessionToolbar:FindChild("Timer"):SetText("00:00:00")
 	if not self.tItems.tRaids then self.tItems.tRaids = {} end
 
-	table.insert(self.tItems.tRaids,{raidType = nRaidType,finishTime = time,length = nRaidTime})
+	table.insert(self.tItems.tRaids,1,{raidType = nRaidType,finishTime = time,length = nRaidTime})
+	self:AttCheckReset()
 end
 
 function DKP:AttGetSavePackage()
@@ -858,12 +930,11 @@ function DKP:AttRestore(pkg)
 		player.nSecs = player.nSecs + timeDiff
 		nRaidTime = nRaidTime + timeDiff
 	end
-	if self:RSIsRaidZone(148--[[GameLib.GetCurrentZoneMap().id]]) then
-		--self:NotificationStart("Raid Session resumed , time difference : " .. timeDiff,10,5)
+	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap().id) then
 		
 		self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
 		self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
-	else
+	elseif nRaidSessionStatus == SESSION_RUN then
 		self:AttInvokePopUp("What do you want to do with current session?","Pause","End")
 	end
 end
@@ -876,18 +947,23 @@ function DKP:AttUpdateToolbar()
 		
 		if nRaidSessionStatus == SESSION_PAUSE then
 			self.wndSessionToolbar:FindChild("PauseResume"):SetText("Resume")
+			self.wndSessionToolbar:FindChild("Stop"):Enable(true)
+			self.wndSessionToolbar:FindChild("PauseResume"):Enable(true)
 		elseif nRaidSessionStatus == SESSION_RUN then
 			self.wndSessionToolbar:FindChild("PauseResume"):SetText("Pause")
+
 		end
 
 		if nRaidSessionStatus == SESSION_STOP then
 			self.wndSessionToolbar:FindChild("Stop"):Enable(false)
 			self.wndSessionToolbar:FindChild("Start"):Enable(true)
 			self.wndSessionToolbar:FindChild("Running"):Show(false)
+			self.wndSessionToolbar:FindChild("PauseResume"):Enable(false)
 		elseif nRaidSessionStatus == SESSION_RUN then
 			self.wndSessionToolbar:FindChild("Start"):Enable(false)
 			self.wndSessionToolbar:FindChild("Stop"):Enable(true)
 			self.wndSessionToolbar:FindChild("Running"):Show(true)
+			self.wndSessionToolbar:FindChild("PauseResume"):Enable(true)
 		end
 
 	end
@@ -899,4 +975,103 @@ function DKP:AttPauseResume()
 	elseif nRaidSessionStatus == SESSION_RUN then
 		self:AttPause()
 	end
+end
+
+function tohtml(x)
+  return(tohtml_table(x,1))
+end
+
+-- Flattens a table to html output
+function tohtml_table(x, table_level)
+  local k, s,  tcolor
+  local html_colors = {
+    "#339900","#33CC00","#669900","#666600","#FF3300",
+    "#FFCC00","#FFFF00","#CCFFCC","#CCCCFF","#CC66FF",
+    "#339900","#33CC00","#669900","#666600","#FF3300",
+    "#FFCC00","#FFFF00","#CCFFCC","#CCCCFF","#CC66FF"
+  }
+  local lineout = {}
+  local tablefound = false
+    if type(x) == "table" then
+    s = ""
+    k = 1
+    local i, v = next(x)
+    while i do
+      if (type(v) == "table") then
+        if (table_level<10) then
+          lineout[k] =  "<b>" .. flat(i) .. "</b>".. tohtml_table(v, table_level + 1)   
+        else
+          lineout[k] = "<b>MAXIMUM LEVEL BREACHED</b>"
+        end
+        tablefound = true
+      else
+        lineout[k] = flat(i) .. " : " .. tohtml_table(v)
+      end
+      k = k + 1
+      i, v = next(x, i)
+    end
+
+    for k,line in ipairs(lineout) do
+      if (tablefound) then
+        s = s .. "<tr><td>" .. line .. "</td></tr>\n"
+      else
+        s = s .. "<td>" .. line .. "</td>\n"
+      end
+    end
+    if not (tablefound) then
+      s = "<table border='1' bgcolor='#FFFFCC' cellpadding='5' cellspacing='0'>" ..
+        "<tr>" .. s .. "</tr></table>\n"
+    else
+      tcolor = html_colors[table_level]
+      s = "<table border='3' bgcolor='"..tcolor.."' cellpadding='10' cellspacing='0'>" ..
+          s ..  "</table>\n"
+    end
+
+    return s 
+  end
+  if type(x) == "function" then
+    return "FUNC"
+  end
+  if type(x) == "file" then
+    return "FILE"
+  end
+
+  return tostring(x) 
+end
+
+-- Flattens a table to string
+function flat(x)  
+  return toflat(x,1)
+end
+
+-- Flattens a table to string
+function toflat(x, tlevel)
+  local s
+  tlevel = tlevel + 1
+
+  if type(x) == "table" then
+    s = "{"
+    local i, v = next(x)
+    while i do
+      if (tlevel < 15) then
+        s = s .. i .. " : " .. toflat(v, tlevel) 
+      else
+        s = s .. i .. " : {#}" 
+      end
+
+      i, v = next(x, i)
+      if i then
+        s = s .. ", " 
+      end
+    end
+    return s .. "}\n"
+  end
+  if type(x) == "function" then
+    return "FUNC"
+  end
+  if type(x) == "file" then
+    return "FILE"
+  end
+
+  return tostring(x) 
 end
