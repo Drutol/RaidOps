@@ -9,6 +9,7 @@
     <Script Name="locale/deDE.lua"/>
     <Script Name="DKP.lua"/>
     <Script Name="RAID2.lua"/>
+    <Script Name="TUT.lua"/>
     <Script Name="BID.lua"/>
     <Script Name="EPGP.lua"/>
     <Script Name="RAIDOPS.lua"/>

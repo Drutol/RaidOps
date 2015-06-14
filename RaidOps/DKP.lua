@@ -496,6 +496,7 @@ function DKP:OnDocLoaded()
 		self:SupportInit()
 		self:AttInit()
 		self:RSInit()
+		self:TutInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -844,7 +845,7 @@ end
 
 function DKP:GIRankAdded(wndHandler,wndControl)
 	table.insert(tAcceptedRanks,tonumber(wndControl:GetName()))
-	
+	Event_FireGenericEvent("GIRankSelect")
 	self:GIUpdateCount()
 end
 
@@ -877,6 +878,8 @@ function DKP:GIImport()
 	self:UndoAddActivity(#tMembers == 1 and ktUndoActions["addp"] or ktUndoActions["addmp"],"--",tMembers,nil,nil,false)
 	self:RefreshMainItemList()
 	self:GIUpdateCount()
+	Event_FireGenericEvent("GIImport")
+
 	
 end
 
@@ -1013,6 +1016,7 @@ end
 -----------------------------------------------------------------------------------------------
 function DKP:OnDKPOn()
 	self.wndMain:Show(true,false)
+	Event_FireGenericEvent("MainWindowShow")
 end
 
 
@@ -1159,6 +1163,7 @@ function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
 	self.wndSelectedListItem = wndControl
 	self:EnableActionButtons()
+	Event_FireGenericEvent("PlayerEntrySelected")
 end
 
 function DKP:OnListItemDeselected()
@@ -1282,7 +1287,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 		self:MassEditModify("Add")
 		return
 	end
-	
+	Event_FireGenericEvent("ModifiedSomething")
 	if self.wndSelectedListItem ~=nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
@@ -1368,7 +1373,7 @@ function DKP:SubtractDKP(cycling)
 		self:MassEditModify("Sub")
 		return
 	end
-	
+	Event_FireGenericEvent("ModifiedSomething")
 	if self.wndSelectedListItem ~=nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
@@ -1450,6 +1455,7 @@ function DKP:SubtractDKP(cycling)
 end
 
 function DKP:Add100DKP()
+	Event_FireGenericEvent("ModifiedSomething")
 	if self.tItems["EPGP"].Enable == 0 then
 		local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 		if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
@@ -1706,6 +1712,7 @@ function DKP:InputBoxTextReset( wndHandler, wndControl, strText )
 	if strDKP == "Comment" or strDKP == "" then
 		self:ResetInputAndComment()
 	end
+	if tonumber(strText) then Event_FireGenericEvent("TypedInputValue") end
 end
 
 function compare_easyDKP(a,b)
@@ -2668,6 +2675,7 @@ end
 
 function DKP:MresOnResize()
 	if prevWidth ~= self.wndMain:GetWidth() then 
+			Event_FireGenericEvent("MresResized")
 			prevWidth = self.wndMain:GetWidth()
 			if prevWidth <= 1060 then 
 				nLabelsToRender = 5
@@ -2792,7 +2800,7 @@ function DKP:LabelMenuOpen(wndHandler,wndControl)
 	if not string.find(wndControl:GetName(),"Label") then return end
 	local tCursor = Apollo.GetMouse()
 	self.wndLabelMenu:Move(tCursor.x - 50, tCursor.y + 30, self.wndLabelMenu:GetWidth(), self.wndLabelMenu:GetHeight())
-
+	Event_FireGenericEvent("LabelSelectionOpen")
 	self.wndLabelMenu:Show(true,false)
 	self.wndLabelMenu:ToFront()
 	self.CurrentlyEditedLabel = tonumber(string.sub(wndControl:GetName(),6))
@@ -2818,7 +2826,7 @@ function DKP:LabelCheckType( wndHandler, wndControl, eMouseButton )
 	if self.SortedLabel == self:LabelGetColumnNumberForValue("Item") then self.SortedLabel = nil end
 	if self.tItems["settings"].LabelOptions[self.SortedLabel] == "Nil" then self.SortedLabel = nil end
 
-
+	Event_FireGenericEvent("LabelChanged")
 
 
 	self:LabelUpdateList()
@@ -3081,6 +3089,7 @@ end
 
 function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
 	if eMouseButton ~= GameLib.CodeEnumInputMouse.Right then 
+		Event_FireGenericEvent("LabelSorted") 
 		if wndControl then 
 			if self:LabelIsSortable(wndControl:GetText()) then
 				if wndControl:GetData() then 
@@ -3153,6 +3162,7 @@ function DKP:LabelSwapSortIndicator(wnd)
 end
 
 function DKP:LabelSetSortIndicator(wnd,strState) -- asc desc
+	if not wnd:FindChild("SortIndicator") then return end 
 	if strState == "asc" then
 		wnd:FindChild("SortIndicator"):SetSprite("CRB_PlayerPathSprites:sprPP_SciSpawnArrowUp")
 		wnd:SetData("asc")
@@ -3771,6 +3781,7 @@ end
 function DKP:SettingGroupByClassOn()
 	self.tItems["settings"].GroupByClass = true
 	self:RefreshMainItemList()
+	Event_FireGenericEvent("GroupByClassEnabled")
 end	
 
 function DKP:SettingGroupByClassOff()
