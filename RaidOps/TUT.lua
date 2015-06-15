@@ -210,6 +210,7 @@ local ktTutIndex =
 			[4] = "Right",
 			[5] = "Label1",
 			[6] = "ResizeHandle",
+			[7] = "Prof2",
 		},
 		text = 
 		{
@@ -219,6 +220,7 @@ local ktTutIndex =
 			[4] = "\nSelect anything from this list , (Last item may fit here well)",
 			[5] = "\nYou can left click on label in order to sort by this label, if grouping is enabled players will be sorted in groups , in order to change direction click again. Click it. ",
 			[6] = "\nYou can have up to 9 labels , to show them grab the corner of the window and resize it.",
+			[7] = "\nBy clicking on this , another set of labels will be loaded. Those sets are saved whenever you change label."
 		},
 		events = 
 		{
@@ -232,8 +234,111 @@ local ktTutIndex =
 			tContext.wndMain:Show(true,false)
 			tContext.wndMain:ToFront()
 		end
-	}
+	},
+	[7] = 
+	{
+		title = "Context menu",
+		window = "Con",
+		anchor = 
+		{
+			[1] = "Mid",
+			[2] = "Mid",
+		},
+		text = 
+		{
+			[1] = "Before we get any further , let's take a look at context menu. Right click on any of players' bar.",
+			[2] = "This widnow allows to perform user specific tasks.\n\n While they are self-explanatory I will return to alts later on.",
+		},
+		events = 
+		{
+			[1] = "ContextMenuOpen",
+		},
+		highlight = false,
+		func = function(tContext)
+			tContext.wndContext:Show(tContext.wndContext:GetData() and true or false)
+		end
+	},
+	[8] = 
+	{
+		title = "Item assignment",
+		window = "Main",
+		anchor = 
+		{
+			[1] = "Right",
+			[2] = "Right",
+			[3] = "Right",
+			[4] = "Right",
+		},
+		text = 
+		{
+			[1] = "\nWhenever you assign something you will be prompted to confirm assignment with GP/DKP value.",
+			[2] = "\nLet's force this window to appear , we are going to use manual award. It works exactly in the same way as you would experience it during raid.",
+			[3] = "\nRight click on player's entry.",
+			[4] = "\nAnd now press 'Item Award' button.",
+		},
+		events = 
+		{
+			[3] = "ContextMenuOpen",
+			[4] = "ManualAssignOpen",
+		},
+		highlight = false,
+	},
+	[9] = 
+	{
+		title = "Manual assign",
+		window = "ManualAssign",
+		anchor = 
+		{
+			[1] = "Right",
+			[2] = "Button1",
+			[3] = "Right",
+		},
+		text = 
+		{
+			[1] = "There's not much to this window alone , just type ID or select it from loot logs and continue.",
+			[2] = "This button will open Loot Logs window with items dropped in this session , find the one you want and just click it.",
+			[3] = "Type some random item ID and proceed. (eg. 39876)",
+		},
+		events = 
+		{
+			[3] = "MAProceed",
+		},
+		highlight = true,
+	},
+	[10] = 
+	{
+		title = "PopUp window",
+		window = "PopUp",
+		anchor = 
+		{
+			[1] = "Right",
+			[2] = "Button",
+			[3] = "QueueLength",
+			[4] = "Right",
+			[5] = "ButtonSkip",
+			[6] = "GPOffspec",
+			[7] = "GPOffspec"
+		},
+		text = 
+		{
+			[1] = "This is the widnow we wanted to get our hands on. As you can see you can just press 'Accept' and GP will be added to this player.",
+			[2] = "This button will instantly award curent item to 'Guild bank'. It means that the log will appear in GB logs.",
+			[3] = "This number shows how many items are in queue waiting to be assigned.",
+			[4] = "Assign another item to different player via Manual Assign.",
+			[5] = "As you can see this button is now active. When you press it this item will be forgotten - no GP charged. Press this button.",
+			[6] = "The window has updated itself with new data. Look at this checkbox now.",
+			[7] = "When pressed it will decrease the GP/DKP value by percentage set in settings window.",
+			[8] = "When you are done simply press 'Accept'."
 
+		},
+		events = 
+		{
+			[4] = "MAProceed",
+			[5] = "PopUpSkip",
+			[8] = "PopUpAccepted"
+		},
+		highlight = true,
+	},
 
 }
 
@@ -248,7 +353,7 @@ function DKP:TutInit()
 		
 		
 	end
-	self.tItems["settings"].nTutProgress = 6
+	self.tItems["settings"].nTutProgress = 7
 	self:TutStart()
 end
 
@@ -283,6 +388,9 @@ function DKP:TutStart(nTut,nProgress)
 		if currTut.window == "Main" then currTut.wnd = self.wndMain 
 		elseif currTut.window == "Settings" then currTut.wnd = self.wndSettings 
 		elseif currTut.window == "GI" then currTut.wnd = self.wndGuildImport 
+		elseif currTut.window == "ManualAssign" then currTut.wnd = self.wndMA 
+		elseif currTut.window == "PopUp" then currTut.wnd = self.wndPopUp 
+		elseif currTut.window == "Con" then currTut.wnd = self.wndContext 
 		end
 		-- Determine Pos
 		if currTut.anchor[nProgress] == "Mid" then
@@ -293,7 +401,7 @@ function DKP:TutStart(nTut,nProgress)
 			self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 		else
 			currTut.targetControl = currTut.wnd:FindChild(currTut.anchor[nProgress])
-			if currTut.window == "Settings" or currTut.window == "GI" then
+			if currTut.window == "Settings" or currTut.window == "GI" or currTut.window == "PopUp" or currTut.window == "ManualAssign" or currTut.window == "Con" then
 				local x,y = currTut.wnd:GetPos()
 				self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 			else

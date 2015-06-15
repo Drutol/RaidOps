@@ -4181,6 +4181,7 @@ function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
 	local newDKP
 	local modifier
 	self:UndoAddActivity(string.format(ktUndoActions["maward"],self.tItems[CurrentPopUpID].strName,PopUpItemQueue[1].strItem),self.wndPopUp:FindChild("EditBoxDKP"):GetText(),{[1] = self.tItems[CurrentPopUpID]},nil,"--")
+	Event_FireGenericEvent("PopUpAccepted")
 	if self.tItems["EPGP"].Enable == 0 then
 		modifier = tonumber(self.tItems[CurrentPopUpID].net)
 		newDKP = tostring(tonumber(self.tItems[CurrentPopUpID].net)-math.abs(tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())))
@@ -4359,6 +4360,7 @@ function DKP:PopUpForceClose( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:PopUpSkip( wndHandler, wndControl, eMouseButton )
+		Event_FireGenericEvent("PopUpSkip")
 		ID_popup = PopUpItemQueue[1].ID
 		self.wndPopUp:FindChild("LabelName"):SetText(PopUpItemQueue[1].strName)
 		self.wndPopUp:FindChild("LabelItem"):SetText(PopUpItemQueue[1].strItem)
@@ -4679,6 +4681,7 @@ end
 function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 	if wndControl ~= wndHandler then return end
 	if eMouseButton == GameLib.CodeEnumInputMouse.Right and self:LabelGetColumnNumberForValue("Name") > 0 and wndControl:IsMouseTarget() then 
+		Event_FireGenericEvent("ContextMenuOpen")
 		local tCursor = Apollo.GetMouse()
 		self.wndContext:Move(tCursor.x, tCursor.y, self.wndContext:GetWidth(), self.wndContext:GetHeight())
 		self.wndContext:Show(true,false)
@@ -4719,6 +4722,7 @@ function DKP:ConLootLogs()
 end
 
 function DKP:ConManualAward()
+	Event_FireGenericEvent("ManualAssignOpen")
 	self:MAOpen(self.wndContext:GetData())
 end
 
@@ -6854,6 +6858,7 @@ function DKP:MAProceed()
 	self:OnLootedItem(item,true)
 	self:LLAddLog(self.wndMA:FindChild("Name"):GetText(),item:GetName())
 	self:PopUpWindowOpen(self.wndMA:FindChild("Name"):GetText(),item:GetName())
+	Event_FireGenericEvent("MAProceed")
 end
 -----------------------------------------------------------------------------------------------
 -- Manual Award 
