@@ -156,6 +156,7 @@ function ML:OnDocLoaded()
 		self:CreateRecipients()
 		self:DrawRecipients()
 		self:ArrangeTiles(self.wndLooterList)
+		self:EnableActionSlotButtons()
 		--Debug
 		--local wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",self.wndLootList,self)
 		--wnd:SetData({itemDrop = Item.GetDataFromId(45323),nLootId = 24})
@@ -214,15 +215,17 @@ function ML:DrawItems()
 	for nLootId , entry in pairs(tCachedItems) do
 		if not entry.wnd or entry.currentLocation ~= entry.destination then
 			if entry.wnd then entry.wnd:Destroy() end
-			local wndTarget = entry.destination == 1 and self.wndLootList or self.wndRandomList
-			if entry.destination == 1 or entry.destination == 2 then
+			local wndTarget = entry.destination == 1 and self.wndLootList or (entry.destination == 4 and self.wndMasterLoot:FindChild("ActionSlot") or self.wndRandomList)
+			if entry.destination == 1 or entry.destination == 2 or entry.destination == 4 then
 				entry.wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",wndTarget,self)
 				entry.wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
 				entry.wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
-				wndTarget:ArrangeChildrenHorz()
+				if entry.destination ~= 4 then wndTarget:ArrangeChildrenHorz() end
+				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
 				entry.wnd:SetData(entry.lootEntry)
 			end
-				entry.currentLocation = entry.destination
+			
+			entry.currentLocation = entry.destination
 		end
 	end
 end
@@ -485,6 +488,9 @@ function ML:Search( wndHandler, wndControl, strText )
 			for k ,wnd in ipairs(self.wndRandomList:GetChildren()) do
 				table.insert(tChildren,wnd)
 			end
+			if self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile") then
+				table.insert(tChildren,self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile"))
+			end
 			
 			for k , wnd in ipairs(tChildren) do
 				wnd:FindChild("ShadowOverlayItem"):Show(false)
@@ -518,6 +524,9 @@ function ML:Search( wndHandler, wndControl, strText )
 			end			
 			for k ,wnd in ipairs(self.wndRandomList:GetChildren()) do
 				table.insert(tChildren,wnd)
+			end
+			if self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile") then
+				table.insert(tChildren,self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile"))
 			end
 			
 			for k , wnd in ipairs(tChildren) do
@@ -634,16 +643,19 @@ function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData
 				break
 			end
 		end
-
+	elseif wndHandler:GetName() == "ActionSlot" then
+		tCachedItems[tData.nLootId].destination = 4
 	end
 
+	
 	self:DrawItems()
+	self:EnableActionSlotButtons()
 	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
 end
 
 function ML:OnQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
 	if wndHandler:GetName() == "PlayerItemTile" then wndHandler = wndHandler:GetParent():GetParent() end
-	if string.find(wndHandler:GetName(),"Pool") or wndHandler:GetName() == "RecipientEntry" then
+	if string.find(wndHandler:GetName(),"Pool") or wndHandler:GetName() == "RecipientEntry" or wndControl:GetName() == "ActionSlot" then
 		wndHandler:FindChild("Highlight"):Show(true)
 		return Apollo.DragDropQueryResult.Accept
 	else
@@ -664,6 +676,16 @@ function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRe
 		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().itemDrop:GetIcon(), wndControl:GetData().nLootId)
 	elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
 		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().lootEntry.itemDrop:GetIcon(), wndControl:GetData().lootEntry.nLootId)
+	end
+end
+
+function ML:EnableActionSlotButtons()
+	if #self.wndMasterLoot:FindChild("ActionSlot"):GetChildren() > 1 then
+		self.wndMasterLoot:FindChild("CB"):Enable(true)
+		self.wndMasterLoot:FindChild("NB"):Enable(true)
+	else		
+		self.wndMasterLoot:FindChild("CB"):Enable(false)
+		self.wndMasterLoot:FindChild("NB"):Enable(false)
 	end
 end
 -----------------------------------------------------------------------------------------------
