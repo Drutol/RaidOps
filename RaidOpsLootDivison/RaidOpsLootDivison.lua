@@ -147,7 +147,7 @@ function ML:OnDocLoaded()
 		--for result , id in pairs(Apollo.DragDropQueryResult) do
 		--	Print(result .. " " .. id)
 		--end
-
+		self:RestoreSettings()
 		self.tRandomPool = {}
 		self.tPlayerPool = {}
 		--for k=1 , 20 do 
@@ -163,10 +163,32 @@ function ML:OnDocLoaded()
 	end
 end
 
+function ML:RestoreSettings()
+	if not self.settings then self.settings = {} end
+	if not self.settings.strSearchType then self.settings.strSearchType = "Player" end
+	self.wndMasterLoot:FindChild("Controls"):FindChild(self.settings.strSearchType):SetCheck(true)
+end
+
+function ML:OnSave(eLevel)
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
+
+	local tSave = {}
+	tSave.settings = self.settings
+end
+
+function ML:OnRestore(eLevel)
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
+	self.settings = tSave.settings
+end
+
 -----------------------------------------------------------------------------------------------
 -- ML Functions
 -----------------------------------------------------------------------------------------------
 local tCachedItems = {}
+
+local function string_starts(String,Start)
+	return string.sub(string.lower(String),1,string.len(Start))==string.lower(Start)
+end
 
 function ML:CacheRecipients()
 
@@ -432,10 +454,92 @@ function ML:ToggleResize(wnd)
 	else
 		wnd:SetAnchorOffsets(l,t,r,b-wnd:GetData().nHeight)
 	end
-
-	l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-	self.wndMasterLoot:SetAnchorOffsets(l,t,r,(wnd:GetData().bExpanded and b+wnd:GetData().nHeight or b-wnd:GetData().nHeight))
 	self.wndMasterLoot:FindChild("Pools"):ArrangeChildrenVert()
+	local lc , tc = self.wndMasterLoot:FindChild("Controls"):GetPos()
+	l,t = self.wndMasterLoot:FindChild("RandomPool"):GetAnchorOffsets()
+	Print(tc - t)
+	if tc - t <= wnd:GetHeight() then
+		l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		self.wndMasterLoot:SetAnchorOffsets(l,t,r,(wnd:GetData().bExpanded and b+wnd:GetData().nHeight or b-wnd:GetData().nHeight))
+	end
+	
+end
+local prevSearch
+function ML:Search( wndHandler, wndControl, strText )
+	if prevSearch then
+		if prevSearch == "Player" then
+			for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+				wnd:FindChild("ShadowOverlay"):Show(false)
+				wnd:FindChild("SearchFlash"):Show(false)
+			end
+		else
+			local tChildren = {}
+			for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+				for j , itemChild in ipairs(wnd:FindChild("ItemsContainer"):GetChildren()) do
+					table.insert(tChildren,itemChild)
+				end
+			end
+			for k ,wnd in ipairs(self.wndLootList:GetChildren()) do
+				table.insert(tChildren,wnd)
+			end			
+			for k ,wnd in ipairs(self.wndRandomList:GetChildren()) do
+				table.insert(tChildren,wnd)
+			end
+			
+			for k , wnd in ipairs(tChildren) do
+				wnd:FindChild("ShadowOverlayItem"):Show(false)
+				wnd:FindChild("SearchFlashItem"):Show(false)
+			end
+		end
+	end
+
+
+	if strText and #strText > 0 then
+		if self.settings.strSearchType == "Player" then
+			for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+				if string_starts(wnd:GetData().strName,strText) then
+					wnd:FindChild("ShadowOverlay"):Show(false)
+					wnd:FindChild("SearchFlash"):Show(true)
+				else
+					wnd:FindChild("ShadowOverlay"):Show(true)
+					wnd:FindChild("SearchFlash"):Show(false)
+				end 
+			end
+
+		else
+			local tChildren = {}
+			for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+				for j , itemChild in ipairs(wnd:FindChild("ItemsContainer"):GetChildren()) do
+					table.insert(tChildren,itemChild)
+				end
+			end
+			for k ,wnd in ipairs(self.wndLootList:GetChildren()) do
+				table.insert(tChildren,wnd)
+			end			
+			for k ,wnd in ipairs(self.wndRandomList:GetChildren()) do
+				table.insert(tChildren,wnd)
+			end
+			
+			for k , wnd in ipairs(tChildren) do
+				if wnd:GetData() then
+					local tData = wnd:GetName() == "BubbleItemTile" and wnd:GetData() or wnd:GetData().lootEntry
+					if string_starts(tData.itemDrop:GetName(),strText) then
+						wnd:FindChild("ShadowOverlayItem"):Show(false)
+						wnd:FindChild("SearchFlashItem"):Show(true)
+					else
+						wnd:FindChild("ShadowOverlayItem"):Show(true)
+						wnd:FindChild("SearchFlashItem"):Show(false)
+					end 
+				end
+			end
+		end
+	end
+	prevSearch = self.settings.strSearchType
+end
+
+function ML:ChangeSearchType(wndHandler,wndControl)
+	self.settings.strSearchType = wndControl:GetName()
+	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
 end
 
 
@@ -534,6 +638,7 @@ function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData
 	end
 
 	self:DrawItems()
+	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
 end
 
 function ML:OnQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
