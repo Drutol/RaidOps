@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 17, 0, 0
+local Major, Minor, Patch, Suffix = 2, 19, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -178,6 +178,24 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.19---
+{18/06/2015}
+From now on skipped/closed PopUp window for item assignment will default item price in loot logs to 0.
+Network bidding should be functional again. (not tested during raid)
+Removed 'GuildChannel' field. Addon now uses guild specific channels.
+Data sync may work better , or it may not. I'm still trying different things.
+Changed appearance of Loot Logs a little bit.
+Added option to specify % modifier to GP value based on chat bidding's command.
+Fixed bug where chat bidding would perform countdow despite of item assignment.
+Now either option 'Assign' and 'select' in chatbidding will terminate bidding session.
+Fixed some bugs concerning import.
+Fixed issue when chat bidding wanted to process not bidding related messages (roll).
+---RaidOps version 2.18---
+{16/06/2015}
+Added tutorials module with 10 tutorials as of now.
+Tutorial window will appear when upgrading to version v2.18 + and after fresh install only.
+Tutorials' list is accessible from settings window.
+Fixed rare LUA error on item assign.
 ---RaidOps version 2.17---
 {9/06/2015}
 Added option to specify minium session length to avoid some buggy sessions.
@@ -227,24 +245,6 @@ Fixed LUA error when player rolled in chat bidding with range different than 1-1
 Added "OneVersion" (nifty addon on curse) support.
 Loot logs' minimum GP setting now properly fills in itsef on startup.
 Loot logs' "Equippable" filter now also includes tokens.
----RaidOps version 2.13---
-{1/06/2015}
-Fixed rename.
-Fixed various quirks related to Labels.
-Added Label 2nd profile.
-Name field will now resize itself when it takes different spot than the first.
----RaidOps version 2.12---
-{30/05/2015}
-Fixed Loot Logs not showing winners in Miscellaneous tab.
-Added option to reassign item.
-Added option to remove item from logs.
-Added menu to item tile in Loot Logs , right click to show.
-Reasign , manual award and item removal will result in undo log.
-Fixed Mass Edit's recent activity comments.
-Added on-screen notification option in Custom Events + notification length.
-Major visual reorganisation for Custom Events.
-Creating Custom Event successfully will result in notification.
-Added Website information.
  ]===]
 
 -- Localization stuff
@@ -293,7 +293,6 @@ function DKP:Init()
 	local tDependencies = {
 	}
 	self.tItems = {}
-	self.tItems["purged"] = nil
 	purge_database = 0
 	Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
@@ -497,6 +496,7 @@ function DKP:OnDocLoaded()
 		self:AttInit()
 		self:RSInit()
 		self:TutInit()
+		self:TutListInit()
 		-- Colors
 	
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
@@ -516,6 +516,7 @@ function DKP:OnDocLoaded()
 		
 		self.tSelectedItems = {}
 		self.bAwardingOnePlayer = false
+		self.tPopUpExceptions = {}
 		
 		
 		self.SortedLabel = nil
@@ -550,7 +551,16 @@ function DKP:OnDocLoaded()
 end
 
 function DKP:DebugFetch()
-	self:AltsBuildDictionary()
+	local item = Item.GetDataFromId(60417)
+	local tDetails = item:GetDetailedInfo()
+	for k,v in pairs(tDetails) do
+		Print(k .. " : " .. type(v))
+	end
+	if tDetails.tPrimary.arClassRequirement then
+		for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do Print(k .. " : " .. class) end
+	end
+	self.tPopUpItemGPvalues[item:GetName()] = 123
+	self.strRandomWinner = "Drutol Windchaser"
 end
 
 function DKP:ChangelogShow()
@@ -1244,7 +1254,7 @@ function DKP:OnSave(eLevel)
 				end
 			end
 		else
-			tSave["purged"] = "purged"
+			tSave["purged"] = true
 		end
 
 	return tSave
@@ -1271,7 +1281,8 @@ function DKP:OnRestore(eLevel, tData)
 			self.tItems["alts"] = {}
 		end
 		self.wndMainLoc = WindowLocation.new(tData.wndMainLoc)
-		
+		if self.tItems["purged"] then self.bPostPurge = true end
+		self.tItems["purged"] = nil
  end
 
 
@@ -1530,7 +1541,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if bFound then break end
 			end
 			
-			if self.ItemDatabase[string.sub(itemStr,2)] then
+			if self.ItemDatabase and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
 				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
 				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
@@ -3546,7 +3557,7 @@ function DKP:SettingsRestore()
 	if self.tItems["settings"].CheckAffiliation == 1 then self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetCheck(true) end
 
 	if self.tItems["settings"].bTrackUndo then self.wndSettings:FindChild("TrackUndo"):SetCheck(true) end
-	
+	if not self.tItems["settings"].bSkipBidders then self.tItems["settings"].bSkipBidders = false end
 	-- Sorry for this abomination above :(
 	
 	self.wndSettings:FindChild("UseColorIcons"):SetCheck(self.tItems["settings"].bColorIcons)
@@ -3643,6 +3654,14 @@ end
 
 function DKP:SettingsSkipGBDisable()
 	self.tItems["settings"].bSkipGB = false
+end
+
+function DKP:SettingsSkipBidderEnable()
+	self.tItems["settings"].bSkipBidders = true
+end
+
+function DKP:SettingsSkipBidderDisable()
+	self.tItems["settings"].bSkipBidders = false
 end
 
 function DKP:SettingsRemoveInvErrorsEnable()
@@ -3913,12 +3932,12 @@ function DKP:ExportExport()
 					self.tItems[k] = nil
 				end
 				for k,raid in ipairs(self.tItems.tRaids or {}) do
-					self.tItems.tRaids[k] = nil
+					if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
 				end
 				for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
 					table.insert(self.tItems,player)
 				end
-				if self.tItems.tRaids then self.tItems.tRaids = {} end
+				if not self.tItems.tRaids then self.tItems.tRaids = {} end
 				for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
 					table.insert(self.tItems.tRaids,raid)
 				end
@@ -4171,61 +4190,19 @@ function DKP:ExportAsHTMLDKP()
 end
 
 ---------------------------------------------------------------------------------------------------
--- MasterLootPopUp Functions --freaking old .... gonna rewrite this all
+-- MasterLootPopUp Functions
 ---------------------------------------------------------------------------------------------------
-local CurrentPopUpID = nil
-local PopUpItemQueue = {} 
+local currEntry
+local tQueue = {}
 
-function DKP:PopUpAccept( wndHandler, wndControl, eMouseButton )
-	if self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "X" or self.wndPopUp:FindChild("EditBoxDKP"):GetText() == "" then return end
-	local newDKP
-	local modifier
-	self:UndoAddActivity(string.format(ktUndoActions["maward"],self.tItems[CurrentPopUpID].strName,PopUpItemQueue[1].strItem),self.wndPopUp:FindChild("EditBoxDKP"):GetText(),{[1] = self.tItems[CurrentPopUpID]},nil,"--")
-	Event_FireGenericEvent("PopUpAccepted")
-	if self.tItems["EPGP"].Enable == 0 then
-		modifier = tonumber(self.tItems[CurrentPopUpID].net)
-		newDKP = tostring(tonumber(self.tItems[CurrentPopUpID].net)-math.abs(tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())))
-		if self.tItems[CurrentPopUpID].listed == 1 and self:LabelGetColumnNumberForValue("Net") ~= -1 then
-			self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(newDKP)
-		end
-		modifier = tostring(tonumber(newDKP) - modifier)
-		self.tItems[CurrentPopUpID].net = newDKP
-		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),"{DKP}",modifier,CurrentPopUpID)
-	else
-		self:EPGPAdd(self.tItems[CurrentPopUpID].strName,nil,tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()))
-		for k , item in ipairs(self.tItems[CurrentPopUpID].tLLogs) do
-			if item.itemID == PopUpItemQueue[1].itemID then
-				item.nGP = tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())
-				break
-			end
-		end
-		if self:LabelGetColumnNumberForValue("GP") ~= -1 and self.tItems[CurrentPopUpID].wnd ~= nil then
-			self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("GP"))):SetText(self.tItems[CurrentPopUpID].GP)
-		end
-		if self:LabelGetColumnNumberForValue("PR") ~= -1 then
-			if self.tItems[CurrentPopUpID].GP ~= 0 then 
-				self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText(string.format("%."..tostring(self.tItems["settings"].Precision).."f",self.tItems[CurrentPopUpID].EP/self.tItems[CurrentPopUpID].GP))
-			else
-				self.tItems[CurrentPopUpID].wnd:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("PR"))):SetText("0")
-			end
-		end	
-		self:DetailAddLog(self.wndPopUp:FindChild("LabelItem"):GetText(),"{GP}",tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText()),CurrentPopUpID)
-	end
-	self:RefreshMainItemList()
-	self:PopUpWindowClose()
-	self:PopUpUpdateQueueLength()
+function DKP:PopUpAccept()
+	
 end
 
 function DKP:PopUpAwardGuildBank()
 	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:DetailAddLog(PopUpItemQueue[1].strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) end
 	self:PopUpWindowClose()
 	self:PopUpUpdateQueueLength()
-end
-
-function DKP:PopUpCheckDKPSpelling( wndHandler, wndControl, strText )
-	if strText == "" then
-		wndControl:SetText("X")
-	end
 end
 
 function DKP:PopUpModifyGPValue(wndHandler,wndControl)
@@ -4254,133 +4231,77 @@ function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 end
 
 function DKP:PopUpWindowClose( wndHandler, wndControl )
-	if PopUpItemQueue ~= nil and #PopUpItemQueue <= 1 then
-		ID_popup = nil
-		self.wndPopUp:Show(false,false)
-		self.wndPopUp:FindChild("EditBoxDKP"):SetText("X")
-		CurrentPopUpID = nil
-		PopUpItemQueue = {}
-	else
-		ID_popup = PopUpItemQueue[1].ID
-		self.wndPopUp:FindChild("EditBoxDKP"):SetText("X")
-		self.wndPopUp:FindChild("LabelName"):SetText(PopUpItemQueue[1].strName)
-		self.wndPopUp:FindChild("LabelItem"):SetText(PopUpItemQueue[1].strItem)
-		self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
-		self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
-		Tooltip.GetItemTooltipForm(self, self.wndPopUp:FindChild("ItemIcon") , Item.GetDataFromId(PopUpItemQueue[1].itemID), {bPrimary = true, bSelling = false})
-		if self.tItems["EPGP"].Enable == 1 then
-			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
-			self.wndPopUp:FindChild("GPOffspec"):Show(true)
-			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-		else
-			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
-			self.wndPopUp:FindChild("GPOffspec"):Show(false)
-			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-		end
-		CurrentPopUpID = PopUpItemQueue[1].ID
-		if self.RegistredBidWinners[string.sub(PopUpItemQueue[1].strItem,2)] ~= nil then
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[string.sub(PopUpItemQueue[1].strItem,2)].cost)
-		end
-		table.remove(PopUpItemQueue,1)
-	end
-	self:PopUpUpdateQueueLength()
+
 end
 
 function DKP:PopUpWindowOpen(strNameOrig,strItem)
-	if self.tItems["settings"].PopupEnable == 0 then return end
-	
+	local entry = {}
 	local strName = ""
-	
 	for uchar in string.gfind(strNameOrig, "([%z\1-\127\194-\244][\128-\191]*)") do
 		if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
 		strName = strName .. uchar
 	end
-	
+
+	entry.strName = strName
+
+	-- Cheking if not to skip and if data is valid 
+
+	if self.ItemDatabase[strItem] and self:GetPlayerByIDByName(strName) ~= -1 then
+		entry.item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
+	else return end
+
 	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return end
+
+	if self:PopUpIsBidWinner(strName) then
+		self:PopUpAssign(nil,self.tPopUpItemGPvalues[strItem])
+	end
+
 	
-	if self:GetPlayerByIDByName("Guild Bank") ~= -1 and strName == "Guild Bank" and self.tItems["settings"].bSkipGB then 
-		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
-		return
-	end
-	local ID_popup = nil
-	for i=1, table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil and string.lower(self.tItems[i].strName) == string.lower(strName) then
-			ID_popup = i
-			break
-		end
-	end
-	if ID_popup == nil or not self.ItemDatabase[strItem] then 
-		return
-	else
-		local item = {}
-		item.strName = strName
-		item.strItem = strItem
-		item.ID = ID_popup
-		if self.ItemDatabase[string.sub(strItem,2)] then
-			item.itemID = self.ItemDatabase[string.sub(strItem,2)].ID
-		else
-			item.itemID = self.ItemDatabase[strItem].ID
-		end
-		table.insert(PopUpItemQueue,1,item)
-		if CurrentPopUpID == nil then --First Iteration
-			self.wndPopUp:FindChild("LabelName"):SetText(strName)
-			self.wndPopUp:FindChild("LabelItem"):SetText(strItem)
-			self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
-			self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
-			Tooltip.GetItemTooltipForm(self, self.wndPopUp:FindChild("ItemIcon") , Item.GetDataFromId(PopUpItemQueue[1].itemID), {bPrimary = true, bSelling = false})
-			if self.tItems["EPGP"].Enable == 1 then
-				self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
-				self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
-				self.wndPopUp:FindChild("GPOffspec"):Show(true)
-				self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-			else
-				self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
-				self.wndPopUp:FindChild("GPOffspec"):Show(false)
-				self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-			end
-			CurrentPopUpID = ID_popup
-		end
-		if self.RegistredBidWinners[string.sub(strItem,2)] ~= nil and self.tItems["EPGP"].Enable == 0 then
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(self.RegistredBidWinners[string.sub(strItem,2)].cost)
-		end
-		self.wndPopUp:Show(true,false)
-		if #PopUpItemQueue > 1 then self.wndPopUp:FindChild("ButtonSkip"):Enable(true) else self.wndPopUp:FindChild("ButtonSkip"):Enable(false) end
-		self:PopUpUpdateQueueLength()
-	end
+
+
+
 end
 
+function DKP:PopUpPopulate( ... )
+	-- body
+end
+
+function DKP:PopUpAssign(entry,nPrice)
+	if not nPrice then nPrice = self:PupUpGetCurrentPrice() end
+	if not nPrice then return end
+	if not entry then entry = tQueue[1] end
+	-- Data provided let's go!
+	
+	if self.tItems["EPGP"].Enable == 1 then
+		self:EPGPAdd(entry.strName,nil,nPrice)
+		self:LLUpdateItemCost(entry.strName,entry.item:GetItemId(),nPrice)
+		self:UndoAddActivity(string.format(ktUndoActions["maward"],entry.name,entry.item:GetName(),nPrice,{[1] = self.tItems[self:GetPlayerByIDByName(entry.strName)]},nil,"--")
+		self:DetailAddLog(entry.item:GetName(),"{GP}",nPrice,self:GetPlayerByIDByName(entry.strName))
+	else
+
+	end
+
+	self:RefreshMainItemList()
+end
+
+function DKP:PopUpGetCurrentPrice()
+	return tonumber(self.wndPopUp:FindChild("EditBoxDKP"):GetText())
+end
+
+function DKP:PopUpIsBidWinner(strName)
+	if not self.tItems["settings"].bSkipBidders then return false end
+	for i,strBidder in ipairs(self.tPopUpExceptions) do
+		if strName == strBidder then return true end
+	end
+	return false
+end
 
 function DKP:PopUpForceClose( wndHandler, wndControl, eMouseButton )
-	ID_popup = nil
-	self.wndPopUp:Show(false,false)
-	self.wndPopUp:FindChild("EditBoxDKP"):SetText("X")
-	PopUpItemQueue = {}
-	CurrentPopUpID = nil
+
 end
 
 function DKP:PopUpSkip( wndHandler, wndControl, eMouseButton )
 		Event_FireGenericEvent("PopUpSkip")
-		ID_popup = PopUpItemQueue[1].ID
-		self.wndPopUp:FindChild("LabelName"):SetText(PopUpItemQueue[1].strName)
-		self.wndPopUp:FindChild("LabelItem"):SetText(PopUpItemQueue[1].strItem)
-		if self.tItems["EPGP"].Enable == 1 then
-			self.wndPopUp:FindChild("LabelCurrency"):SetText("GP.")
-			self.wndPopUp:FindChild("EditBoxDKP"):SetText(string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36))
-			self.wndPopUp:FindChild("GPOffspec"):Show(true)
-			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-		else
-			self.wndPopUp:FindChild("LabelCurrency"):SetText("DKP.")
-			self.wndPopUp:FindChild("GPOffspec"):Show(false)
-			self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-		end
-		self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetItemQuality()))
-		self.wndPopUp:FindChild("ItemIcon"):SetSprite(Item.GetDataFromId(PopUpItemQueue[1].itemID):GetIcon())
-		Tooltip.GetItemTooltipForm(self, self.wndPopUp:FindChild("ItemIcon") , Item.GetDataFromId(PopUpItemQueue[1].itemID), {bPrimary = true, bSelling = false})
-		CurrentPopUpID = PopUpItemQueue[1].ID
-		table.remove(PopUpItemQueue,1)
-		if #PopUpItemQueue <= 1  then wndControl:Enable(false) end
-	    self:PopUpUpdateQueueLength()
 end
 
 function DKP:PopUpUpdateQueueLength()
@@ -4469,8 +4390,6 @@ function DKP:DSInit()
 	if self.tItems["settings"].DS.aboutRaidMembers then self.wndDS:FindChild("ShareAboutMembers"):SetCheck(true) end
 	if self.tItems["settings"].DS.logs then self.wndDS:FindChild("Logs"):SetCheck(true) end
 	if self.tItems["settings"].DS.shareLogs then self.wndDS:FindChild("AllowLogs"):SetCheck(true) end
-	
-	self.wndDS:FindChild("Channel"):SetText(self.tItems["settings"]["Bid2"].strChannel)
 	
 end
 
@@ -5911,7 +5830,16 @@ function DKP:LLFilterDisableTab(wndHandler,wndControl)
 	self.tItems["settings"].LL.tTabsSettings[wndControl:GetName()].bEnable = false
 end
 
-
+function DKP:LLUpdateItemCost(strName,itemID,nGP)
+	local ID = self:GetPlayerByIDByName(strName)
+	if ID == -1 then return end
+	for k , item in ipairs(self.tItems[ID].tLLogs) do
+		if item.itemID == itemID then
+			item.nGP = nGP
+			break
+		end
+	end
+end
 
 function DKP:LLAddLog(strPlayer,strItem)
 	if not self.tItems["settings"].bLootLogs then return end
@@ -5920,7 +5848,7 @@ function DKP:LLAddLog(strPlayer,strItem)
 		local item = self.ItemDatabase[strItem].ID
 		if item then
 			if self.tItems[ID].tLLogs == nil then self.tItems[ID].tLLogs = {} end
-			table.insert(self.tItems[ID].tLLogs,1,{itemID = self.ItemDatabase[strItem].ID,nDate = os.time(),nGP = tonumber(string.sub(self:EPGPGetItemCostByID(self.ItemDatabase[strItem].ID),36))})
+			table.insert(self.tItems[ID].tLLogs,1,{itemID = self.ItemDatabase[strItem].ID,nDate = os.time(),nGP = 0})
 
 			if #self.tItems[ID].tLLogs > 50 then table.remove(self.tItems[ID].tLLogs,51) end
 
@@ -6478,12 +6406,14 @@ end
 -- Syncing
 local tFetchers = {} -- heavy stuff
 function DKP:DFJoinSyncChannel()
-	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel",ICCommLib.CodeEnumICCommChannelType.Global)
+	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel",ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
 	self.sChannel:SetReceivedMessageFunction("DFOnSyncMessage",self)
 end
 
 function DKP:DFOnSyncMessage(channel, strMessage, idMessage)
+
 	local tMsg = serpent.load(strMessage)
+	Print(tMsg.type)
 	if tMsg.type  then
 		if tMsg.type == "SendMeData" then
 			self.sChannel:SendPrivateMessage(tMsg.strSender,self:GetEncodedData(tMsg.strSender))
@@ -6504,7 +6434,7 @@ function DKP:ProccesEncodedData(tData)
 	
 	if tData then
 		for k, player in ipairs(self.tItems) do
-			table.remove(self.tItems,k)
+			table.remove(self.tItems,1)
 		end
 		self.tItems["alts"] = tData["alts"] or {}
 		for k,player in ipairs(tData) do

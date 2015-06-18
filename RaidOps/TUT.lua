@@ -15,16 +15,17 @@ local ktTutIndex =
 		{
 			[1] = "Mid",
 			[2] = "Mid",
+			[3] = "Mid"
 		},
 		text = 
 		{
 			[1] = "Thanks for trying out this addon!\n\nAs it's quite rich in features this tutorial will help you understand the basics.\n\nClosing this window will stop the tutorial , you can get back to it from settings window.",
-			[2] = "In order to open main roster window type /epgp",
+			[2] = "Please note that these tutorials are not fool-proof .\nThat's not the point , try not to rush things and follow them.\n\nIf something goes wrong you can always restart them :).",
+			[3] = "In order to open main roster window type /epgp"
 		},
 		events = 
 		{
-			[1] = nil,
-			[2] = "MainWindowShow",
+			[3] = "MainWindowShow",
 		},
 		highlight = false,
 	},
@@ -106,8 +107,8 @@ local ktTutIndex =
 		},
 		text = 
 		{
-			[1] = "\nWelcome to the settings window.Those don't represent all of the settings available each module has it's own specific settings.\n\nGeneral settings are split into following groups:",
-			[2] = "\nPlayer creation group , you can collect players from raid and filter them by nameplate affilition. Right now I advize to use Guild Import",
+			[1] = "\nWelcome to the settings window.Those don't represent all of the settings available , each module has it's own specific settings.\n\nGeneral settings are split into following groups:",
+			[2] = "\nPlayer creation group , you can collect players from raid and filter them by nameplate affiliation. Right now I advise to use Guild Import",
 			[3] = "\nPopUp group , whenever you assign stuff this window may appear depending on filters and can be customized with those settings.",
 			[4] = "\nDisplay group , a bit of cosmetic customization.",
 			[5] = "\nLogs group , a few settings for Undo logs , standard logs and loot logs.",
@@ -256,6 +257,7 @@ local ktTutIndex =
 		highlight = false,
 		func = function(tContext)
 			tContext.wndContext:Show(tContext.wndContext:GetData() and true or false)
+			tContext.wndContext:ToFront()
 		end
 	},
 	[8] = 
@@ -317,25 +319,26 @@ local ktTutIndex =
 			[4] = "Right",
 			[5] = "ButtonSkip",
 			[6] = "GPOffspec",
-			[7] = "GPOffspec"
+			[7] = "GPOffspec",
+			[8] = "Right",
 		},
 		text = 
 		{
-			[1] = "This is the widnow we wanted to get our hands on. As you can see you can just press 'Accept' and GP will be added to this player.",
+			[1] = "This is the window we wanted to get our hands on. As you can see you can just press 'Accept' and GP will be added to this player.",
 			[2] = "This button will instantly award curent item to 'Guild bank'. It means that the log will appear in GB logs.",
 			[3] = "This number shows how many items are in queue waiting to be assigned.",
 			[4] = "Assign another item to different player via Manual Assign.",
 			[5] = "As you can see this button is now active. When you press it this item will be forgotten - no GP charged. Press this button.",
 			[6] = "The window has updated itself with new data. Look at this checkbox now.",
 			[7] = "When pressed it will decrease the GP/DKP value by percentage set in settings window.",
-			[8] = "When you are done simply press 'Accept'."
+			[8] = "When you are done simply press 'Accept'.",
 
 		},
 		events = 
 		{
 			[4] = "MAProceed",
 			[5] = "PopUpSkip",
-			[8] = "PopUpAccepted"
+			[8] = "PopUpAccepted",
 		},
 		highlight = true,
 	},
@@ -350,11 +353,12 @@ function DKP:TutInit()
 	self.wndTut:Show(false)
 
 	if not self.tItems["settings"].nTutProgress then 
-		
-		
+		self.tItems["settings"].nTutProgress = 1
+		if not self.bPostPurge then
+			self:TutStart()
+		end
 	end
-	self.tItems["settings"].nTutProgress = 7
-	self:TutStart()
+
 end
 
 function DKP:TutFwd()
@@ -366,22 +370,25 @@ function DKP:TutFwd()
 	else
 		self:TutStart(nil,currTut.nProgress+1)
 	end
+	if not ktTutIndex[self.tItems["settings"].nTutProgress] then self.wndTut:Show(false) end
 end
 
 function DKP:TutBck()
+	if currTut.events[currTut.nProgress] then Apollo.RemoveEventHandler(currTut.events[currTut.nProgress],self) end
 	if currTut.wndGlow then currTut.wndGlow:Destroy() end
 	self:TutStart(nil,currTut.nProgress-1)
 end
 
-function DKP:TutClose()
-
+function DKP:TutCanGoto(nTut)
+	if nTut == 9 or nTut == 10 then return false else return true end
 end
 
 function DKP:TutStart(nTut,nProgress)
 	if not nTut then nTut = self.tItems["settings"].nTutProgress end
 	if not nProgress then nProgress = 1 end
 	currTut = ktTutIndex[nTut]
-	Print(nTut)
+	if not ktTutIndex[nTut+1] and self:TutCanGoto(nTut+1) then self.wndTut:FindChild("Next"):Enable(false) else self.wndTut:FindChild("Next"):Enable(true) end
+	if not ktTutIndex[nTut-1] and self:TutCanGoto(nTut-1) then self.wndTut:FindChild("Prev"):Enable(false) else self.wndTut:FindChild("Prev"):Enable(true) end
 	if currTut then
 		currTut.nProgress = nProgress
 		-- Determine window
@@ -394,18 +401,18 @@ function DKP:TutStart(nTut,nProgress)
 		end
 		-- Determine Pos
 		if currTut.anchor[nProgress] == "Mid" then
-			local x,y = currTut.wnd:GetPos()
+			local x,y = currTut.wnd:GetAnchorOffsets()
 			self.wndTut:Move( x + currTut.wnd:GetWidth()/2 - self.wndTut:GetWidth()/2,  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 		elseif currTut.anchor[nProgress] == "Right" then
-			local x,y = currTut.wnd:GetPos()
+			local x,y = currTut.wnd:GetAnchorOffsets()
 			self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 		else
 			currTut.targetControl = currTut.wnd:FindChild(currTut.anchor[nProgress])
 			if currTut.window == "Settings" or currTut.window == "GI" or currTut.window == "PopUp" or currTut.window == "ManualAssign" or currTut.window == "Con" then
-				local x,y = currTut.wnd:GetPos()
+				local x,y = currTut.wnd:GetAnchorOffsets()
 				self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 			else
-				local x,y = currTut.wnd:GetPos()
+				local x,y = currTut.wnd:GetAnchorOffsets()
 				self.wndTut:Move( x + currTut.wnd:GetWidth()/2 - self.wndTut:GetWidth()/2,  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 			end
 		end
@@ -417,18 +424,16 @@ function DKP:TutStart(nTut,nProgress)
 		else
 			self.wndTut:FindChild("Fwd"):Show(true)
 		end
+
+		if nProgress-1 >= 1 then
+			self.wndTut:FindChild("Bck"):Show(true)
+		else
+			self.wndTut:FindChild("Bck"):Show(false)
+		end
+
 		--Set Text	
 		self.wndTut:FindChild("TutText"):SetText(currTut.text[nProgress])
 		self.wndTut:FindChild("TutTitle"):SetText(currTut.title)
-		--[[if currTut.nProgress < #currTut.text or currTut.continue == "Fwd" or not currTut.events[currTut.nProgress] then self.wndTut:FindChild("Fwd"):Show(true) else self.wndTut:FindChild("Fwd"):Show(false) end
-		if currTut.nProgress > 1 and #currTut.text >= currTut.nProgress then self.wndTut:FindChild("Bck"):Show(true) else self.wndTut:FindChild("Bck"):Show(false) end
-
-		-- Handlers
-		if currTut.continue == "Click" and currTut.targetControl then
-			if not currTut.highlight then currTut.targetControl:AddEventHandler("MouseButtonDown","TutProceedClick",self) end
-		elseif currTut.continue == "actionShow" then
-			currTut.wnd:AddEventHandler("WindowShow","TutProceedShow",self)
-		end]]
 	  	if currTut.highlight and currTut.targetControl then
 			local wnd = Apollo.LoadForm(self.xmlDoc3,"TutGlow",currTut.targetControl,self)
 			currTut.wndGlow = wnd
@@ -439,25 +444,52 @@ function DKP:TutStart(nTut,nProgress)
 	end
 end
 
-function DKP:TutProceedClick(wndHandler,wndControl)
-	if currTut.continue ~= "Click" or currTut.nProgress ~= #currTut.text then return end
-	if wndHandler ~= wndControl then return end
-	local glow = wndControl:FindChild("TutGlow")
-	if glow then glow:Destroy() end
-
-	self.tItems["settings"].nTutProgress = self.tItems["settings"].nTutProgress + 1
-	self:TutStart()
-end
-
-function DKP:TutProceedShow(wndHandler,wndControl)
-	if currTut.continue ~= "actionShow" or currTut.nProgress ~= #currTut.text then return end
-	
-	wndHandler:RemoveEventHandler("WindowShow",self)
-	
-	self.tItems["settings"].nTutProgress = self.tItems["settings"].nTutProgress + 1
-	self:TutStart()
-end
-
 function DKP:TutFront()
 	self.wndTut:ToFront()
+end
+
+function DKP:TutStop()
+	self.wndTut:Show(false,false)
+end
+
+function DKP:TutNextTut()
+	if currTut and currTut.wndGlow then currTut.wndGlow:Destroy() end
+	self.tItems["settings"].nTutProgress = self.tItems["settings"].nTutProgress + 1
+
+	self:TutStart()
+end
+
+function DKP:TutPrevTut()
+	if currTut and currTut.wndGlow then currTut.wndGlow:Destroy() end
+	self.tItems["settings"].nTutProgress = self.tItems["settings"].nTutProgress - 1
+	self:TutStart()
+end
+
+function DKP:TutListInit()
+	self.wndTutList = Apollo.LoadForm(self.xmlDoc3,"TutList",nil,self)
+	self.wndTutList:Show(false)
+	
+	for k , tut in ipairs(ktTutIndex) do
+		if k ~= 9 and k ~= 10 then 
+			self.wndTutList:FindChild("Grid"):AddRow(k..".")
+			self.wndTutList:FindChild("Grid"):SetCellData(k,1,tut.title)
+		end
+	end
+
+	self.wndTutList:FindChild("Grid"):AddEventHandler("GridSelChange","TutListOpenTut",self)
+end
+
+function DKP:TutListShow()
+	self.wndTutList:Show(true,false)
+	self.wndTutList:ToFront()
+end
+
+function DKP:TutListHide()
+	self.wndTutList:Show(false,false)
+end
+
+function DKP:TutListOpenTut(wndHandler,wndCotrol,iRow,iCol)
+	self.tItems["settings"].nTutProgress = iRow
+	self:TutStart()
+	self.wndTutList:Show(false,false)
 end

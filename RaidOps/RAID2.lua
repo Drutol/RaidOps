@@ -165,7 +165,7 @@ function DKP:IBPopulate(wndBubble)
 					wndTile:FindChild("Tooltip"):Show(true)
 				end
 
-				wndTile:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQuality(tItemPiece:GetItemQuality()))
+				wndTile:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(tItemPiece:GetItemQuality()))
 				wndTile:FindChild("ItemFrame"):FindChild("ItemIcon"):SetSprite(tItemPiece:GetIcon())
 				if tIDCounter[tItemPiece:GetName()] and tIDCounter[tItemPiece:GetName()].nCount > 1 then
 					wndTile:FindChild("Count"):SetText("x"..tIDCounter[tItemPiece:GetName()].nCount)

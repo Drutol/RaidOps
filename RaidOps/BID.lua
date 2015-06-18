@@ -92,8 +92,8 @@ local umplauteConversions =
 	["ú"] = "u",
  }
  
- local ktDefaultCommands = 
- {
+local ktDefaultCommands = 
+{
 	["Cmd1"] = 
 	{
 		bEnable = true,
@@ -114,8 +114,15 @@ local umplauteConversions =
 		bEnable = false,
 		strCmd = "---",
 	},
- }
+}
  
+local ktDefaultBidModifiers =
+{
+	[1] = 100,
+	[2] = 100,
+	[3] = 100,
+	[4] = 100,
+}
 
 local bInitialized = false
 local timeout = 5
@@ -271,9 +278,15 @@ function DKP:BidCompleteInit()
 	if self.tItems["settings"].bAutoStart == nil then self.tItems["settings"].bAutoStart = false end
 	self.wndBid:FindChild("ControlsContainer"):FindChild("Modes"):FindChild("AutoStart"):SetCheck(self.tItems["settings"].bAutoStart)
 	
+	if not self.tItems["settings"].tBidCategoryModifiers then self.tItems["settings"].tBidCategoryModifiers = ktDefaultBidModifiers end
+	
+	for k=1,4 do
+		self.wndBid:FindChild("ControlsContainer"):FindChild("Cmd"..k):SetText(self.tItems["settings"].tBidCategoryModifiers[k])
+	end
 	self.GeminiLocale:TranslateWindow(self.Locale, self.wndBid)
 	self:BidDisplayHelp()
 	if not self.tItems["settings"].tBidCommands then self.tItems["settings"].tBidCommands = ktDefaultCommands end
+
 	self:BidCheckConditions()
 	local wndCmd = self.wndBid:FindChild("Commands")
 	for k , tCommand in pairs(self.tItems["settings"].tBidCommands) do
@@ -281,11 +294,6 @@ function DKP:BidCompleteInit()
 		wndCmd:FindChild(k):Enable(tCommand.bEnable)
 		wndCmd:FindChild(k.."Enable"):SetCheck(tCommand.bEnable)
 	end
-	
-	
-	
-	
-	
 	
 	self.bIsBidding = false
 	--Post Update To generate Labels for Main DKP window
@@ -303,7 +311,7 @@ function DKP:BidCompleteInit()
 		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
 		self:EPGPHookToETooltip()
 	end
-	
+	self.tPopUpItemGPvalues = {}
 	--Hook.wndMasterLoot:Show(true,false)
 end
 
@@ -721,7 +729,7 @@ end
 
 function DKP:BidProcessMessageRoll(tData)
 	local strReturn = -1
-	
+	if not string.find(tData.strMsg,"rolls") and not string.find(tData.strMsg,"würfelt") then return -1 end
 	local words = {}
 	for word in string.gmatch(tData.strMsg,"%S+") do
 		table.insert(words,word)
@@ -882,6 +890,12 @@ function DKP:BidSelectWinner(nOpt)
 end
 
 function DKP:BidPerformCountdown()
+	if not self.bIsBidding then
+		if self.BidCountdown then self.BidCountdown:Stop() end
+		Apollo.RemoveEventHandler("BidPerformCountdown",self)
+		return
+	end
+
 	self.BidCounter = self.BidCounter + 1
 	if self.BidCounter >= self.tItems["settings"].BidCount then
 		if self.BidCountdown then self.BidCountdown:Stop() end
@@ -914,13 +928,14 @@ end
 
 function DKP:BidSelectBidder(wndHandler,wndControl)
 	self.CurrentBidSession.strSelected  = wndControl:GetData().strName
+	self.CurrentBidSession.nSelectedOpt = wndControl:GetData().nOpt
 	self:BidEnableAssign()
 end
 
 function DKP:BidAssignItem(wndHandler,wndControl)
 	local bMaster = true
-
-	if self.CurrentBidSession == nil or not self.CurrentBidSession.strSelected then return end
+ 	
+	if self.CurrentBidSession == nil or not self.CurrentBidSession.strSelected or not self.CurrentBidSession.nSelectedOpt then return end
 	
 	if bMaster then
 		for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
@@ -979,10 +994,18 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 					table.insert(self.tPopUpExceptions,self.CurrentBidSession.strSelected)
 				end
 			end
+
+
+			local price = self:EPGPGetItemCostByID(selectedItem.itemDrop:GetItemId(),true)
+			if price and type(price) ~= "string" then
+				price = (self.tItems["settings"].tBidCategoryModifiers[self.CurrentBidSession.nSelectedOpt] * price) / 100
+				self.tPopUpItemGPvalues[selectedItem.itemDrop:GetName()] = price
+			end
 			Hook:OnAssignDown() 
 		end
 	end
 	self:BidEnableAssign()
+	self.bIsBidding = false
 end
 
 function DKP:BidClose()
@@ -1029,6 +1052,15 @@ function DKP:BidSetCommand(wndHandler,wndControl,strText)
 	else
 		self.tItems["settings"].tBidCommands[wndControl:GetName()].strCmd = "---"
 		wndControl:SetText("---")
+	end
+end
+
+function DKP:BidSetCommandModifier(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val >= 0 and val <= 100 then
+		self.tItems["settings"].tBidCategoryModifiers[tonumber(string.sub(wndControl:GetName(),4,4))] = val
+	else
+		wndControl:SetText(self.tItems["settings"].tBidCategoryModifiers[tonumber(string.sub(wndControl:GetName(),3,4))])
 	end
 end
 
@@ -1154,15 +1186,11 @@ function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
 end
 
 function DKP:BidJoinChannel()
-	if string.len(self.tItems["settings"]["Bid2"].strChannel) < 5 then self.tItems["settings"]["Bid2"].strChannel = "Input Channel Name" end
-	self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Group)
-	--self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
-	self.channel:SetReceivedMessageFunction("OnRaidResponse",self)
-	self.channel:SetThrottledFunction("OnRaidThrottle",self)
-end
-
-function DKP:OnRaidThrottle(iccomm)
-
+	if self.uGuild then
+		self.tItems["settings"]["Bid2"].strChannel = "ROPSGuildSpecific"
+		self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
+		self.channel:SetReceivedMessageFunction("OnRaidResponse",self)
+	end
 end
 
 function DKP:Bid2PackAndSend(tData)
@@ -2424,16 +2452,16 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				
 				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
 					if string.find(tItem.itemDrop:GetName(),"Imprint") then
-						local bWantEsp = true
-						local bWantWar = true
-						local bWantSpe = true
-						local bWantMed = true
-						local bWantSta = true
-						local bWantEng = true
+					    bWantEsp = false
+					    bWantWar = false
+					    bWantSpe = false
+					    bWantMed = false
+					    bWantSta = false
+					    bWantEng = false
 						
 						local tDetails = tItem.itemDrop:GetDetailedInfo()
-						if tDetails.arClassRequirement then
-							for k , class in ipairs(tDetails.arClassRequirement.arClasses) do
+						if tDetails.tPrimary.arClassRequirement then
+							for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do
 								if class == 1 then bWantWar = true
 								elseif class == 2 then bWantEng = true
 								elseif class == 3 then bWantEsp = true
@@ -2797,7 +2825,6 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
 	
 	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
-	self.wndMLSettings:FindChild("ChannelName"):SetText(self.tItems["settings"]["Bid2"].strChannel)
 end
 
 function DKP:MLSettingsValueEnable()
