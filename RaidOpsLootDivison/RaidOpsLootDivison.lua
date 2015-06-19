@@ -148,6 +148,7 @@ function ML:OnDocLoaded()
 		--	Print(result .. " " .. id)
 		--end
 		self:RestoreSettings()
+		self:FilterInit()
 		self.tRandomPool = {}
 		self.tPlayerPool = {}
 		--for k=1 , 20 do 
@@ -175,9 +176,10 @@ function ML:OnSave(eLevel)
 
 	local tSave = {}
 	tSave.settings = self.settings
+	return tSave
 end
 
-function ML:OnRestore(eLevel)
+function ML:OnRestore(eLevel,tSave)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 	self.settings = tSave.settings
 end
@@ -726,7 +728,223 @@ function ML:GetSlotSpriteByQualityRectangle(ID)
 	end
 end
 
+-----------------------------------------------------------------------------------------------
+-- Filtering
+-----------------------------------------------------------------------------------------------
 
+function ML:FilterInit()
+	self.wndFilter = Apollo.LoadForm(self.xmlDoc,"Filters",nil,self)
+	self.wndFilter:Show(false)
+
+	-- Defaults
+
+	if not self.settings.tFilters then self.settings.tFilters = {} end
+	if self.settings.tFilters.bSigns == nil then self.settings.tFilters.bSigns = false end
+	if self.settings.tFilters.bSignsAuto == nil then self.settings.tFilters.bSignsAuto = false end	
+	
+	if self.settings.tFilters.bPatterns == nil then self.settings.tFilters.bPatterns = false end
+	if self.settings.tFilters.bPatternsAuto == nil then self.settings.tFilters.bPatternsAuto = false end	
+
+	if self.settings.tFilters.bSchem == nil then self.settings.tFilters.bSchem = false end
+	if self.settings.tFilters.bSchemAuto == nil then self.settings.tFilters.bSchemAuto = false end	
+	
+	if self.settings.tFilters.bWhite == nil then self.settings.tFilters.bWhite = false end
+	if self.settings.tFilters.bWhiteAuto == nil then self.settings.tFilters.bWhiteAuto = false end	
+	
+	if self.settings.tFilters.bGray == nil then self.settings.tFilters.bGray = false end
+	if self.settings.tFilters.bGrayAuto == nil then self.settings.tFilters.bGrayAuto = false end	
+	
+	if self.settings.tFilters.bGreen == nil then self.settings.tFilters.bGreen = false end
+	if self.settings.tFilters.bGreenAuto == nil then self.settings.tFilters.bGreenAuto = false end	
+
+	if self.settings.tFilters.bBlue == nil then self.settings.tFilters.bBlue = false end
+	if self.settings.tFilters.bBlueAuto == nil then self.settings.tFilters.bBlueAuto = false end
+
+	-- Fill in
+
+	self.wndFilter:FindChild("Sign"):SetCheck(self.settings.tFilters.bSigns)
+	self.wndFilter:FindChild("Sign"):FindChild("Auto"):SetCheck(self.settings.tFilters.bSignsAuto)
+	
+	self.wndFilter:FindChild("Patt"):SetCheck(self.settings.tFilters.bPatterns)
+	self.wndFilter:FindChild("Patt"):FindChild("Auto"):SetCheck(self.settings.tFilters.bPatternsAuto)
+	
+	self.wndFilter:FindChild("Schem"):SetCheck(self.settings.tFilters.bSchem)
+	self.wndFilter:FindChild("Schem"):FindChild("Auto"):SetCheck(self.settings.tFilters.bSchemAuto)
+	
+	self.wndFilter:FindChild("Gray"):SetCheck(self.settings.tFilters.bGray)
+	self.wndFilter:FindChild("Gray"):FindChild("Auto"):SetCheck(self.settings.tFilters.bGrayAuto)
+	
+	self.wndFilter:FindChild("White"):SetCheck(self.settings.tFilters.bWhite)
+	self.wndFilter:FindChild("White"):FindChild("Auto"):SetCheck(self.settings.tFilters.bWhiteAuto)
+	
+	self.wndFilter:FindChild("Green"):SetCheck(self.settings.tFilters.bGreen)
+	self.wndFilter:FindChild("Green"):FindChild("Auto"):SetCheck(self.settings.tFilters.bGreenAuto)
+	
+	self.wndFilter:FindChild("Blue"):SetCheck(self.settings.tFilters.bBlue)
+	self.wndFilter:FindChild("Blue"):FindChild("Auto"):SetCheck(self.settings.tFilters.bBlueAuto)
+
+	-- Populate custom
+	if not self.settings.tFilters.tCustom then self.settings.tFilters.tCustom = {} end
+
+	self:FilterPopulate()
+end
+
+function ML:FilterShow()
+	self.wndFilter:Show(true,false)
+	self.wndFilter:ToFront()
+
+	self:FilterPopulate()
+end
+
+function ML:FilterHide()
+	self.wndFilter:Show(false,false)
+end
+
+local function containsWord(tWords,word)
+	for k , strWord in ipairs(tWords) do
+		if strWord == word then return true end
+	end
+	return false 
+end
+
+function ML:FilterIsRandomed(item)
+	local  words = {}
+	for word in string.gmatch(item:GetName(),"%S+") do
+		table.insert(words,word)
+	end
+	if self.settings.tFilters.bSigns and containsWord(words,"Sign") then return true end
+	if self.settings.tFilters.bPatterns and containsWord(words,"Pattern") then return true end
+	if self.settings.tFilters.bSchem and containsWord(words,"Schematic") then return true end
+	if self.settings.tFilters.bWhite and item:GetItemQuality() == 1 then return true end
+	if self.settings.tFilters.bGray and item:GetItemQuality() == 2 then return true end
+	if self.settings.tFilters.bGreen and item:GetItemQuality() == 3 then return true end
+	if self.settings.tFilters.bBlue and item:GetItemQuality() == 4 then return true end
+
+	for k , tFilter in ipairs(self.settings.tFilters.tCustom) do
+		if containsWord(words,tFilter.strKeyword) then return true end
+	end
+
+	return false
+end
+
+function ML:FilterIsAuto(item)
+	local  words = {}
+	for word in string.gmatch(item:GetName(),"%S+") do
+		table.insert(words,word)
+	end
+	if self.settings.tFilters.bSignsAuto and containsWord(words,"Sign") then return true end
+	if self.settings.tFilters.bPatternsAuto and containsWord(words,"Pattern") then return true end
+	if self.settings.tFilters.bSchemAuto and containsWord(words,"Schematic") then return true end
+	if self.settings.tFilters.bWhiteAuto and item:GetItemQuality() == 1 then return true end
+	if self.settings.tFilters.bGrayAuto and item:GetItemQuality() == 2 then return true end
+	if self.settings.tFilters.bGreenAuto and item:GetItemQuality() == 3 then return true end
+	if self.settings.tFilters.bBlueAuto and item:GetItemQuality() == 4 then return true end
+
+	for k , tFilter in ipairs(self.settings.tFilters.tCustom) do
+		if tFilter.bAuto and containsWord(words,tFilter.strKeyword) then return true end
+	end
+
+	return false
+end
+
+function ML:FilterPopulate()
+	self.wndFilter:FindChild("List"):DestroyChildren()
+	for k , tFilter in ipairs(self.settings.tFilters.tCustom) do
+		local wnd = Apollo.LoadForm(self.xmlDoc,"FilterKeywordEntry",self.wndFilter:FindChild("List"),self)
+		wnd:FindChild("Keyword"):SetText(tFilter.strKeyword)
+		wnd:FindChild("Keyword"):Enable(false)
+		wnd:FindChild("Auto"):SetCheck(tFilter.bAuto)
+		wnd:SetName(tFilter.strKeyword)
+	end
+	local wnd = Apollo.LoadForm(self.xmlDoc,"FilterKeywordEntry",self.wndFilter:FindChild("List"),self)
+	wnd:FindChild("Keyword"):SetText("Type new keyword here.")
+	wnd:FindChild("Auto"):Show(false)
+	wnd:FindChild("Rem"):Show(false)
+	self:FilterArrangeWords()
+end
+local prevWord
+function ML:FilterArrangeWords()
+	local list = self.wndFilter:FindChild("List")
+	local children = list:GetChildren()
+	for k , child in ipairs(children) do
+		child:SetAnchorOffsets(5,0,child:GetWidth()+5,child:GetHeight())
+	end
+	for k , child in ipairs(children) do
+		if k > 1 then
+			local l,t,r,b = prevWord:GetAnchorOffsets()
+			child:SetAnchorOffsets(5,b-50,child:GetWidth()+5,b+child:GetHeight()-50)
+		end
+		prevWord = child
+	end
+end
+
+function ML:FilterAddCustom(wndHandler,wndControl,strText)
+	if strText and strText ~= "" then
+		local  words = {}
+		for word in string.gmatch(item:GetName(),"%S+") do
+			table.insert(words,word)
+		end
+		if #words > 1 then return end
+		for k , tFilter in ipairs(self.settings.tFilters.tCustom) do if string.lower(tFilter.strKeyword) == string.lower(strText) then return end end
+		wndControl:SetText("")
+		table.insert(self.settings.tFilters.tCustom,{strKeyword = strText,bAuto = false})
+		self:FilterPopulate()
+	end
+end
+
+function ML:FilterEnablePreset(wndHandler,wndControl)
+	if wndControl:GetName() == "Sign" then self.settings.tFilters.bSigns = true
+	elseif wndControl:GetName() == "Patt" then self.settings.tFilters.bPatterns = true
+	elseif wndControl:GetName() == "Schem" then self.settings.tFilters.bSchem = true
+	elseif wndControl:GetName() == "Gray" then self.settings.tFilters.bGray = true
+	elseif wndControl:GetName() == "White" then self.settings.tFilters.bWhite = true
+	elseif wndControl:GetName() == "Green" then self.settings.tFilters.bGreen = true
+	elseif wndControl:GetName() == "Blue" then self.settings.tFilters.bBlue = true
+	end
+end
+
+function ML:FilterDisablePreset(wndHandler,wndControl)
+	if wndControl:GetName() == "Sign" then self.settings.tFilters.bSigns = false
+	elseif wndControl:GetName() == "Patt" then self.settings.tFilters.bPatterns = false
+	elseif wndControl:GetName() == "Schem" then self.settings.tFilters.bSchem = false
+	elseif wndControl:GetName() == "Gray" then self.settings.tFilters.bGray = false
+	elseif wndControl:GetName() == "White" then self.settings.tFilters.bWhite = false
+	elseif wndControl:GetName() == "Green" then self.settings.tFilters.bGreen = false
+	elseif wndControl:GetName() == "Blue" then self.settings.tFilters.bBlue = false
+	end
+end
+
+function ML:FilterRegisterAutoRandom(wndHandler,wndControl)
+	wndControl = wndControl:GetParent()
+	if wndControl:GetName() == "Sign" then self.settings.tFilters.bSignsAuto = true
+	elseif wndControl:GetName() == "Patt" then self.settings.tFilters.bPatternsAuto = true
+	elseif wndControl:GetName() == "Schem" then self.settings.tFilters.bSchemAuto = true
+	elseif wndControl:GetName() == "Gray" then self.settings.tFilters.bGrayAuto = true
+	elseif wndControl:GetName() == "White" then self.settings.tFilters.bWhiteAuto = true
+	elseif wndControl:GetName() == "Green" then self.settings.tFilters.bGreenAuto = true
+	elseif wndControl:GetName() == "Blue" then self.settings.tFilters.bBlueAuto = true
+	else
+		for k , tFilter in ipairs(self.settings.tFilters.tCustom) do
+			if tFilter.strKeyword == wndControl:GetName() then tFilter.bAuto = true break end
+		end
+	end
+end
+
+function ML:FilterDeregisterAutoRandom(wndHandler,wndControl)
+	wndControl = wndControl:GetParent()
+	if wndControl:GetName() == "Sign" then self.settings.tFilters.bSignsAuto = false
+	elseif wndControl:GetName() == "Patt" then self.settings.tFilters.bPatternsAuto = false
+	elseif wndControl:GetName() == "Schem" then self.settings.tFilters.bSchemAuto = false
+	elseif wndControl:GetName() == "Gray" then self.settings.tFilters.bGrayAuto = false
+	elseif wndControl:GetName() == "White" then self.settings.tFilters.bWhiteAuto = false
+	elseif wndControl:GetName() == "Green" then self.settings.tFilters.bGreenAuto = false
+	elseif wndControl:GetName() == "Blue" then self.settings.tFilters.bBlueAuto = false
+	else
+		for k , tFilter in ipairs(self.settings.tFilters.tCustom) do
+			if tFilter.strKeyword == wndControl:GetName() then tFilter.bAuto = false break end
+		end
+	end
+end
 -----------------------------------------------------------------------------------------------
 -- ML Instance
 -----------------------------------------------------------------------------------------------

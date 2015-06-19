@@ -311,7 +311,7 @@ function DKP:BidCompleteInit()
 		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
 		self:EPGPHookToETooltip()
 	end
-	self.tPopUpItemGPvalues = {}
+
 	--Hook.wndMasterLoot:Show(true,false)
 end
 

@@ -568,7 +568,7 @@ function DKP:AttInit()
 	self.wndSessionToolbar = Apollo.LoadForm(self.xmlDoc3,"SessionToolbar",nil,self)
 	self.wndSessionPopUp:Show(false)
 	self.wndSessionToolbar:Show(false)
-	Apollo.RegisterEventHandler("ChangeWorld", "AttCheckZone", self)
+	Apollo.RegisterEventHandler("ChangeWorld", "AttZoneChanged", self)
 	Apollo.RegisterTimerHandler(30,"AttAddTime",self)
 	Apollo.RegisterTimerHandler(1,"AttCheckTime",self)
 
@@ -609,7 +609,11 @@ function DKP:AttInit()
 	self:AttCheckZone()
 end
 
-function DKP:AttCheckZone()
+function DKP:AttZoneChanged()
+	self:delay(5,function(tContext) tContext:AttCheckZone() end)
+end
+
+function DKP:AttCheckZone()	
 	local tMap = GameLib.GetCurrentZoneMap()
 	if tMap and self:RSIsRaidZone(tMap.id) then
 		

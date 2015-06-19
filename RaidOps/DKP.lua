@@ -179,7 +179,7 @@ local RAID_Y = 2
 local strChangelog = 
 [===[
 ---RaidOps version 2.19---
-{18/06/2015}
+{19/06/2015}
 From now on skipped/closed PopUp window for item assignment will default item price in loot logs to 0.
 Network bidding should be functional again. (not tested during raid)
 Removed 'GuildChannel' field. Addon now uses guild specific channels.
@@ -190,6 +190,12 @@ Fixed bug where chat bidding would perform countdow despite of item assignment.
 Now either option 'Assign' and 'select' in chatbidding will terminate bidding session.
 Fixed some bugs concerning import.
 Fixed issue when chat bidding wanted to process not bidding related messages (roll).
+Added option to add Loot Log only after PopUp window.
+Fixed (?) issue when raid session pop-up wouldn't pop-up.
+Now when skipping PopUp for bid winners , PopUp will assign this item with price dependent on modifiers.
+Complete rewrite of PopUp backend.
+Slight visual upgrade of pop-up windnow.
+Fixed Phageborn Convergence not triggering custom event.
 ---RaidOps version 2.18---
 {16/06/2015}
 Added tutorials module with 10 tutorials as of now.
@@ -517,6 +523,7 @@ function DKP:OnDocLoaded()
 		self.tSelectedItems = {}
 		self.bAwardingOnePlayer = false
 		self.tPopUpExceptions = {}
+		self.tPopUpItemGPvalues = {}
 		
 		
 		self.SortedLabel = nil
@@ -560,7 +567,13 @@ function DKP:DebugFetch()
 		for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do Print(k .. " : " .. class) end
 	end
 	self.tPopUpItemGPvalues[item:GetName()] = 123
+	table.insert(self.tPopUpExceptions,"Drutol Windchaser")
 	self.strRandomWinner = "Drutol Windchaser"
+
+	self:CEOnUnitDamage({bTargetKilled = true,name = "Ersoth Curseform"})
+	self:CEOnUnitDamage({bTargetKilled = true,name = "Fleshmonger Vratorg"})
+	self:CEOnUnitDamage({bTargetKilled = true,name = "Terax Blightweaver"})
+	self:CEOnUnitDamage({bTargetKilled = true,name = "Goldox Lifecrusher"})
 end
 
 function DKP:ChangelogShow()
@@ -643,7 +656,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 	for k,player in ipairs(tMembers) do table.insert(tMembersNames,player.strName) end
 	table.sort(tMembersNames,raidOpsSortCategories)
 	table.insert(tUndoActions,1,{tAffectedNames = tMembersNames,strType = strType,strMod = strMod,nAffected = #tMembers,strData = serpent.dump(tMembers),bRemove = bRemoval,strTimestamp = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time()),strComment = strComment,bAddAlt = bAddAlt})
-	if #tUndoActions > 15 then table.remove(tUndoActions,16) end
+	if #tUndoActions > 20 then table.remove(tUndoActions,21) end
 	self:UndoPopulate()
 	tRedoActions = {} 
 	self.wndActivity:FindChild("Redo"):Enable(false)
@@ -1549,13 +1562,11 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			elseif self.tItems["settings"].strLootFiltering == "WL" and not bFound then
 				return
 			end
-			
-			
-			
+		
 			
 			self:Bid2CloseOnAssign(string.sub(itemStr,2))
 			strName = string.sub(strName,2)
-			self:LLAddLog(strName:sub(1, #strName - 1),string.sub(itemStr,2))
+			if not self.tItems["settings"].bLLAfterPopUp then self:LLAddLog(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
 
 			if strName ~= "" and itemStr ~= "" then
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
@@ -1613,7 +1624,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName,strItem) end
 			 self:HubRegisterLoot(strName,strItem)
 			 self:Bid2CloseOnAssign(strItem)
-			 self:LLAddLog(strName,strItem)
+			 if not self.tItems["settings"].bLLAfterPopUp then self:LLAddLog(strName,strItem) end
 		end
 	end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper or channelCurrent:GetType() == ChatSystemLib.ChatChannel_Guild then
@@ -3558,6 +3569,8 @@ function DKP:SettingsRestore()
 
 	if self.tItems["settings"].bTrackUndo then self.wndSettings:FindChild("TrackUndo"):SetCheck(true) end
 	if not self.tItems["settings"].bSkipBidders then self.tItems["settings"].bSkipBidders = false end
+	if self.tItems["settings"].bLLAfterPopUp == nil then self.tItems["settings"].bLLAfterPopUp = false end
+
 	-- Sorry for this abomination above :(
 	
 	self.wndSettings:FindChild("UseColorIcons"):SetCheck(self.tItems["settings"].bColorIcons)
@@ -3572,6 +3585,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("SkipRandomAssign"):SetCheck(self.tItems["settings"].bPopUpRandomSkip)
 	self.wndSettings:FindChild("AutoLog"):SetCheck(self.tItems["settings"].bAutoLog)
 	self.wndSettings:FindChild("SkipWinner"):SetCheck(self.tItems["settings"].bSkipBidders)
+	self.wndSettings:FindChild("LLonPopUp"):SetCheck(self.tItems["settings"].bLLAfterPopUp)
 	self.wndSettings:FindChild(self.tItems["settings"].strDateFormat):SetCheck(true)
 	
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
@@ -3582,6 +3596,14 @@ function DKP:SettingsRestore()
 									 " /nb - For Network Bidding window \n" ..
 									 " /chatbid - For Chat Bidding window \n")
 									 
+end
+
+function DKP:SettingsLLAfterPopUpEnable()
+	self.tItems["settings"].bLLAfterPopUp = true
+end
+
+function DKP:SettingsLLAfterPopUpDisable()
+	self.tItems["settings"].bLLAfterPopUp = false
 end
 
 function DKP:SettingsEnablePlayerCollection( wndHandler, wndControl, eMouseButton )
@@ -4196,13 +4218,13 @@ local currEntry
 local tQueue = {}
 
 function DKP:PopUpAccept()
-	
+	self:PopUpAssign()
 end
 
 function DKP:PopUpAwardGuildBank()
-	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:DetailAddLog(PopUpItemQueue[1].strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) end
-	self:PopUpWindowClose()
-	self:PopUpUpdateQueueLength()
+	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:DetailAddLog(currEntry.strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) end
+	currEntry = nil
+	self:PopUpCheckUpdate()
 end
 
 function DKP:PopUpModifyGPValue(wndHandler,wndControl)
@@ -4230,10 +4252,6 @@ function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 	if value then self.wndPopUp:FindChild("EditBoxDKP"):SetText(value) end
 end
 
-function DKP:PopUpWindowClose( wndHandler, wndControl )
-
-end
-
 function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	local entry = {}
 	local strName = ""
@@ -4253,35 +4271,87 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return end
 
 	if self:PopUpIsBidWinner(strName) then
-		self:PopUpAssign(nil,self.tPopUpItemGPvalues[strItem])
+		self:PopUpAssign(entry,self.tPopUpItemGPvalues[strItem])
+		self.tPopUpItemGPvalues[strItem] = nil
+		return
 	end
 
-	
+	-- Set GP value
 
+	if self.tPopUpItemGPvalues[strItem] then
+		entry.nGP = self.tPopUpItemGPvalues[strItem]
+		self.tPopUpItemGPvalues[strItem] = nil
+	else
+		entry.nGP = self:EPGPGetItemCostByID(entry.item:GetItemId(),true)
+	end
 
+	-- Store in queue
+
+	table.insert(tQueue,1,entry)
+
+	-- update if necessary
+
+	self:PopUpCheckUpdate()
 
 end
 
-function DKP:PopUpPopulate( ... )
-	-- body
+function DKP:PopUpCheckUpdate()
+	if not currEntry then
+		currEntry = tQueue[1]
+		table.remove(tQueue,1)
+	end
+	self:PopUpPopulate()
+end
+
+function DKP:PopUpPopulate()
+	if not currEntry then 
+		self.wndPopUp:Show(false,false)
+		return 
+	end
+	self.wndPopUp:FindChild("LabelName"):SetText(currEntry.strName)
+	self.wndPopUp:FindChild("LabelItem"):SetText(currEntry.item:GetName())
+	self.wndPopUp:FindChild("LabelCurrency"):SetText(self.tItems["EPGP"].Enable == 1 and "GP." or "DKP.")
+	self.wndPopUp:FindChild("GPOffspec"):Show(self.tItems["EPGP"].Enable == 1 and true or false)
+	self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
+	self.wndPopUp:FindChild("EditBoxDKP"):SetText(currEntry.nGP)
+	self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(currEntry.item:GetItemQuality()))
+	self.wndPopUp:FindChild("ItemIcon"):SetSprite(currEntry.item:GetIcon())
+	Tooltip.GetItemTooltipForm(self,self.wndPopUp:FindChild("Frame"),currEntry.item,{})
+
+	self.wndPopUp:FindChild("QueueLength"):SetText(#tQueue)
+	if #tQueue == 0 then
+		self.wndPopUp:FindChild("ButtonSkip"):Enable(false)
+	else
+		self.wndPopUp:FindChild("ButtonSkip"):Enable(true)
+	end
+	self.wndPopUp:Show(true,false)
+	self.wndPopUp:ToFront()
 end
 
 function DKP:PopUpAssign(entry,nPrice)
-	if not nPrice then nPrice = self:PupUpGetCurrentPrice() end
+	if not nPrice then nPrice = self:PopUpGetCurrentPrice() end
 	if not nPrice then return end
-	if not entry then entry = tQueue[1] end
+	if not entry then entry = currEntry end
+	if not entry then return end
 	-- Data provided let's go!
-	
+
+	self:UndoAddActivity(string.format(ktUndoActions["maward"],entry.strName,entry.item:GetName()),nPrice,{[1] = self.tItems[self:GetPlayerByIDByName(entry.strName)]},nil,"--")
+	if self.tItems["settings"].bLLAfterPopUp then self:LLAddLog(entry.strName,entry.item:GetName()) end
+	self:LLUpdateItemCost(entry.strName,entry.item:GetItemId(),nPrice)
+	local ID = self:GetPlayerByIDByName(entry.strName)
+
 	if self.tItems["EPGP"].Enable == 1 then
 		self:EPGPAdd(entry.strName,nil,nPrice)
-		self:LLUpdateItemCost(entry.strName,entry.item:GetItemId(),nPrice)
-		self:UndoAddActivity(string.format(ktUndoActions["maward"],entry.name,entry.item:GetName(),nPrice,{[1] = self.tItems[self:GetPlayerByIDByName(entry.strName)]},nil,"--")
 		self:DetailAddLog(entry.item:GetName(),"{GP}",nPrice,self:GetPlayerByIDByName(entry.strName))
 	else
-
+		self.tItems[ID].net = self.tItems[ID].net - nPrice
+		self:DetailAddLog(entry.item:GetName(),"{DKP}",nPrice,self:GetPlayerByIDByName(entry.strName))
 	end
 
-	self:RefreshMainItemList()
+	currEntry = nil
+	self:PopUpCheckUpdate()
+
+	if self.tItems[ID].wnd then self:UpdateItem(self.tItems[ID]) end
 end
 
 function DKP:PopUpGetCurrentPrice()
@@ -4291,21 +4361,24 @@ end
 function DKP:PopUpIsBidWinner(strName)
 	if not self.tItems["settings"].bSkipBidders then return false end
 	for i,strBidder in ipairs(self.tPopUpExceptions) do
-		if strName == strBidder then return true end
+		if strName == strBidder then 
+			table.remove(self.tPopUpExceptions,i)
+			return true 
+		end
 	end
 	return false
 end
 
 function DKP:PopUpForceClose( wndHandler, wndControl, eMouseButton )
-
+	tQueue = {}
+	currEntry = nil
+	self:PopUpCheckUpdate()
 end
 
 function DKP:PopUpSkip( wndHandler, wndControl, eMouseButton )
-		Event_FireGenericEvent("PopUpSkip")
-end
-
-function DKP:PopUpUpdateQueueLength()
-		if PopUpItemQueue ~= nil then self.wndPopUp:FindChild("QueueLength"):SetText(tostring(#PopUpItemQueue-1)) end
+	Event_FireGenericEvent("PopUpSkip")
+	currEntry = nil
+	self:PopUpCheckUpdate()
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -4915,7 +4988,7 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after)})
 		if #self.tItems[ID].logs >= 15 then 
 			for k=15,#self.tItems[ID].logs do
-				table.remove(self.tItems[ID].logs,15) 
+				self.tItems[ID].logs[k] = nil
 			end
 		end
 		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
@@ -5348,7 +5421,7 @@ local tKilledBossesInSession = {
 function DKP:CEOnUnitDamage(tArgs)
 	if self.tItems["settings"].CERaidOnly and not GroupLib.InRaid() then return end
 	if tArgs.bTargetKilled == false then return end
-	if tArgs.unitTarget == nil then return end
+	--if tArgs.unitTarget == nil then return end
 	local tUnits = {}
 	local tBosses = {}
 	
@@ -5356,8 +5429,8 @@ function DKP:CEOnUnitDamage(tArgs)
 		if event.uType == "Unit" then table.insert(tUnits,{strUnit = event.strUnit,ID = k}) else table.insert(tBosses,{bType = event.bType,ID = k}) end
 	end
 
-	local name = tArgs.unitTarget:GetName()
-	
+	--local name = tArgs.unitTarget:GetName()
+	local name = tArgs.name
 	-- Counting Council Fights
 	if name == "Phagetech Commander" then tKilledBossesInSession.tech1 = true end
 	if name == "Phagetech Augmentor" then tKilledBossesInSession.tech2 = true end
@@ -5366,9 +5439,10 @@ function DKP:CEOnUnitDamage(tArgs)
 	
 	if name == "Ersoth Curseform" then tKilledBossesInSession.born1 = true end
 	if name == "Fleshmonger Vratorg" then tKilledBossesInSession.born2 = true end
-	if name == "Terax Blightweaver" then tKilledBossesInSession.born3 = true end
-	if name == "Goldox Lifecrusher" then tKilledBossesInSession.born4 = true  end
-	if name == "Noxmind the Insidious" then tKilledBossesInSession.born5 =true end
+	if name == "Terex Blightweaver" then tKilledBossesInSession.born3 = true end
+	if name == "Golgox the Lifecrusher" then tKilledBossesInSession.born4 = true  end
+	if name == "Noxmind the Insidious" then tKilledBossesInSession.born5 = true end
+		
 		
 	
 	local bornCounter = 0
@@ -5377,7 +5451,7 @@ function DKP:CEOnUnitDamage(tArgs)
 	if tKilledBossesInSession.born3 then bornCounter = bornCounter + 1 end 
 	if tKilledBossesInSession.born4 then bornCounter = bornCounter + 1 end 
 	if tKilledBossesInSession.born5 then bornCounter = bornCounter + 1 end 
-	
+	Print(bornCounter)
 	if #tUnits > 0 then
 		for k,unit in ipairs(tUnits) do
 			if string.lower(unit.strUnit) == string.lower(name) then
@@ -6786,7 +6860,7 @@ end
 function DKP:MAProceed()
 	local item = Item.GetDataFromId(tonumber(self.wndMA:FindChild("ID"):GetText()))
 	self:OnLootedItem(item,true)
-	self:LLAddLog(self.wndMA:FindChild("Name"):GetText(),item:GetName())
+	if not self.tItems["settings"].bLLAfterPopUp then self:LLAddLog(self.wndMA:FindChild("Name"):GetText(),item:GetName()) end
 	self:PopUpWindowOpen(self.wndMA:FindChild("Name"):GetText(),item:GetName())
 	Event_FireGenericEvent("MAProceed")
 end
