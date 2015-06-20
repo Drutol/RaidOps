@@ -149,6 +149,7 @@ function ML:OnDocLoaded()
 		--end
 		self:RestoreSettings()
 		self:FilterInit()
+		self:SummaryInit()
 		self.tRandomPool = {}
 		self.tPlayerPool = {}
 		--for k=1 , 20 do 
@@ -206,7 +207,16 @@ function ML:CreateLootTable()
 			local cache = {}
 			cache.lootEntry = entry
 			cache.currentLocation = 1
-			cache.destination = 1
+			if self:FilterIsRandomed(entry.itemDrop) then
+				if not self:FilterIsAuto(entry.itemDrop) then
+					cache.destination = 2
+				else
+					cache.destination = 4
+					-- GameLib.AssignMasterLoot(entry.nLootId,unit)
+				end
+			else
+				cache.destination = 1
+			end
 			tCachedItems[entry.nLootId] = cache
 		end
 	end
@@ -621,7 +631,7 @@ end
 
 function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
 	local tData = wndSource:GetName() == "BubbleItemTile" and wndSource:GetData() or wndSource:GetData().lootEntry
-	Print(tCachedItems[tData.nLootId].currentLocation)
+
 	if tCachedItems[tData.nLootId].currentLocation == 3 then
 		for k , recipient in ipairs(self.tRecipients) do
 			if recipient.strName == tCachedItems[tData.nLootId].strRecipient then
@@ -649,17 +659,39 @@ function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData
 		tCachedItems[tData.nLootId].destination = 4
 	end
 
-	
+	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+		wnd:FindChild("NonApp"):Show(false)
+	end
 	self:DrawItems()
 	self:EnableActionSlotButtons()
 	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
 end
 
+function ML:DragDropCancel()
+	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+		wnd:FindChild("NonApp"):Show(false)
+	end
+end
+
 function ML:OnQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
 	if wndHandler:GetName() == "PlayerItemTile" then wndHandler = wndHandler:GetParent():GetParent() end
 	if string.find(wndHandler:GetName(),"Pool") or wndHandler:GetName() == "RecipientEntry" or wndControl:GetName() == "ActionSlot" then
-		wndHandler:FindChild("Highlight"):Show(true)
-		return Apollo.DragDropQueryResult.Accept
+		
+		if wndHandler:GetName() == "RecipientEntry" then
+			if self:IsRecipientApplicable(wndHandler,wndSource) then 
+				wndHandler:FindChild("NonApp"):Show(false)
+				wndHandler:FindChild("Highlight"):Show(true)
+				return Apollo.DragDropQueryResult.Accept		
+			else 
+				wndHandler:FindChild("NonApp"):Show(true)
+				wndHandler:FindChild("Highlight"):Show(false)
+				return Apollo.DragDropQueryResult.PassOn 
+			end
+		else
+			wndHandler:FindChild("Highlight"):Show(true)
+			return Apollo.DragDropQueryResult.Accept
+		end
+		
 	else
 		return Apollo.DragDropQueryResult.PassOn
 	end
@@ -673,12 +705,18 @@ function ML:OnQueryBeginDragDrop(wndHandler, wndControl, nX, nY)
 end
 
 function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
-	if wndHandler ~= wndControl then return end
+	if wndHandler ~= wndControl or not wndControl:GetData() then return end
 	if wndControl:GetName() == "BubbleItemTile" then
 		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().itemDrop:GetIcon(), wndControl:GetData().nLootId)
 	elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
 		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().lootEntry.itemDrop:GetIcon(), wndControl:GetData().lootEntry.nLootId)
 	end
+
+	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+		wnd:FindChild("NonApp"):Show(not self:IsRecipientApplicable(wnd,wndControl))
+	end
+	
+	if wndHandler:GetName() == "RecipientEntry" then wndHandler:FindChild("NonApp"):Show(false) end
 end
 
 function ML:EnableActionSlotButtons()
@@ -689,6 +727,22 @@ function ML:EnableActionSlotButtons()
 		self.wndMasterLoot:FindChild("CB"):Enable(false)
 		self.wndMasterLoot:FindChild("NB"):Enable(false)
 	end
+end
+
+function ML:IsRecipientApplicable(wndTarget,wndSource)
+	local tData = wndSource:GetName() == "BubbleItemTile" and wndSource:GetData() or wndSource:GetData().lootEntry
+
+	local bCanLoot
+	local bInRange = true
+	for k , playerUnit in pairs(tCachedItems[tData.nLootId].lootEntry.tLooters or {}) do
+		if wndTarget:GetData().strName == playerUnit:GetName() then bCanLoot = true break end
+	end	
+	for k , playerUnit in pairs(tCachedItems[tData.nLootId].lootEntry.tLootersOutOfRange or {}) do
+		if wndTarget:GetData().strName == playerUnit:GetName() then bInRange = false break end
+	end
+	
+	if wndTarget:GetData().strName == "Cpt Bicard" then return true end
+	if bInRange and bCanLoot then return true else return false end
 end
 -----------------------------------------------------------------------------------------------
 -- Helpers
@@ -862,6 +916,7 @@ function ML:FilterPopulate()
 	wnd:FindChild("Rem"):Show(false)
 	self:FilterArrangeWords()
 end
+
 local prevWord
 function ML:FilterArrangeWords()
 	local list = self.wndFilter:FindChild("List")
@@ -881,7 +936,7 @@ end
 function ML:FilterAddCustom(wndHandler,wndControl,strText)
 	if strText and strText ~= "" then
 		local  words = {}
-		for word in string.gmatch(item:GetName(),"%S+") do
+		for word in string.gmatch(strText,"%S+") do
 			table.insert(words,word)
 		end
 		if #words > 1 then return end
@@ -890,6 +945,13 @@ function ML:FilterAddCustom(wndHandler,wndControl,strText)
 		table.insert(self.settings.tFilters.tCustom,{strKeyword = strText,bAuto = false})
 		self:FilterPopulate()
 	end
+end
+
+function ML:FilterRemoveCustom(wndHandler,wndControl)
+	for k , tFilter in ipairs(self.settings.tFilters.tCustom) do
+		if tFilter.strKeyword == wndControl:GetParent():GetName() then table.remove(self.settings.tFilters.tCustom,k) break end
+	end
+	self:FilterPopulate()
 end
 
 function ML:FilterEnablePreset(wndHandler,wndControl)
@@ -944,6 +1006,74 @@ function ML:FilterDeregisterAutoRandom(wndHandler,wndControl)
 			if tFilter.strKeyword == wndControl:GetName() then tFilter.bAuto = false break end
 		end
 	end
+end
+-----------------------------------------------------------------------------------------------
+-- Summary
+-----------------------------------------------------------------------------------------------
+
+
+function ML:SummaryInit()
+	self.wndSummary = Apollo.LoadForm(self.xmlDoc,"Summary",nil,self)
+	self.wndSummary:Show(false)
+end
+
+function ML:SummaryHide()
+	self.wndSummary:Show(false,false)
+end
+
+function ML:SummaryOpen()
+	local list = self.wndSummary:FindChild("List")
+	list:DestroyChildren()
+	for j ,entry in pairs(tCachedItems) do
+		if entry.strRecipient then
+			local wnd = Apollo.LoadForm(self.xmlDoc,"SummaryEntry",list,self)
+			wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQualityRectangle(entry.lootEntry.itemDrop:GetItemQuality()))
+			wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
+			wnd:FindChild("ItemName"):SetText(entry.lootEntry.itemDrop:GetName())
+			Tooltip.GetItemTooltipForm(self,wnd:FindChild("ItemIcon"),entry.lootEntry.itemDrop,{})
+
+			local player
+			for k , recipient in ipairs(self.tRecipients) do
+				if recipient.strName == entry.strRecipient then player = recipient break end
+			end
+
+			wnd:FindChild("PlayerName"):SetText(entry.strRecipient)
+			wnd:FindChild("ClassIcon"):SetSprite(ktStringToNewIconOrig[player.class])
+			local unit
+			for k , playerUnit in ipairs(entry.lootEntry.tLooters or {}) do
+				if playerUnit:GetName() == entry.strRecipient then
+					unit = playerUnit
+					break
+				end
+			end
+			if not unit then 
+				wnd:Destroy()
+			else
+				wnd:SetData({nLootId = j,unit = unit})
+			end
+		end
+	end
+	list:ArrangeChildrenVert()
+	self.wndSummary:Show(true,false)
+	self.wndSummary:ToFront()
+end
+
+function ML:SummaryEntryAssign(wndHandler,wndControl)
+	GameLib.AssignMasterLoot(wndControl:GetParent():GetData().nLootId,wndControl:GetParent():GetData().unit)
+	self:SummaryOpen()
+end
+
+function ML:SummaryEntryRemove(wndHandler,wndControl)
+	tCachedItems[wndControl:GetParent():GetData().nLootId].strRecipient = nil
+	tCachedItems[wndControl:GetParent():GetData().nLootId].destination = 1
+	self:SummaryOpen()
+end
+
+function ML:SummaryAssignAll()
+	for k , child in ipairs(self.wndSummary:FindChild("List"):GetChildren()) do
+		GameLib.AssignMasterLoot(child:GetParent():GetData().nLootId,child:GetParent():GetData().unit)
+	end
+	self:SummaryOpen()
 end
 -----------------------------------------------------------------------------------------------
 -- ML Instance
