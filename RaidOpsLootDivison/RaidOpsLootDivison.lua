@@ -95,6 +95,32 @@ local ktClassStringToId =
 	["Engineer"]		= GameLib.CodeEnumClass.Engineer,
 	["Spellslinger"]	= GameLib.CodeEnumClass.Spellslinger,
 }
+
+local ktSizingPairs = 
+{
+	["Exp2"] =
+	{
+		x = 1515,
+		y = 741,
+	},
+	["Exp1"] =
+	{
+		x = 1215,
+		y = 572,
+	},
+	["Exp0"] =
+	{
+		x = 1215 ,
+		y = 410,
+	},
+	["Max"] =
+	{
+		x = 1939,
+		y = 1078,
+	}
+
+
+}
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -135,7 +161,6 @@ function ML:OnDocLoaded()
 
 		self.wndMasterLoot = Apollo.LoadForm(self.xmlDoc,"MasterLootWindow",nil,self)
 
-
 		--self.wndMasterLoot:Show(false)
 
 		self.wndLooterList = self.wndMasterLoot:FindChild("PlayerPool"):FindChild("RecipientsList")
@@ -150,6 +175,7 @@ function ML:OnDocLoaded()
 		self:RestoreSettings()
 		self:FilterInit()
 		self:SummaryInit()
+		self:SettingsInit()
 		self.tRandomPool = {}
 		self.tPlayerPool = {}
 		--for k=1 , 20 do 
@@ -163,6 +189,12 @@ function ML:OnDocLoaded()
 		--local wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",self.wndLootList,self)
 		--wnd:SetData({itemDrop = Item.GetDataFromId(45323),nLootId = 24})
 		self:CreateLootTable()
+
+
+		self.wndMasterLoot:SetSizingMaximum(ktSizingPairs["Max"].x,ktSizingPairs["Max"].y)
+		if self.settings and self.settings.bRPExpand then self:ExpandRandomPool() end
+		if self.settings and self.settings.bLPExpand then self:ExpandLootPool() end
+		self:FigureSizing()
 	end
 end
 
@@ -410,6 +442,35 @@ function ML:UpdateRecipientWnd(tRecipient,bSuppressArr)
 	tRecipient.wnd:SetData(tRecipient)
 end
 
+function ML:FigureSizing()
+	local bRPoolExpanded
+	local bLPoolExpanded
+	if self.wndMasterLoot:FindChild("RandomPool"):GetData() then
+		 bRPoolExpanded = self.wndMasterLoot:FindChild("RandomPool"):GetData().bExpanded
+	else
+		bRPoolExpanded = false
+	end
+	if self.wndMasterLoot:FindChild("ItemPool"):GetData() then
+		bLPoolExpanded = self.wndMasterLoot:FindChild("ItemPool"):GetData().bExpanded
+	else
+		bLPoolExpanded = false
+	end
+
+	if bRPoolExpanded and bLPoolExpanded then 
+		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
+		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
+	elseif bRPoolExpanded or bLPoolExpanded then
+		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
+		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
+	else
+		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
+		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
+	end
+end
+
 function ML.sortByClass(a,b)
 	local c1 = ktClassStringToId[a.class]
 	local c2 = ktClassStringToId[b.class]
@@ -442,6 +503,7 @@ function ML:ExpandLootPool()
 		self.wndMasterLoot:FindChild("ItemPool"):SetData({nHeight = nHeight,bExpanded = false})
 	end
 	self:ToggleResize(self.wndMasterLoot:FindChild("ItemPool"))
+	self.wndMasterLoot:FindChild("ItemPool"):FindChild("Expand"):SetCheck(true)
 end
 
 function ML:ExpandRandomPool()
@@ -451,6 +513,7 @@ function ML:ExpandRandomPool()
 		self.wndMasterLoot:FindChild("RandomPool"):SetData({nHeight = nHeight,bExpanded = false})
 	end
 	self:ToggleResize(self.wndMasterLoot:FindChild("RandomPool"))
+	self.wndMasterLoot:FindChild("RandomPool"):FindChild("Expand"):SetCheck(true)
 end
 
 function ML:CollapseLootPool()
@@ -472,8 +535,7 @@ function ML:ToggleResize(wnd)
 	self.wndMasterLoot:FindChild("Pools"):ArrangeChildrenVert()
 	local lc , tc = self.wndMasterLoot:FindChild("Controls"):GetPos()
 	l,t = self.wndMasterLoot:FindChild("RandomPool"):GetAnchorOffsets()
-	Print(tc - t)
-	if tc - t <= wnd:GetHeight() then
+	if tc - t <= wnd:GetHeight() + 50 then
 		l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
 		self.wndMasterLoot:SetAnchorOffsets(l,t,r,(wnd:GetData().bExpanded and b+wnd:GetData().nHeight or b-wnd:GetData().nHeight))
 	end
@@ -563,14 +625,19 @@ function ML:ChangeSearchType(wndHandler,wndControl)
 	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
 end
 
+function ML:WindowResized()
+	self:ArrangeTiles(self.wndLooterList)
+end
+
 
 local tPrevOffsets = {}
 function ML:ArrangeTiles(wndList,bForce)
 	if tPrevOffsets[wndList] and not bForce then
-		if tPrevOffsets[wndList] == wndList:GetAnchorOffsets() then return end
-		tPrevOffsets[wndList] = wndList:GetAnchorOffsets()
+		Print('lol')
+		if tPrevOffsets[wndList] == wndList:GetWidth() + wndList:GetHeight() then return end
+		tPrevOffsets[wndList] = wndList:GetWidth() + wndList:GetHeight()
 	else
-		tPrevOffsets[wndList] = wndList:GetAnchorOffsets()
+		tPrevOffsets[wndList] = wndList:GetWidth() + wndList:GetHeight()
 	end
 	
 	local prevChild
@@ -1074,6 +1141,84 @@ function ML:SummaryAssignAll()
 		GameLib.AssignMasterLoot(child:GetParent():GetData().nLootId,child:GetParent():GetData().unit)
 	end
 	self:SummaryOpen()
+end
+-----------------------------------------------------------------------------------------------
+-- Settings
+-----------------------------------------------------------------------------------------------
+function ML:SettingsInit()
+	self.wndSet = Apollo.LoadForm(self.xmlDoc,"Settings",nil,self)
+	self.wndSet:Show(false)
+
+	if self.settings.bRPExpand == nil then self.settings.bRPExpand = false end
+	if self.settings.bLPExpand == nil then self.settings.bLPExpand = true end
+	if self.settings.bOOCAppear == nil then self.settings.bOOCAppear = true end
+	if self.settings.bReminder == nil then self.settings.bReminder = true end
+	if self.settings.bSummary == nil then self.settings.bRPExpand = true end
+	if self.settings.bRopsIntegration == nil then self.settings.bRopsIntegration = true end
+
+	self.wndSet:FindChild("Container"):FindChild("RPE"):SetCheck(self.settings.bRPExpand)
+	self.wndSet:FindChild("LPE"):SetCheck(self.settings.bLPExpand)
+	self.wndSet:FindChild("OOCApp"):SetCheck(self.settings.bOOCAppear)
+	self.wndSet:FindChild("Reminder"):SetCheck(self.settings.bReminder)
+	self.wndSet:FindChild("Summary"):SetCheck(self.settings.bSummary)
+	self.wndSet:FindChild("RopsInt"):SetCheck(self.settings.bRopsIntegration)
+end
+
+function ML:SetOpen()
+	self.wndSet:Show(true,false)
+	self.wndSet:ToFront()
+end
+
+function ML:SetHide()
+	self.wndSet:Show(false,false)
+end
+
+function ML:SetRPExpandEnable()
+	self.settings.bRPExpand = true
+end
+
+function ML:SetRPExpandDisable()
+	self.settings.bRPExpand = false
+end
+
+function ML:SetLPExpandEnable()
+	self.settings.bLPExpand = true
+end
+
+function ML:SetLPExpandDisable()
+	self.settings.bLPExpand = false
+end
+
+function ML:SetOOCAppearEnable()
+	self.settings.bOOCAppear = true
+end
+
+function ML:SetOOCAppearDisable()
+	self.settings.bOOCAppear = false
+end
+
+function ML:SetReminderEnable()
+	self.settings.bReminder = true
+end
+
+function ML:SetReminderDisable()
+	self.settings.bReminder = false
+end
+
+function ML:SetSummaryEnable()
+	self.settings.bSummary = true
+end
+
+function ML:SetSummaryDisable()
+	self.settings.bSummary = false
+end
+
+function ML:SetRaidOpsIntegrationEnable()
+	self.settings.bRopsIntegration = true
+end
+
+function ML:SetRaidOpsIntegrationDisable()
+	self.settings.bRopsIntegration = false
 end
 -----------------------------------------------------------------------------------------------
 -- ML Instance
