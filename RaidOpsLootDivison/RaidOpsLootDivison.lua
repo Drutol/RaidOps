@@ -183,7 +183,6 @@ function ML:OnDocLoaded()
 		--end
 		self:CreateRecipients()
 		self:DrawRecipients()
-		self:ArrangeTiles(self.wndLooterList)
 		self:EnableActionSlotButtons()
 		--Debug
 		--local wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",self.wndLootList,self)
@@ -192,8 +191,14 @@ function ML:OnDocLoaded()
 
 
 		self.wndMasterLoot:SetSizingMaximum(ktSizingPairs["Max"].x,ktSizingPairs["Max"].y)
-		if self.settings and self.settings.bRPExpand then self:ExpandRandomPool() end
-		if self.settings and self.settings.bLPExpand then self:ExpandLootPool() end
+		if self.settings and self.settings.bRPExpand then 
+			self.wndMasterLoot:FindChild("RandomPool"):FindChild("Expand"):Show(false)
+			self:ExpandRandomPool() 
+		end
+		if self.settings and self.settings.bLPExpand then 
+			self.wndMasterLoot:FindChild("ItemPool"):FindChild("Expand"):Show(false)
+			self:ExpandLootPool() 
+		end
 		self:FigureSizing()
 	end
 end
@@ -294,14 +299,14 @@ function ML:CreateRecipients()
 		elseif member.bTank then strRole = "Tank"
 		end
 
-		if not Apollo.GetAddon("RaidOps") then
+		if not Apollo.GetAddon("RaidOps") or not self.settings.bRopsIntegration then
 			table.insert(targets,{strName = member.strCharacterName,role = strRole,class = ktClassToString[member.eClassId],tItemsAssigned = {},tItemsToBeAssigned = {}})
 		else
 			table.insert(targets,{strName = member.strCharacterName})
 		end
 	end
 
-	if Apollo.GetAddon("RaidOps") then
+	if Apollo.GetAddon("RaidOps") and self.settings.bRopsIntegration then
 		local EPGPHook =  Apollo.GetAddon("RaidOps")
 		for k , player in ipairs(targets) do
 			local ID = EPGPHook:GetPlayerByIDByName(player.strName)
@@ -320,6 +325,24 @@ function ML:CreateRecipients()
 	end
 
 	self.tRecipients = targets
+end
+
+function ML:RecreateRecipients()
+	-- map items to [name] = {item table}
+	local tSavedItems = {}
+	for k , recipient in ipairs(self.tRecipients) do
+		tSavedItems[recipient.strName] = recipient.tItemsToBeAssigned
+	end
+	-- flush everyone down the drain
+	self.tRecipients = {}
+	-- and start from scratch
+	self:CreateRecipients()
+	-- assign stuff back
+	for k , recipient in ipairs(self.tRecipients) do
+		recipient.tItemsToBeAssigned = tSavedItems[recipient.strName] or {}
+	end
+	-- and draw them like nothing has happend
+	self:DrawRecipients()
 end
 
 function ML:UpdateRecipients()
@@ -360,37 +383,56 @@ function ML:UpdateRecipients()
 end
 
 function ML:AddRecipient(tMember)
-	local tRecipient
-	if not Apollo.GetAddon("RaidOps") then
-		table.insert(tRecipient,{strName = member.strCharacterName,role = strRole,class = ktClassToString[member.eClassId],tItemsAssigned = {},tItemsToBeAssigned = {}})
+	local tRecipient = {}
+	if not Apollo.GetAddon("RaidOps") or not self.settings.bRopsIntegration then
+		tRecipient = {strName = tMember.strCharacterName,role = strRole,class = ktClassToString[tMember.eClassId],tItemsAssigned = {},tItemsToBeAssigned = {}}
 	else
-		table.insert(tRecipient,{strName = member.strCharacterName})
+		tRecipient = {strName = tMember.strCharacterName}
 	end
-	if Apollo.GetAddon("RaidOps") then
+	if Apollo.GetAddon("RaidOps") and self.settings.bRopsIntegration then
 		local EPGPHook =  Apollo.GetAddon("RaidOps")
 		local ID = EPGPHook:GetPlayerByIDByName(tRecipient.strName)
 		if ID ~= -1 then 
-			player.role = EPGPHook.tItems[ID].role
-			player.offrole = EPGPHook.tItems[ID].offrole
-			player.class = EPGPHook.tItems[ID].class
+			tRecipient.role = EPGPHook.tItems[ID].role
+			tRecipient.offrole = EPGPHook.tItems[ID].offrole
+			tRecipient.class = EPGPHook.tItems[ID].class
 
-			player.ID = ID 
-			player.PR = EPGPHook:EPGPGetPRByID(ID)
-			player.tItemsToBeAssigned = {}
-			player.tItemsAssigned = {}
+			tRecipient.ID = ID 
+			tRecipient.PR = EPGPHook:EPGPGetPRByID(ID)
+			tRecipient.tItemsToBeAssigned = {}
+			tRecipient.tItemsAssigned = {}
 		end
 	end
+	table.insert(self.tRecipients,tRecipient)
 end
 
 function ML:DrawRecipients()
 	self.wndLooterList:DestroyChildren()
-	table.sort(self.tRecipients,ML.sortByClass)
+	for k , recipient in ipairs(self.tRecipients) do
+		recipient.wnd = nil
+	end
+	if self.settings.bGroup then
+		if self.settings.currSort == "SortPR" then
+			table.sort(self.tRecipients,ML.sortByClassPR)
+		else
+			table.sort(self.tRecipients,ML.sortByClassName)
+		end
+	else
+		if self.settings.currSort == "SortPR" then
+			table.sort(self.tRecipients,ML.sortByValue)
+		else
+			table.sort(self.tRecipients,ML.sortByName)
+		end
+	end
+	
 	for k , recipient in ipairs(self.tRecipients) do
 		if not recipient.wnd then
 			recipient.wnd = Apollo.LoadForm(self.xmlDoc,"RecipientEntry",self.wndLooterList,self)
 			self:UpdateRecipientWnd(recipient,true)
 		end
 	end
+
+	self:ArrangeTiles(self.wndLooterList,true)
 end
 
 function ML:UpdateRecipientWnd(tRecipient,bSuppressArr)
@@ -471,20 +513,31 @@ function ML:FigureSizing()
 	end
 end
 
-function ML.sortByClass(a,b)
+function ML.sortByClassPR(a,b)
 	local c1 = ktClassStringToId[a.class]
 	local c2 = ktClassStringToId[b.class]
 	return c1 == c2 and ML.sortByValue(a,b) or c1 < c2 
 end
 
+function ML.sortByClassName(a,b)
+	local c1 = ktClassStringToId[a.class]
+	local c2 = ktClassStringToId[b.class]
+	return c1 == c2 and ML.sortByName(a,b) or c1 < c2 
+end
+
 function ML.sortByValue(a,b)
 	local pr1 = a.PR
 	local pr2 = b.PR
-	return pr1 == pr2 and ML.sortByName(a.strName,b.strName) or pr1 > pr2
+	return pr1 == pr2 and ML.sortByName(a,b) or pr1 > pr2
 end
 
 function ML.sortByName(a,b)
-	return a < b
+	return a.strName < b.strName
+end
+
+function ML:SortingTypeChanged(wndHandler,wndControl)
+	self.settings.currSort = wndControl:GetName()
+	self:DrawRecipients()
 end
 
 
@@ -633,7 +686,6 @@ end
 local tPrevOffsets = {}
 function ML:ArrangeTiles(wndList,bForce)
 	if tPrevOffsets[wndList] and not bForce then
-		Print('lol')
 		if tPrevOffsets[wndList] == wndList:GetWidth() + wndList:GetHeight() then return end
 		tPrevOffsets[wndList] = wndList:GetWidth() + wndList:GetHeight()
 	else
@@ -646,47 +698,50 @@ function ML:ArrangeTiles(wndList,bForce)
 	for k,child in ipairs(wndList:GetChildren()) do
 		child:SetAnchorOffsets(knRecipientHorzSpacing,0,child:GetWidth()+knRecipientHorzSpacing,child:GetHeight())
 	end
-	
+	local counter = 0
 	for k,child in ipairs(wndList:GetChildren()) do
-		if k > 1 then
-			local prevL,prevT,prevR,prevB = prevChild:GetAnchorOffsets()
-			local newL,newT,newR,newB = child:GetAnchorOffsets()
-			local prevRow = #tRows
-			-- Add next to prev
-			newL = prevR + knRecipientHorzSpacing
-			newR = newL + child:GetWidth()
-			newT = prevT
-			newB = prevT + child:GetHeight()
-			
-			local bNewRow = false
-			
-			if newR >= wndList:GetWidth() then --or child:GetData().bForceNewRow then -- New Row
-				bNewRow = true
-				newL = knRecipientHorzSpacing
+		if child:IsShown() then
+			counter = counter + 1
+			if counter > 1 then
+				local prevL,prevT,prevR,prevB = prevChild:GetAnchorOffsets()
+				local newL,newT,newR,newB = child:GetAnchorOffsets()
+				local prevRow = #tRows
+				-- Add next to prev
+				newL = prevR + knRecipientHorzSpacing
 				newR = newL + child:GetWidth()
-
-				-- Move under highestInRow
-				local highL,highT,highR,highB = tRows[prevRow].wnd:GetAnchorOffsets()
+				newT = prevT
+				newB = prevT + child:GetHeight()
 				
-				newT = highB + knRecipientVertSpacing
-				newB = newT + child:GetHeight()
-			end
+				local bNewRow = false
+				
+				if newR >= wndList:GetWidth() then --or child:GetData().bForceNewRow then -- New Row
+					bNewRow = true
+					newL = knRecipientHorzSpacing
+					newR = newL + child:GetWidth()
+
+					-- Move under highestInRow
+					local highL,highT,highR,highB = tRows[prevRow].wnd:GetAnchorOffsets()
+					
+					newT = highB + knRecipientVertSpacing
+					newB = newT + child:GetHeight()
+				end
+				
 			
+				
+				if child:GetHeight() > tRows[prevRow].nHeight then
+					tRows[prevRow] = {wnd = child , nHeight = child:GetHeight()}
+				end
+				
 		
-			
-			if child:GetHeight() > tRows[prevRow].nHeight then
-				tRows[prevRow] = {wnd = child , nHeight = child:GetHeight()}
+				child:SetAnchorOffsets(newL,newT,newR,newB)
+				prevChild = child
+				if bNewRow then 
+					table.insert(tRows,{wnd = child , nHeight = child:GetHeight()})		
+				end
+			else
+				prevChild = child
+				table.insert(tRows,{wnd = child , nHeight = child:GetHeight()})
 			end
-			
-	
-			child:SetAnchorOffsets(newL,newT,newR,newB)
-			prevChild = child
-			if bNewRow then 
-				table.insert(tRows,{wnd = child , nHeight = child:GetHeight()})		
-			end
-		else
-			prevChild = child
-			table.insert(tRows,{wnd = child , nHeight = child:GetHeight()})
 		end
 	end
 end
@@ -728,7 +783,9 @@ function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData
 
 	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
 		wnd:FindChild("NonApp"):Show(false)
+		wnd:Show(true)
 	end
+	if self.settings.bHideInapp then self:ArrangeTiles(self.wndLooterList,true) end
 	self:DrawItems()
 	self:EnableActionSlotButtons()
 	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
@@ -737,7 +794,9 @@ end
 function ML:DragDropCancel()
 	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
 		wnd:FindChild("NonApp"):Show(false)
+		wnd:Show(true)
 	end
+	if self.settings.bHideInapp then self:ArrangeTiles(self.wndLooterList,true) end
 end
 
 function ML:OnQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
@@ -780,7 +839,14 @@ function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRe
 	end
 
 	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
-		wnd:FindChild("NonApp"):Show(not self:IsRecipientApplicable(wnd,wndControl))
+		if not self.settings.bHideInapp then
+			wnd:FindChild("NonApp"):Show(not self:IsRecipientApplicable(wnd,wndControl))
+		else
+			wnd:Show(self:IsRecipientApplicable(wnd,wndControl))
+		end
+	end
+	if self.settings.bHideInapp then
+		self:ArrangeTiles(self.wndLooterList,true)
 	end
 	
 	if wndHandler:GetName() == "RecipientEntry" then wndHandler:FindChild("NonApp"):Show(false) end
@@ -910,7 +976,7 @@ function ML:FilterInit()
 	self:FilterPopulate()
 end
 
-function ML:FilterShow()
+function ML:FilterShow() 
 	self.wndFilter:Show(true,false)
 	self.wndFilter:ToFront()
 
@@ -1149,12 +1215,17 @@ function ML:SettingsInit()
 	self.wndSet = Apollo.LoadForm(self.xmlDoc,"Settings",nil,self)
 	self.wndSet:Show(false)
 
+	if not self.settings.currSort then self.settings.currSort = "SortAlph" end
+	self.wndSet:FindChild(self.settings.currSort):SetCheck(true)
+
 	if self.settings.bRPExpand == nil then self.settings.bRPExpand = false end
 	if self.settings.bLPExpand == nil then self.settings.bLPExpand = true end
 	if self.settings.bOOCAppear == nil then self.settings.bOOCAppear = true end
 	if self.settings.bReminder == nil then self.settings.bReminder = true end
 	if self.settings.bSummary == nil then self.settings.bRPExpand = true end
 	if self.settings.bRopsIntegration == nil then self.settings.bRopsIntegration = true end
+	if self.settings.bGroup == nil then self.settings.bGroup = true end
+	if self.settings.bHideInapp == nil then self.settings.bHideInapp = false end
 
 	self.wndSet:FindChild("Container"):FindChild("RPE"):SetCheck(self.settings.bRPExpand)
 	self.wndSet:FindChild("LPE"):SetCheck(self.settings.bLPExpand)
@@ -1162,9 +1233,12 @@ function ML:SettingsInit()
 	self.wndSet:FindChild("Reminder"):SetCheck(self.settings.bReminder)
 	self.wndSet:FindChild("Summary"):SetCheck(self.settings.bSummary)
 	self.wndSet:FindChild("RopsInt"):SetCheck(self.settings.bRopsIntegration)
+	self.wndSet:FindChild("SortPR"):Enable(self.settings.bRopsIntegration)
+	self.wndSet:FindChild("Group"):SetCheck(self.settings.bGroup)
+	self.wndSet:FindChild("HideInapp"):SetCheck(self.settings.bHideInapp)
 end
 
-function ML:SetOpen()
+function ML:SetOpen() 
 	self.wndSet:Show(true,false)
 	self.wndSet:ToFront()
 end
@@ -1175,18 +1249,24 @@ end
 
 function ML:SetRPExpandEnable()
 	self.settings.bRPExpand = true
+	if not self.wndMasterLoot:FindChild("RandomPool"):GetData().bExpanded then self:ExpandRandomPool() end
+	self.wndMasterLoot:FindChild("RandomPool"):FindChild("Expand"):Show(false)
 end
 
 function ML:SetRPExpandDisable()
 	self.settings.bRPExpand = false
+	self.wndMasterLoot:FindChild("RandomPool"):FindChild("Expand"):Show(true)
 end
 
 function ML:SetLPExpandEnable()
 	self.settings.bLPExpand = true
+	if not self.wndMasterLoot:FindChild("ItemPool"):GetData().bExpanded then self:ExpandLootPool() end
+	self.wndMasterLoot:FindChild("ItemPool"):FindChild("Expand"):Show(false)
 end
 
 function ML:SetLPExpandDisable()
 	self.settings.bLPExpand = false
+	self.wndMasterLoot:FindChild("ItemPool"):FindChild("Expand"):Show(true)
 end
 
 function ML:SetOOCAppearEnable()
@@ -1219,6 +1299,28 @@ end
 
 function ML:SetRaidOpsIntegrationDisable()
 	self.settings.bRopsIntegration = false
+	if self.settings.currSort == "SortPR" then
+		self.settings.currSort = "SortAlph"
+		self:RecreateRecipients()
+	end
+end
+
+function ML:SetHideInappPlayersEnable()
+	self.settings.bHideInapp = true
+end
+
+function ML:SetHideInappPlayersDisable()
+	self.settings.bHideInapp = false
+end
+
+function ML:SetGroupEnable()
+	self.settings.bGroup = true
+	self:DrawRecipients()
+end
+
+function ML:SetGroupDisable()
+	self.settings.bGroup = false
+	self:DrawRecipients()
 end
 -----------------------------------------------------------------------------------------------
 -- ML Instance
