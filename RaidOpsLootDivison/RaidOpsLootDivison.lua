@@ -96,6 +96,16 @@ local ktClassStringToId =
 	["Spellslinger"]	= GameLib.CodeEnumClass.Spellslinger,
 }
 
+local ktClassOrderDefault = 
+{
+	[1] = "Esper",
+	[2] = "Spellslinger",
+	[3] = "Medic",
+	[4] = "Stalker",
+	[5] = "Warrior",
+	[6] = "Engineer",
+}
+
 local ktSizingPairs = 
 {
 	["Exp2"] =
@@ -214,12 +224,14 @@ function ML:OnSave(eLevel)
 
 	local tSave = {}
 	tSave.settings = self.settings
+	tSave.wndLoc = self.wndMasterLoot:GetLocation():ToTable()
 	return tSave
 end
 
 function ML:OnRestore(eLevel,tSave)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 	self.settings = tSave.settings
+	self.wndMasterLootLoc = tSave.wndLoc
 end
 
 -----------------------------------------------------------------------------------------------
@@ -229,10 +241,6 @@ local tCachedItems = {}
 
 local function string_starts(String,Start)
 	return string.sub(string.lower(String),1,string.len(Start))==string.lower(Start)
-end
-
-function ML:CacheRecipients()
-
 end
 
 function ML:CreateLootTable()
@@ -443,10 +451,12 @@ function ML:UpdateRecipientWnd(tRecipient,bSuppressArr)
 	tRecipient.wnd:FindChild("PlayerName"):SetText(tRecipient.strName)
 	if tRecipient.offrole then
 		tRecipient.wnd:FindChild("OffRoleIcon"):SetSprite(ktRoleStringToIcon[tRecipient.offrole])
+	else
+		tRecipient.wnd:FindChild("OffRoleIcon"):Show(false)
 	end
 	
 	tRecipient.wnd:FindChild("HookValue"):SetText(tRecipient.PR)
-
+	if not tRecipient.tItemsToBeAssigned then tRecipient.tItemsToBeAssigned = {} end
 	if tRecipient.wnd:FindChild("ItemsContainer"):GetData() ~= #tRecipient.tItemsToBeAssigned then
 		tRecipient.wnd:FindChild("ItemsContainer"):DestroyChildren()
 
@@ -501,34 +511,39 @@ function ML:FigureSizing()
 	if bRPoolExpanded and bLPoolExpanded then 
 		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
 		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-		self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
+		--self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
 	elseif bRPoolExpanded or bLPoolExpanded then
 		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
 		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-		self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
+		--self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
 	else
 		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
 		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-		self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
+		--self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
+	end
+
+	if self.wndMasterLootLoc ~= nil and self.wndMasterLootLoc.nOffsets[1] ~= 0 then 
+		self.wndMasterLoot:MoveToLocation(WindowLocation.new(self.wndMasterLootLoc))
+		self.wndMasterLootLoc = nil
 	end
 end
 
 function ML.sortByClassPR(a,b)
-	local c1 = ktClassStringToId[a.class]
-	local c2 = ktClassStringToId[b.class]
+	local c1 = ktClassStringToId[a.class] + ML.tClassWeight[a.class]
+	local c2 = ktClassStringToId[b.class] + ML.tClassWeight[b.class]
 	return c1 == c2 and ML.sortByValue(a,b) or c1 < c2 
 end
 
 function ML.sortByClassName(a,b)
-	local c1 = ktClassStringToId[a.class]
-	local c2 = ktClassStringToId[b.class]
-	return c1 == c2 and ML.sortByName(a,b) or c1 < c2 
+	local c1 = ktClassStringToId[a.class] + ML.tClassWeight[a.class]
+	local c2 = ktClassStringToId[b.class] + ML.tClassWeight[b.class]
+	if c1 and c2 then return c1 == c2 and ML.sortByName(a,b) or c1 < c2 else return ML.sortByName(a,b) end
 end
 
 function ML.sortByValue(a,b)
 	local pr1 = a.PR
 	local pr2 = b.PR
-	return pr1 == pr2 and ML.sortByName(a,b) or pr1 > pr2
+	if pr1 and pr2 then return pr1 == pr2 and ML.sortByName(a,b) or pr1 > pr2 else return ML.sortByName(a,b) end
 end
 
 function ML.sortByName(a,b)
@@ -825,9 +840,6 @@ end
 
 function ML:HideHighligt(wndHandler,wndControl)
 	wndHandler:FindChild("Highlight"):Show(false)
-end
-
-function ML:OnQueryBeginDragDrop(wndHandler, wndControl, nX, nY)
 end
 
 function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
@@ -1227,6 +1239,9 @@ function ML:SettingsInit()
 	if self.settings.bGroup == nil then self.settings.bGroup = true end
 	if self.settings.bHideInapp == nil then self.settings.bHideInapp = false end
 
+	if not self.settings.tClassOrder then self.settings.tClassOrder = ktClassOrderDefault end
+	self:SetClassOrderPopulate()
+
 	self.wndSet:FindChild("Container"):FindChild("RPE"):SetCheck(self.settings.bRPExpand)
 	self.wndSet:FindChild("LPE"):SetCheck(self.settings.bLPExpand)
 	self.wndSet:FindChild("OOCApp"):SetCheck(self.settings.bOOCAppear)
@@ -1236,6 +1251,17 @@ function ML:SettingsInit()
 	self.wndSet:FindChild("SortPR"):Enable(self.settings.bRopsIntegration)
 	self.wndSet:FindChild("Group"):SetCheck(self.settings.bGroup)
 	self.wndSet:FindChild("HideInapp"):SetCheck(self.settings.bHideInapp)
+
+	--Class Weight
+	self:SetBuildClassWeightTable()
+
+end
+
+function ML:SetBuildClassWeightTable()
+	ML.tClassWeight = {}
+	for k , class in ipairs(self.settings.tClassOrder) do
+		ML.tClassWeight[class] = k*10
+	end	
 end
 
 function ML:SetOpen() 
@@ -1295,14 +1321,17 @@ end
 
 function ML:SetRaidOpsIntegrationEnable()
 	self.settings.bRopsIntegration = true
+	self.wndSet:FindChild("SortPR"):Enable(true)
+	self:RecreateRecipients()
 end
 
 function ML:SetRaidOpsIntegrationDisable()
 	self.settings.bRopsIntegration = false
-	if self.settings.currSort == "SortPR" then
-		self.settings.currSort = "SortAlph"
-		self:RecreateRecipients()
-	end
+	self.wndSet:FindChild("SortPR"):Enable(false)
+	self.settings.currSort = "SortAlph"
+	self.wndSet:FindChild("SortAlph"):SetCheck(true)
+	self.wndSet:FindChild("SortPR"):SetCheck(false)
+	self:RecreateRecipients()
 end
 
 function ML:SetHideInappPlayersEnable()
@@ -1321,6 +1350,61 @@ end
 function ML:SetGroupDisable()
 	self.settings.bGroup = false
 	self:DrawRecipients()
+end
+-----------------------------------------------------------------------------------------------
+-- Drag&Drop - Settings Class Order
+-----------------------------------------------------------------------------------------------
+
+
+function ML:SetClassOrderPopulate()
+	self.wndSet:FindChild("ClassOrder"):FindChild("List"):DestroyChildren()
+	for k , class in ipairs(self.settings.tClassOrder) do
+		local wnd = Apollo.LoadForm(self.xmlDoc,"ClassOrderTile",self.wndSet:FindChild("ClassOrder"):FindChild("List"),self)
+		wnd:SetSprite(ktStringToNewIconOrig[class])
+		wnd:SetData(k)
+	end
+	self.wndSet:FindChild("ClassOrder"):FindChild("List"):ArrangeChildrenHorz()
+end
+
+function ML:SetOrderTileShowHighliht(wndHandler,wndControl)
+	wndHandler:FindChild("Highlight"):Show(true)
+end
+
+function ML:SetOrderTileHideHighliht(wndHandler,wndControl)
+	wndHandler:FindChild("Highlight"):Show(false)
+end
+
+-- Drag&Drop
+
+function ML:SetOrderTileStartDragDrop(wndHandler,wndControl)
+	if wndHandler ~= wndControl or self.bClassOrderDragDrop then return end
+	Apollo.BeginDragDrop(wndControl, "MLClassOrderSwap", wndControl:GetSprite(), wndControl:GetData())
+	self.bClassOrderDragDrop = true
+end
+
+function ML:SetOrderTileQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if wndHandler:GetName() == "ClassOrderTile" then return Apollo.DragDropQueryResult.Accept else return Apollo.DragDropQueryResult.PassOn end
+end
+
+function ML:SetOrderTileDropped(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if wndHandler ~= wndControl then return end
+	-- Swap in order table
+
+	local source = self.settings.tClassOrder[wndSource:GetData()]
+	local target = self.settings.tClassOrder[wndControl:GetData()]
+
+	self.settings.tClassOrder[wndSource:GetData()] = target
+	self.settings.tClassOrder[wndControl:GetData()] = source
+
+	self:SetClassOrderPopulate()
+	self.bClassOrderDragDrop = false
+
+	self:SetBuildClassWeightTable()
+	self:DrawRecipients()
+end
+
+function ML:SetOrderTileDragDropCancel()
+	self.bClassOrderDragDrop = false
 end
 -----------------------------------------------------------------------------------------------
 -- ML Instance
