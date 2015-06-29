@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 19, 0, 0
+local Major, Minor, Patch, Suffix = 2, 20, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -112,6 +112,16 @@ local ktRoleStringToIcon =
 	["None"] = "",
 }
 
+local ktClassOrderDefault = 
+{
+	[1] = "Esper",
+	[2] = "Spellslinger",
+	[3] = "Medic",
+	[4] = "Stalker",
+	[5] = "Warrior",
+	[6] = "Engineer",
+}
+
 local ktUndoActions = 
 {
 	--Players
@@ -178,6 +188,18 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.20---
+{29/06/2015}
+Previous a,b,c and d versions fixed LUA errors preventing from addon usage.
+Fixed LUA error when attempting to enable offspec in PopUp window and the GP value equals 0.
+Complete reskin of loot logs.
+Changed sliders appearance.
+Sliders will now indicate the current value.
+Added 'disable' option do Max Days slider in Loot Logs.
+Added option to specify class order when grouping by class.
+Added stock context menu to item label.
+
+NOTE: Decreased freqency of updates is caused by me developing completly different addon and some irl stuff. More info at a later date.
 ---RaidOps version 2.19---
 {19/06/2015}
 From now on skipped/closed PopUp window for item assignment will default item price in loot logs to 0.
@@ -399,7 +421,6 @@ function DKP:OnDocLoaded()
 		self.wndCredits:Show(false,true)
 		self.wndChangelog:Show(false,true)
 		Apollo.RegisterSlashCommand("epgp", "OnDKPOn", self)
-		Apollo.RegisterSlashCommand("rops", "HubShow", self)
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
 		Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
@@ -408,7 +429,6 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterEventHandler("Group_Invite_Result","InviteOnResult", self)
 		
 		self.timer = ApolloTimer.Create(10, true, "OnTimer", self)
-
 
 		local setButton = self.wndMain:FindChild("ButtonSet")
 		local addButton = self.wndMain:FindChild("ButtonAdd")
@@ -472,11 +492,15 @@ function DKP:OnDocLoaded()
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
 		self.wndMain:FindChild("MassEditControls"):SetOpacity(0)
-		self.wndMain:FindChild("MassEditControls"):Show(false)
+		self:delay(1,function (tContext)
+			tContext.wndMain:FindChild("MassEditControls"):Show(false)
+		end)
+		-- Colors
+		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
 		-- Inits
 		self:TimeAwardRestore()
+		self:COInit()
 		self:EPGPInit()
-		self:RaidOpsInit()
 		self:ConInit()
 		self:AltsInit()
 		self:LogsInit()
@@ -503,9 +527,7 @@ function DKP:OnDocLoaded()
 		self:RSInit()
 		self:TutInit()
 		self:TutListInit()
-		-- Colors
-	
-		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
+
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
 		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
@@ -540,7 +562,6 @@ function DKP:OnDocLoaded()
 			self.wndMain:FindChild("CustomAuction"):Show(false)
 			self.wndMain:FindChild("BidCustomStart"):Show(false)
 			self.wndMain:FindChild("LabelAuction"):Show(false)
-			self.wndHub:FindChild("NetworkBidding"):Show(false)
 			self:DSInit()
 		end
 
@@ -550,7 +571,7 @@ function DKP:OnDocLoaded()
 			self:OnUnitCreated("Guild Bank",true)
 		end
 		self.wndMain:FindChild("ButtonNB"):Enable(false)
-		self.wndHub:FindChild("NetworkBidding"):Enable(false)
+
 
 		--OneVersion
 		self:delay(2,function() Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOps", Major, Minor, Patch) end)
@@ -1243,7 +1264,6 @@ function DKP:OnSave(eLevel)
 			tSave["EPGP"] = self.tItems["EPGP"]
 			tSave["Standby"] = self.tItems["Standby"]
 			tSave["AwardTimer"] = self.tItems["AwardTimer"]
-			tSave["Hub"] = self.tItems["Hub"]
 			tSave["BidSlots"] = self.tItems["BidSlots"]
 			tSave["Auctions"] = {}
 			tSave["MyChoices"] = self.MyChoices
@@ -1570,7 +1590,6 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 
 			if strName ~= "" and itemStr ~= "" then
 				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
-				self:HubRegisterLoot(strName:sub(1, #strName - 1),string.sub(itemStr,2))
 			end
 		
 		elseif strLocale == "deDE" then
@@ -1622,7 +1641,6 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			 
 			 
 			 if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName,strItem) end
-			 self:HubRegisterLoot(strName,strItem)
 			 self:Bid2CloseOnAssign(strItem)
 			 if not self.tItems["settings"].bLLAfterPopUp then self:LLAddLog(strName,strItem) end
 		end
@@ -2564,12 +2582,13 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 					local item = Item.GetDataFromId(playerItem.tLLogs[1].itemID)
 					if item then
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
-						Apollo.LoadForm(self.xmlDoc,"LoadIconToStat",playerItem.wnd:FindChild("Stat"..tostring(i)),self)
-						playerItem.wnd:FindChild("Stat"..tostring(i)):FindChild("LoadIconToStat"):SetSprite(item:GetIcon())
+						local wnd = Apollo.LoadForm(self.xmlDoc,"LoadIconToStat",playerItem.wnd:FindChild("Stat"..tostring(i)),self)
+						wnd:SetSprite(item:GetIcon())
+						wnd:SetData(item)
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetText("")
 						local l,t,r,b = playerItem.wnd:FindChild("Stat"..tostring(i)):GetAnchorOffsets()
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetAnchorOffsets(l+32.5,t,r-32.5,b)
-						Tooltip.GetItemTooltipForm(self,playerItem.wnd:FindChild("Stat"..tostring(i)):FindChild("LoadIconToStat"), item  ,{bPrimary = true, bSelling = false})
+						Tooltip.GetItemTooltipForm(self,wnd, item  ,{bPrimary = true, bSelling = false})
 					end
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Hrs" then
@@ -2666,6 +2685,11 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			end
 		end
 	end
+end
+
+function DKP:LabelFireContextMenuForItemLabel(wndHandler,wndControl,eMouseButton)
+	if wndHandler ~= wndControl or  eMouseButton ~= GameLib.CodeEnumInputMouse.Right  then return end
+	Event_FireGenericEvent("GenericEvent_ContextMenuItem", wndControl:GetData())
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -2996,17 +3020,17 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			if type(tIDs) == "table" then player = self.tItems[player] end
 			if player.strName ~= "Guild Bank" then
 				if player.class ~= nil then
-					if player.class == "Esper" then
+					if player.class == self.tItems["settings"].tClassOrder[1] then
 						table.insert(esp,player)
-					elseif player.class == "Engineer" then
+					elseif player.class == self.tItems["settings"].tClassOrder[2] then
 						table.insert(eng,player)
-					elseif player.class == "Medic" then
+					elseif player.class == self.tItems["settings"].tClassOrder[3] then
 						table.insert(med,player)
-					elseif player.class == "Warrior" then
+					elseif player.class == self.tItems["settings"].tClassOrder[4] then
 						table.insert(war,player)
-					elseif player.class == "Stalker" then
+					elseif player.class == self.tItems["settings"].tClassOrder[5] then
 						table.insert(sta,player)
-					elseif player.class == "Spellslinger" then
+					elseif player.class == self.tItems["settings"].tClassOrder[6] then
 						table.insert(spe,player)
 					end
 				else
@@ -3560,9 +3584,11 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(self.tItems["settings"].networking)
 	self.wndSettings:FindChild("ButtonSettingsEquip"):SetCheck(self.tItems["settings"].FilterEquippable)
 	
-	--Slider
+	--Sliders
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
 	self.wndSettings:FindChild("PrecisionEPGP"):SetValue(self.tItems["settings"].PrecisionEPGP)
+	self.wndSettings:FindChild("PrecisionTitle"):SetText(string.format(self.Locale["#wndSettings:PRPrec"].. " - %d",self.tItems["settings"].Precision))
+	self.wndSettings:FindChild("PrecisionEPGPTitle"):SetText(string.format(self.Locale["#wndSettings:EPGPPrec"].. " - %d",self.tItems["settings"].PrecisionEPGP))
 	
 	--Affiliation
 	if self.tItems["settings"].CheckAffiliation == 1 then self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetCheck(true) end
@@ -3591,7 +3617,6 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
 	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /epgp - For main roster window \n" ..
-									 " /rops - For RaidOps Hub window \n" ..
 									 " /ropsml - For Master Looter Settings window \n" ..
 									 " /nb - For Network Bidding window \n" ..
 									 " /chatbid - For Chat Bidding window \n")
@@ -3860,6 +3885,7 @@ function DKP:SettingsSetPrecision( wndHandler, wndControl, fNewValue, fOldValue 
 	if math.floor(fNewValue) ~= self.tItems["settings"].Precision then
 		self.tItems["settings"].Precision = math.floor(fNewValue)
 		self:ShowAll()
+		self.wndSettings:FindChild("PrecisionTitle"):SetText(string.format(self.Locale["#wndSettings:PRPrec"].. " - %d",self.tItems["settings"].Precision))
 	end
 end
 
@@ -3867,6 +3893,7 @@ function DKP:SettingsSetPrecisionEPGP( wndHandler, wndControl, fNewValue, fOldVa
 	if math.floor(fNewValue) ~= self.tItems["settings"].PrecisionEPGP then
 		self.tItems["settings"].PrecisionEPGP = math.floor(fNewValue)
 		self:ShowAll()
+		self.wndSettings:FindChild("PrecisionEPGPTitle"):SetText(string.format(self.Locale["#wndSettings:EPGPPrec"].. " - %d",self.tItems["settings"].PrecisionEPGP))
 	end
 end
 
@@ -4245,7 +4272,7 @@ function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 			if wndControl:IsChecked() then 
 				value = 0
 			else
-				value = string.sub(self:EPGPGetItemCostByID(PopUpItemQueue[1].itemID),36)
+				value = currEntry.nGP
 			end
 		end
 	end
@@ -5421,7 +5448,7 @@ local tKilledBossesInSession = {
 function DKP:CEOnUnitDamage(tArgs)
 	if self.tItems["settings"].CERaidOnly and not GroupLib.InRaid() then return end
 	if tArgs.bTargetKilled == false then return end
-	--if tArgs.unitTarget == nil then return end
+	if tArgs.unitTarget == nil then return end
 	local tUnits = {}
 	local tBosses = {}
 	
@@ -5429,8 +5456,8 @@ function DKP:CEOnUnitDamage(tArgs)
 		if event.uType == "Unit" then table.insert(tUnits,{strUnit = event.strUnit,ID = k}) else table.insert(tBosses,{bType = event.bType,ID = k}) end
 	end
 
-	--local name = tArgs.unitTarget:GetName()
-	local name = tArgs.name
+	local name = tArgs.unitTarget:GetName()
+
 	-- Counting Council Fights
 	if name == "Phagetech Commander" then tKilledBossesInSession.tech1 = true end
 	if name == "Phagetech Augmentor" then tKilledBossesInSession.tech2 = true end
@@ -5451,7 +5478,6 @@ function DKP:CEOnUnitDamage(tArgs)
 	if tKilledBossesInSession.born3 then bornCounter = bornCounter + 1 end 
 	if tKilledBossesInSession.born4 then bornCounter = bornCounter + 1 end 
 	if tKilledBossesInSession.born5 then bornCounter = bornCounter + 1 end 
-	Print(bornCounter)
 	if #tUnits > 0 then
 		for k,unit in ipairs(tUnits) do
 			if string.lower(unit.strUnit) == string.lower(name) then
@@ -5811,6 +5837,10 @@ function DKP:LLInit()
 			wnd:FindChild(tab.strRelation):SetCheck(true)
 		end
 	end
+
+	self.wndLLM:FindChild("SettingsMisc"):FindChild("MaxRowsTitle"):SetText(string.format("Max rows per bubble. - %d",self.tItems["settings"].LL.nMaxRows))
+	self.wndLLM:FindChild("SettingsMisc"):FindChild("MaxItemsTitle"):SetText(string.format("Max items per row. - %d",self.tItems["settings"].LL.nMaxItems))
+	self.wndLLM:FindChild("SettingsMisc"):FindChild("MaxDaysTitle"):SetText(string.format("When grouping by day show items form last %s days:",self.tItems["settings"].LL.nMaxDays == 0 and "X" or tostring(self.tItems["settings"].LL.nMaxDays)))
 	
 	self.wndLLM:FindChild("SlotsTab"):AttachTab(self.wndLLM:FindChild("ClassesTab"),false)
 	self.wndLLM:FindChild("SlotsTab"):AttachTab(self.wndLLM:FindChild("QualityTab"),false)
@@ -6029,7 +6059,7 @@ function DKP:LLPrepareData()
 							end
 						else -- Group Date
 							local diff = os.date("*t",(os.time() - entry.nDate)).day
-							if diff <= self.tItems["settings"].LL.nMaxDays then 
+							if self.tItems["settings"].LL.nMaxDays == 0 or diff <= self.tItems["settings"].LL.nMaxDays then 
 								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
@@ -6068,7 +6098,7 @@ function DKP:LLPrepareData()
 					else
 						for j , entry in ipairs(player.tLLogs) do
 							local diff = os.date("*t",(os.time() - entry.nDate)).day
-							if diff <= self.tItems["settings"].LL.nMaxDays then 
+							if self.tItems["settings"].LL.nMaxDays == 0 or diff <= self.tItems["settings"].LL.nMaxDays then 
 								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP,{nStart = nStart,nFinish = nFinish,nTime = entry.nDate}) then
@@ -6218,18 +6248,22 @@ function DKP:LLSetMaxRows( wndHandler, wndControl, fNewValue, fOldValue )
 	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxRows then
 		self.tItems["settings"].LL.nMaxRows = math.floor(fNewValue)
 	end
+	self.wndLLM:FindChild("SettingsMisc"):FindChild("MaxRowsTitle"):SetText(string.format("Max rows per bubble. - %d",math.floor(fNewValue)))
 end
 
 function DKP:LLSetMaxItems( wndHandler, wndControl, fNewValue, fOldValue )
 	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxItems then
 		self.tItems["settings"].LL.nMaxItems = math.floor(fNewValue)
 	end
+	self.wndLLM:FindChild("SettingsMisc"):FindChild("MaxItemsTitle"):SetText(string.format("Max items per row. - %d",math.floor(fNewValue)))
 end
 
 function DKP:LLSetMaxDays( wndHandler, wndControl, fNewValue, fOldValue )
 	if math.floor(fNewValue) ~= self.tItems["settings"].LL.nMaxDays then
 		self.tItems["settings"].LL.nMaxDays = math.floor(fNewValue)
 	end
+
+	self.wndLLM:FindChild("SettingsMisc"):FindChild("MaxDaysTitle"):SetText(string.format("When grouping by day show items form last %s days:",math.floor(fNewValue) == 0 and "X" or tostring(math.floor(fNewValue))))
 end
 
 
@@ -6479,9 +6513,18 @@ end
 
 -- Syncing
 local tFetchers = {} -- heavy stuff
+local connCounter = 0
 function DKP:DFJoinSyncChannel()
-	self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel",ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
-	self.sChannel:SetReceivedMessageFunction("DFOnSyncMessage",self)
+	if self.uGuild then
+		self.sChannel = ICCommLib.JoinChannel("RaidOpsSyncChannel",ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
+		self.sChannel:SetReceivedMessageFunction("DFOnSyncMessage",self)
+	elseif connCounter < 4 then
+		connCounter = connCounter + 1
+		self:delay(2,function (tContext)
+			tContext:ImportFromGuild()
+			tContext:DFJoinSyncChannel()
+		end)
+	end
 end
 
 function DKP:DFOnSyncMessage(channel, strMessage, idMessage)
@@ -7152,6 +7195,78 @@ end
 
 function DKP:SupportClose()
 	self.wndSup:Show(false,false)
+end
+-----------------------------------------------------------------------------------------------
+-- ClassOrder
+-----------------------------------------------------------------------------------------------
+
+function DKP:COInit()
+	self.wndCO = Apollo.LoadForm(self.xmlDoc3,"ClassOrder",nil,self)
+	self.wndCO:Show(false)
+
+	if not self.tItems["settings"].tClassOrder then self.tItems["settings"].tClassOrder = ktClassOrderDefault end
+
+	self:COPopulate()
+end
+
+function DKP:COShow()
+	if not self.wndCO:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndCO:Move(tCursor.x - 100, tCursor.y - 100, self.wndCO:GetWidth(), self.wndCO:GetHeight())
+	end
+	self.wndCO:Show(true,false)
+	self.wndCO:ToFront()
+
+end
+
+function DKP:COPopulate()
+	self.wndCO:FindChild("List"):DestroyChildren()
+	for k , class in ipairs(self.tItems["settings"].tClassOrder) do
+		local wnd = Apollo.LoadForm(self.xmlDoc3,"ClassOrderTile",self.wndCO:FindChild("List"),self)
+		wnd:SetSprite(ktStringToIcon[class])
+		wnd:SetData(k)
+	end
+	self.wndCO:FindChild("List"):ArrangeChildrenVert()
+end
+
+function DKP:COTileShowHighliht(wndHandler,wndControl)
+	wndHandler:FindChild("Highlight"):Show(true)
+end
+
+function DKP:COTileHideHighliht(wndHandler,wndControl)
+	wndHandler:FindChild("Highlight"):Show(false)
+end
+
+-- Drag&Drop
+
+function DKP:COTileStartDragDrop(wndHandler,wndControl)
+	if wndHandler ~= wndControl or self.bClassOrderDragDrop then return end
+	Apollo.BeginDragDrop(wndControl, "DKPClassOrderSwap", wndControl:GetSprite(), wndControl:GetData())
+	self.bClassOrderDragDrop = true
+end
+
+function DKP:COTileQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if wndHandler:GetName() == "ClassOrderTile" then return Apollo.DragDropQueryResult.Accept else return Apollo.DragDropQueryResult.PassOn end
+end
+
+function DKP:COTileDropped(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if wndHandler ~= wndControl then return end
+	-- Swap in order table
+
+	local source = self.tItems["settings"].tClassOrder[wndSource:GetData()]
+	local target = self.tItems["settings"].tClassOrder[wndControl:GetData()]
+
+	self.tItems["settings"].tClassOrder[wndSource:GetData()] = target
+	self.tItems["settings"].tClassOrder[wndControl:GetData()] = source
+
+	self:COPopulate()
+	self.bClassOrderDragDrop = false
+
+	self:RefreshMainItemList()
+end
+
+function DKP:COTileDragDropCancel()
+	self.bClassOrderDragDrop = false
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

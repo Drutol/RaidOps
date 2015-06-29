@@ -156,8 +156,6 @@ function DKP:BidCompleteInit()
 		self.wndMain:FindChild("CustomAuction"):Show(false)
 		self.wndMain:FindChild("BidCustomStart"):Show(false)
 		self.wndMain:FindChild("LabelAuction"):Show(false)
-		self.wndHub:FindChild("NetworkBidding"):Enable(false)
-		self.wndHub:FindChild("NetworkBidding"):SetTextColor("vdarkgray")
 		Print("RaidOps - Could not find Dependency Master Loot Addon - All Bidding/ML Functionalities are now suspended.")
 		self:DSInit()
 		bInitialized = true
@@ -1138,7 +1136,6 @@ function DKP:InitBid2()
 	self:BidCustomLabelsUpdate()
 	
 	self.wndMain:FindChild("ButtonNB"):Enable(true)
-	self.wndHub:FindChild("NetworkBidding"):Enable(true)
 end
 
 function DKP:Bid2ShowNetworkBidding()
@@ -1185,11 +1182,18 @@ function DKP:SetChannelAndRecconect(wndHandler,wndControl,strText)
 	self:BidJoinChannel()
 end
 
+local connCounter = 0
 function DKP:BidJoinChannel()
 	if self.uGuild then
 		self.tItems["settings"]["Bid2"].strChannel = "ROPSGuildSpecific"
 		self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["Bid2"].strChannel,ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
 		self.channel:SetReceivedMessageFunction("OnRaidResponse",self)
+	elseif connCounter < 4 then
+		connCounter = connCounter + 1
+		self:delay(2,function (tContext)
+			tContext:ImportFromGuild()
+			tContext:BidJoinChannel()
+		end)
 	end
 end
 

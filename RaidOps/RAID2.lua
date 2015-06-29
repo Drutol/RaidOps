@@ -643,9 +643,10 @@ function DKP:AttUpdatePlayers(nTime)
 	for k , player in ipairs(currentPlayers) do
 		local bFound = false 
 		for j , attendee in ipairs(tPlayersInSession) do
-			if attendee.strName == player then 
-			attendee.nSecs = attendee.nSecs + nTime 
-			bFound = true end
+				if attendee.strName == player then 
+				attendee.nSecs = attendee.nSecs + nTime 
+				bFound = true 
+			end
 		end
 		if not bFound then
 			table.insert(tPlayersInSession,{strName = player,nSecs = nTime})
@@ -831,16 +832,18 @@ function DKP:AttStart()
 end
 
 function DKP:AttPause()
-	nRaidSessionStatus = SESSION_PAUSE
-	for k,player in ipairs(tPlayersInSession) do
-		player.nSecs = player.nSecs + nTimeFromLastUpdate
-	end
-	nRaidTime = nRaidTime + nTimeFromLastUpdate
-	nTimeFromLastUpdate = 0
+	if self.raidTimer then
+		nRaidSessionStatus = SESSION_PAUSE
+		for k,player in ipairs(tPlayersInSession) do
+			player.nSecs = player.nSecs + nTimeFromLastUpdate
+		end
+		nRaidTime = nRaidTime + nTimeFromLastUpdate
+		nTimeFromLastUpdate = 0
 
-	self.raidTimer:Stop()
-	self.raidPreciseTimer:Stop()
-	self:AttUpdateToolbar()
+		self.raidTimer:Stop()
+		self.raidPreciseTimer:Stop()
+		self:AttUpdateToolbar()
+	end
 end
 
 function DKP:AttResume()
