@@ -83,6 +83,7 @@ function DKP:EPGPInit()
 	if self.tItems["EPGP"].bDecayRealGP == nil then self.tItems["EPGP"].bDecayRealGP = false end
 	if self.tItems["EPGP"].bMinGP == nil then self.tItems["EPGP"].bMinGP = false end
 	if self.tItems["EPGP"].bDecayPrec == nil then self.tItems["EPGP"].bDecayPrec = false end
+	if self.tItems["EPGP"].bMinGPThres == nil then self.tItems["EPGP"].bMinGPThres = false end
 	
 	self.wndEPGPSettings:FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
 	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
@@ -95,6 +96,9 @@ function DKP:EPGPInit()
 	
 	self.wndEPGPSettings:FindChild("DecayRealGP"):SetCheck(self.tItems["EPGP"].bDecayRealGP)
 	self.wndEPGPSettings:FindChild("DecayPrecision"):SetCheck(self.tItems["EPGP"].bDecayPrec)
+
+	self.wndEPGPSettings:FindChild("GPMinimum1"):SetCheck(self.tItems["EPGP"].bMinGP)
+	self.wndEPGPSettings:FindChild("GPDecayThreshold"):SetCheck(self.tItems["EPGP"].bMinGPThres)
 	
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
@@ -305,7 +309,11 @@ function DKP:EPGPAdd(strName,EP,GP)
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP + GP
 		end
-		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then self.tItems[ID].GP = 1 end
+		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
+			self.tItems[ID].GP = 1
+		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
+			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+		end
 	end
 
 end
@@ -322,7 +330,11 @@ function DKP:EPGPSubtract(strName,EP,GP)
 		if GP ~= nil then
 			self.tItems[ID].GP = self.tItems[ID].GP - GP
 		end
-		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then self.tItems[ID].GP = 1 end
+		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
+			self.tItems[ID].GP = 1
+		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
+			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+		end
 	end
 
 end
@@ -339,7 +351,11 @@ function DKP:EPGPSet(strName,EP,GP)
 		if GP ~= nil then
 			self.tItems[ID].GP = GP
 		end
-		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then self.tItems[ID].GP = 1 end
+		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
+			self.tItems[ID].GP = 1
+		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
+			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+		end
 	end
 end
 
@@ -371,11 +387,16 @@ function DKP:EPGPAwardRaid(EP,GP)
 end
 
 function DKP:EPGPCheckTresholds()
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil then
-			if self.tItems[i].EP < self.tItems["EPGP"].MinEP then
-				 self.tItems[i].EP = self.tItems["EPGP"].MinEP
-			end
+	for k , player in ipairs(self.tItems) do
+		if player.EP < self.tItems["EPGP"].MinEP then
+			 player.EP = self.tItems["EPGP"].MinEP
+		end
+		
+		if self.tItems["EPGP"].bMinGP and player.GP < 1 then 
+			player.GP = 1
+		end
+		if self.tItems["EPGP"].bMinGPThres and player.GP < self.tItems["EPGP"].BaseGP then 
+			player.GP = self.tItems["EPGP"].BaseGP 
 		end
 	end
 end
@@ -461,7 +482,11 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 				end
 				if self.tItems["settings"].logs == 1 then self:DetailAddLog(self.tItems["EPGP"].nDecayValue .. "% GP Decay","{Decay}",math.floor((nPreGP - self.tItems[i].GP)) * -1 ,i) end
 			end
-			if self.tItems["EPGP"].bMinGP and self.tItems[i].GP < 1 then self.tItems[i].GP = 1 end
+			if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
+				self.tItems[ID].GP = 1
+			elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
+				self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			end
 		end
 	end
 	self:EPGPCheckTresholds()
@@ -598,11 +623,24 @@ end
 
 function DKP:EPGPMinGPEnable()
 	self.tItems["EPGP"].bMinGP = true
+	self:EPGPGPBaseThresDisable()
 	for k ,player in ipairs(self.tItems) do if player.GP < 1 then player.GP = 1 end end
 end
 
 function DKP:EPGPMinDisable()
 	self.tItems["EPGP"].bMinGP = false
+	self.wndEPGPSettings:FindChild("GPMinimum1"):SetCheck(false)
+end
+
+function DKP:EPGPGPBaseThresEnable()
+	self.tItems["EPGP"].bMinGPThres = true
+	self:EPGPMinDisable()
+	for k ,player in ipairs(self.tItems) do if player.GP < self.tItems["EPGP"].BaseGP then player.GP = self.tItems["EPGP"].BaseGP end end
+end
+
+function DKP:EPGPGPBaseThresDisable()
+	self.tItems["EPGP"].bMinGPThres = false
+	self.wndEPGPSettings:FindChild("GPDecayThreshold"):SetCheck(false)
 end
 
 

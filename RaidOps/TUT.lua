@@ -450,6 +450,7 @@ end
 
 function DKP:TutStop()
 	self.wndTut:Show(false,false)
+	if currTut and currTut.wndGlow then currTut.wndGlow:Destroy() end
 end
 
 function DKP:TutNextTut()

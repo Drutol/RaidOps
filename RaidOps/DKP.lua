@@ -189,15 +189,19 @@ local RAID_Y = 2
 local strChangelog = 
 [===[
 ---RaidOps version 2.20---
-{29/06/2015}
-Previous a,b,c and d versions fixed LUA errors preventing from addon usage.
-Fixed LUA error when attempting to enable offspec in PopUp window and the GP value equals 0.
+{30/06/2015}
+Fixed LUA error when attempting to enable offspec in PopUp window while the GP value equals 0.
 Complete reskin of loot logs.
 Changed sliders appearance.
 Sliders will now indicate the current value.
 Added 'disable' option do Max Days slider in Loot Logs.
 Added option to specify class order when grouping by class.
 Added stock context menu to item label.
+Raid session will now convert all alts' names to their main's name.Solves problem of missing or multiple entries.
+Added option to make GP value unable to drop below BaseGP value.
+Fixed Loot Logs's day filter not counting months.
+Fixed tutorial window not destroying glow on tutorial exit.
+Added all missing Datascape map ids for raid summaries. 
 
 NOTE: Decreased freqency of updates is caused by me developing completly different addon and some irl stuff. More info at a later date.
 ---RaidOps version 2.19---
@@ -264,15 +268,6 @@ Added Raid Session toolbar.
 Added Raid Session pop-up prompt.
 Fixed bug where I attepted to use uninitialized data.
 Website export now includes attendance.
----RaidOps version 2.14---
-{4/06/2015}
-Reassign window will now fill in the real GP value of item. (the one that recipient has gained).
-Fixed bug concerning networking.
-People who are bidding (chat) are now added to the loot window regardless of class filtering.
-Fixed LUA error when player rolled in chat bidding with range different than 1-100.
-Added "OneVersion" (nifty addon on curse) support.
-Loot logs' minimum GP setting now properly fills in itsef on startup.
-Loot logs' "Equippable" filter now also includes tokens.
  ]===]
 
 -- Localization stuff
@@ -2056,8 +2051,8 @@ function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	selectedMembers = {}
 	self.MassEdit = true
 	self:RefreshMainItemList()
-	self.wndMain:FindChild("MassEditControls"):Show(true,false)
 	self.wndMain:FindChild("MassEditControls"):SetOpacity(1)
+	self.wndMain:FindChild("MassEditControls"):Show(true,false)
 	self:EnableActionButtons()
 end
 
@@ -4061,6 +4056,7 @@ function DKP:ExportAddStringPart()
 		strConcatedString = strConcatedString .. self.wndExport:FindChild("ExportBox"):GetText()
 		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	end
+	self.wndExport:FindChild("ExportBox"):SetText("")
 end
 
 function DKP:ExportResetString()
@@ -4249,7 +4245,7 @@ function DKP:PopUpAccept()
 end
 
 function DKP:PopUpAwardGuildBank()
-	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:DetailAddLog(currEntry.strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) end
+	if self:GetPlayerByIDByName("Guild Bank") ~= -1 then self:DetailAddLog(currEntry.item:GetName(),"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) end
 	currEntry = nil
 	self:PopUpCheckUpdate()
 end
@@ -5851,7 +5847,7 @@ function DKP:LLInit()
 	self.wndLLM:FindChild("MaxRows"):SetValue(self.tItems["settings"].LL.nMaxRows)
 	self.wndLLM:FindChild("MaxDays"):SetValue(self.tItems["settings"].LL.nMaxDays)
 	self.wndLLM:FindChild("ChannelPrefix"):SetText(self.tItems["settings"].LL.strChatPrefix)
-	self.wndLL:SetSizingMinimum(768,493)
+	self.wndLL:SetSizingMinimum(785,493)
 end
 
 function DKP:LLMSetPrefix(wndHandler,wndControl,strText)
@@ -5999,6 +5995,7 @@ function DKP:LLOpenWhole()
 	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Whole Roster")
 	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(true)
 	self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(true)
+	self.wndLL:ToFront()
 	self:LLPopuplate()
 end
 
@@ -6008,6 +6005,7 @@ function DKP:LLOpenML()
 	self.wndLL:FindChild("Controls"):FindChild("Player"):SetText("Master Loot Entries")
 	self.wndLL:FindChild("Controls"):FindChild("GroupName"):Show(false)
 	self.wndLL:FindChild("Controls"):FindChild("GroupDate"):Show(false)
+	self.wndLL:ToFront()
 	self:LLPopuplate()
 end
 
@@ -6058,8 +6056,9 @@ function DKP:LLPrepareData()
 								table.insert(tWinnersDictionary,{ID = entry.itemID,strInfo = player.strName,strHeader = item:GetItemCategoryName() == "" and "Miscellaneous" or item:GetItemCategoryName()})			
 							end
 						else -- Group Date
-							local diff = os.date("*t",(os.time() - entry.nDate)).day
-							if self.tItems["settings"].LL.nMaxDays == 0 or diff <= self.tItems["settings"].LL.nMaxDays then 
+							local diff = os.date("*t",(os.time() - entry.nDate))
+							diff = diff.day + (diff.month-1)*30
+							if self.tItems["settings"].LL.nMaxDays == 0 or (diff <= self.tItems["settings"].LL.nMaxDays) then 
 								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
 								if self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),self.tItems[ID],entry.nGP) then
@@ -6097,7 +6096,8 @@ function DKP:LLPrepareData()
 						end
 					else
 						for j , entry in ipairs(player.tLLogs) do
-							local diff = os.date("*t",(os.time() - entry.nDate)).day
+							local diff = os.date("*t",(os.time() - entry.nDate))
+							diff = diff.day + (diff.month-1)*30
 							if self.tItems["settings"].LL.nMaxDays == 0 or diff <= self.tItems["settings"].LL.nMaxDays then 
 								local strDate = self:ConvertDate(os.date("%x",entry.nDate))
 								if tGrouppedItems[strDate] == nil then tGrouppedItems[strDate] = {} end
@@ -7262,7 +7262,7 @@ function DKP:COTileDropped(wndHandler, wndControl, nX, nY, wndSource, strType, i
 	self:COPopulate()
 	self.bClassOrderDragDrop = false
 
-	self:RefreshMainItemList()
+	if self.tItems["settings"].GroupByClass then self:RefreshMainItemList() end
 end
 
 function DKP:COTileDragDropCancel()

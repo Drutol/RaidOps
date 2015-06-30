@@ -136,7 +136,7 @@ function DKP:IBPopulate(wndBubble)
 			nHeight = nHeight + knItemTileHeight + knItemTileVertSpacing	
 		end
 	end
-	wndBubble:GetData().nWidthMod = nWidth
+	wndBubble:GetData().nWidthMod = nWidth - 30
 	wndBubble:GetData().nHeightMod =  nHeight
 	tIDCounter = {}
 	
@@ -560,7 +560,18 @@ function DKP:RSShowLoot(wndHandler,wndControl)
 end
 
 function DKP:RSIsRaidZone(id)
-	if id == 105 or id == 148 or id == 149 or id == 475 then return true else return false end
+	if id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 --DS
+	or id == 148 or id == 149 -- GA
+	or id == 475 -- Y-83
+	then return true else return false end
+end
+
+function DKP:AttGetRaidType()
+	local id = GameLib.GetCurrentZoneMap().id
+	if id == 148 or id == 149 then return RAID_GA
+	elseif id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 then return RAID_DS
+	elseif id == 475 then return RAID_Y
+	else return -1 end
 end
 
 function DKP:AttInit()
@@ -617,10 +628,7 @@ function DKP:AttCheckZone()
 	local tMap = GameLib.GetCurrentZoneMap()
 	if tMap and self:RSIsRaidZone(tMap.id) then
 		
-		if tMap.id == 148 or tMap.id == 149 then nRaidType = RAID_GA
-		elseif tMap.id == 105 then nRaidType = RAID_DS
-		elseif tMap.id == 475 then nRaidType = RAID_Y
-		end
+		nRaidType = self:AttGetRaidType()
 
 		if nRaidSessionStatus == SESSION_STOP then
 			self:AttInvokePopUp("Would you like to start raid session?","Yes","No") 
@@ -639,6 +647,14 @@ function DKP:AttUpdatePlayers(nTime)
 		end
 	end
 	table.insert(currentPlayers,GameLib.GetPlayerUnit():GetName())
+
+	-- Alts
+	for k , player in ipairs(currentPlayers) do
+		if self.tItems["alts"][string.lower(player)] and self.tItems[self.tItems["alts"][string.lower(player)]] then
+			currentPlayers[k] = self.tItems[self.tItems["alts"][string.lower(player)]].strName
+		end
+	end
+
 
 	for k , player in ipairs(currentPlayers) do
 		local bFound = false 
@@ -817,6 +833,13 @@ function DKP:AttStart()
 		for k ,player in ipairs(players) do
 			players[k] = {strName = player,nSecs = 0}
 		end
+
+		-- Alts
+		for k , player in ipairs(players) do
+			if self.tItems["alts"][string.lower(player)] and self.tItems[self.tItems["alts"][string.lower(player)]] then
+				players[k].strName = self.tItems[self.tItems["alts"][string.lower(player)]].strName
+			end
+		end
 		
 		tPlayersInSession = players
 		nRaidSessionStatus = SESSION_RUN
@@ -880,17 +903,12 @@ function DKP:AttEndSession()
 	nTimeFromLastUpdate = 0
 
 	if not nRaidType then
-		local tMap = GameLib.GetCurrentZoneMap()
-		if tMap.id == 148 or tMap.id == 149 then nRaidType = RAID_GA
-		elseif tMap.id == 105 then nRaidType = RAID_DS
-		elseif tMap.id == 475 then nRaidType = RAID_Y
-		end
+		nRaidType = self:AttGetRaidType()
 	end
 
 	local time = os.time()
 
 	for k,player in ipairs(tPlayersInSession) do
-		
 		if (player.nSecs * 100) / nRaidTime >= self.tItems["settings"].nTimePer then
 			local ID = self:GetPlayerByIDByName(player.strName)
 			if ID ~= -1 then
@@ -938,7 +956,6 @@ function DKP:AttRestore(pkg)
 		nRaidTime = nRaidTime + timeDiff
 	end
 	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap().id) then
-		
 		self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
 		self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
 	elseif nRaidSessionStatus == SESSION_RUN then

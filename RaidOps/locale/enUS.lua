@@ -230,3 +230,5 @@ L["#LabelTooltips:GA"] = "Ratio of attended GA raids to all GA sessions."
 L["#LabelTooltips:DS"] = "Ratio of attended GA raids to all DS sessions."
 L["#LabelTooltips:Y"] = "Ratio of attended GA raids to all Y-83 sessions."
 L["#LabelTooltips:Total"] = "Ratio of all attended raids to all sessions."
+--v2.20
+L["#wndEPGPSettings:GPThres"] = "Don't allow GP to drop below Base GP value."
