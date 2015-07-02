@@ -517,9 +517,14 @@ function DKP:RSPopulate()
 		local wnd = Apollo.LoadForm(self.xmlDoc3,"SessionEntry",list,self)
 		wnd:FindChild("Date"):SetText(self:ConvertDate(os.date("%x",raid.finishTime)))
 		wnd:FindChild("Date"):SetTooltip(os.date("%X",raid.finishTime-raid.length) .. " - " ..  os.date("%X",raid.finishTime))
-		if raid.raidType == RAID_GA then wnd:FindChild("Type"):SetText("GA")
-		elseif raid.raidType == RAID_DS then wnd:FindChild("Type"):SetText("DS")
-		elseif raid.raidType == RAID_Y then wnd:FindChild("Type"):SetText("Y-83")
+		if raid.raidType == RAID_GA then 
+			wnd:FindChild("Type"):SetText("GA")
+			wnd:FindChild("Type"):SetTextColor("xkcdLightishPurple")
+		elseif raid.raidType == RAID_DS then 
+			wnd:FindChild("Type"):SetText("DS")
+		elseif raid.raidType == RAID_Y then 
+			wnd:FindChild("Type"):SetText("Y-83")
+			wnd:FindChild("Type"):SetTextColor("xkcdLighterPurple")
 		end
 
 		if raid.name then wnd:FindChild("SessionName"):SetText(raid.name) else
@@ -571,7 +576,7 @@ function DKP:AttGetRaidType()
 	if id == 148 or id == 149 then return RAID_GA
 	elseif id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 then return RAID_DS
 	elseif id == 475 then return RAID_Y
-	else return -1 end
+	else return 0 end
 end
 
 function DKP:AttInit()
@@ -647,7 +652,6 @@ function DKP:AttUpdatePlayers(nTime)
 		end
 	end
 	table.insert(currentPlayers,GameLib.GetPlayerUnit():GetName())
-
 	-- Alts
 	for k , player in ipairs(currentPlayers) do
 		if self.tItems["alts"][string.lower(player)] and self.tItems[self.tItems["alts"][string.lower(player)]] then
@@ -836,7 +840,7 @@ function DKP:AttStart()
 
 		-- Alts
 		for k , player in ipairs(players) do
-			if self.tItems["alts"][string.lower(player)] and self.tItems[self.tItems["alts"][string.lower(player)]] then
+			if self.tItems["alts"][string.lower(player.strName)] and self.tItems[self.tItems["alts"][string.lower(player.strName)]] then
 				players[k].strName = self.tItems[self.tItems["alts"][string.lower(player)]].strName
 			end
 		end
@@ -891,8 +895,12 @@ function DKP:AttEndSession()
 	nRaidTime = nRaidTime + nTimeFromLastUpdate
 	if  nRaidTime < self.tItems["settings"].nMinTime * 60  then 
 		nRaidSessionStatus = SESSION_STOP
-		self.raidTimer:Stop()
-		self.raidPreciseTimer:Stop()
+		if self.raidTimer then
+			self.raidTimer:Stop()
+		end
+		if self.raidPreciseTimer then
+			self.raidPreciseTimer:Stop()
+		end
 		self:AttUpdateToolbar()
 		self.wndSessionToolbar:FindChild("Timer"):SetText("00:00:00")
 		return 

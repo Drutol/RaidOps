@@ -110,7 +110,7 @@ local ktSizingPairs =
 {
 	["Exp2"] =
 	{
-		x = 1515,
+		x = 1215,
 		y = 741,
 	},
 	["Exp1"] =
@@ -170,6 +170,7 @@ function ML:OnDocLoaded()
 
 
 		self.wndMasterLoot = Apollo.LoadForm(self.xmlDoc,"MasterLootWindow",nil,self)
+		self.wndMasterLootLooter = Apollo.LoadForm(self.xmlDoc,"LooterForm",nil,self)
 
 		--self.wndMasterLoot:Show(false)
 
@@ -245,22 +246,36 @@ end
 
 function ML:CreateLootTable()
 	local tLootPool = GameLib.GetMasterLoot()
-	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24})
-	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25})
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24,bIsMaster = false})
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25,bIsMaster = true})
+	--Clear old stuff
+	for k , tCache in pairs(tCachedItems or {}) do
+		local bFound = false
+		for k , entry in ipairs(tLootPool or {}) do
+			if entry.nLootId == k then bFound = true end
+		end
+		if not bFound then tCachedItems[k] = nil end
+	end
+
+	--Add new
 	for k , entry in ipairs(tLootPool or {}) do
 		if not tCachedItems[entry.nLootId] then
 			local cache = {}
 			cache.lootEntry = entry
 			cache.currentLocation = 1
-			if self:FilterIsRandomed(entry.itemDrop) then
-				if not self:FilterIsAuto(entry.itemDrop) then
-					cache.destination = 2
+			if entry.bIsMaster then
+				if self:FilterIsRandomed(entry.itemDrop) then
+					if not self:FilterIsAuto(entry.itemDrop) then
+						cache.destination = 2 -- RandomPool
+					else
+						cache.destination = 4
+						-- GameLib.AssignMasterLoot(entry.nLootId,unit)
+					end
 				else
-					cache.destination = 4
-					-- GameLib.AssignMasterLoot(entry.nLootId,unit)
+					cache.destination = 1 -- LootPool
 				end
 			else
-				cache.destination = 1
+				cache.destination = 5 -- Looter List
 			end
 			tCachedItems[entry.nLootId] = cache
 		end
@@ -280,6 +295,14 @@ function ML:DrawItems()
 				if entry.destination ~= 4 then wndTarget:ArrangeChildrenHorz() end
 				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
 				entry.wnd:SetData(entry.lootEntry)
+			elseif entry.destination == 5 then
+				wndTarget = self.wndMasterLootLooter:FindChild("List")
+				entry.wnd = Apollo.LoadForm(self.xmlDoc,"LooterFormEntry",wndTarget,self)
+				entry.wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
+				entry.wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
+				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
+				entry.wnd:FindChild("ItemName"):SetText(entry.lootEntry.itemDrop:GetName())
+				wndTarget:ArrangeChildrenVert()
 			end
 			
 			entry.currentLocation = entry.destination
@@ -494,6 +517,33 @@ function ML:UpdateRecipientWnd(tRecipient,bSuppressArr)
 	tRecipient.wnd:SetData(tRecipient)
 end
 
+function ML:FigureShow()
+	local bML = false
+	local bLooter = false
+	if #tCachedItems > 0 then
+		
+		for k , entry in pairs(tCachedItems) do
+			if entry.lootEntry.bIsMaster then bML = true
+			else bLooter = true end
+			if bML and bLooter then break end
+		end
+
+		if self.settings.bOOCAppear then
+			local myUnit = GameLib.GetPlayerUnit()
+			local bInCombat = myUnit:IsInCombat()
+			if bInCombat then
+				bML = false
+				bLooter = false
+			elseif self.settings.bReminder then
+				self.wndReminder:Show(true,false)
+			end
+		end
+
+	end
+	self.wndMasterLoot:Show(bML,false)
+	self.wndMasterLootLooter:Show(bLooter,false)
+end
+
 function ML:FigureSizing()
 	local bRPoolExpanded
 	local bLPoolExpanded
@@ -572,6 +622,7 @@ function ML:ExpandLootPool()
 	end
 	self:ToggleResize(self.wndMasterLoot:FindChild("ItemPool"))
 	self.wndMasterLoot:FindChild("ItemPool"):FindChild("Expand"):SetCheck(true)
+	self:FigureSizing()
 end
 
 function ML:ExpandRandomPool()
@@ -582,14 +633,17 @@ function ML:ExpandRandomPool()
 	end
 	self:ToggleResize(self.wndMasterLoot:FindChild("RandomPool"))
 	self.wndMasterLoot:FindChild("RandomPool"):FindChild("Expand"):SetCheck(true)
+	self:FigureSizing()
 end
 
 function ML:CollapseLootPool()
 	self:ToggleResize(self.wndMasterLoot:FindChild("ItemPool"))
+	self:FigureSizing()
 end
 
 function ML:CollapseRandomPool()
 	self:ToggleResize(self.wndMasterLoot:FindChild("RandomPool"))
+	self:FigureSizing()
 end
 
 function ML:ToggleResize(wnd)

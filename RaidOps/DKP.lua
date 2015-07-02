@@ -188,6 +188,11 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.21---
+{xx/07/2015}
+Added option to hide Standby players from main roster.
+Fixed error on raid session start.
+Raid types in Raid Summaries are now colored.
 ---RaidOps version 2.20---
 {30/06/2015}
 Fixed LUA error when attempting to enable offspec in PopUp window while the GP value equals 0.
@@ -480,6 +485,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].strLootFiltering == nil then self.tItems["settings"].strLootFiltering = "Nil" end
 		if self.tItems["settings"].strDateFormat == nil then self.tItems["settings"].strDateFormat = "EU" end
 		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
+		if self.tItems["settings"].bHideStandby == nil then self.tItems["settings"].bHideStandby = false end
 		if self.tItems["settings"].nMinIlvl == nil then self.tItems["settings"].nMinIlvl = 1 end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
@@ -567,29 +573,34 @@ function DKP:OnDocLoaded()
 		end
 		self.wndMain:FindChild("ButtonNB"):Enable(false)
 
+		--DEBUG
+		if not self.tItems["settings"].tDebugLogs then self.tItems["settings"].tDebugLogs = {} end
+
 
 		--OneVersion
 		self:delay(2,function() Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOps", Major, Minor, Patch) end)
 	end
 end
 
+-----
+-- Debug
+-----
 function DKP:DebugFetch()
-	local item = Item.GetDataFromId(60417)
-	local tDetails = item:GetDetailedInfo()
-	for k,v in pairs(tDetails) do
-		Print(k .. " : " .. type(v))
-	end
-	if tDetails.tPrimary.arClassRequirement then
-		for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do Print(k .. " : " .. class) end
-	end
-	self.tPopUpItemGPvalues[item:GetName()] = 123
-	table.insert(self.tPopUpExceptions,"Drutol Windchaser")
-	self.strRandomWinner = "Drutol Windchaser"
+	local wnd = Apollo.LoadForm(self.xmlDoc3,"DbgOutput",nil,self)
+	local str = self:dbggetlogs()
+	wnd:FindChild("Output"):SetText(#str > 29999 and "Reached limit of 30k" or str)
+end
 
-	self:CEOnUnitDamage({bTargetKilled = true,name = "Ersoth Curseform"})
-	self:CEOnUnitDamage({bTargetKilled = true,name = "Fleshmonger Vratorg"})
-	self:CEOnUnitDamage({bTargetKilled = true,name = "Terax Blightweaver"})
-	self:CEOnUnitDamage({bTargetKilled = true,name = "Goldox Lifecrusher"})
+function DKP:dbglog(strMsg)
+	--table.insert(self.tItems["settings"].tDebugLogs,"["..os.date("%X",os.time()).."] "..strMsg)
+end
+
+function DKP:dbggetlogs()
+	local str = ""
+	for k , log in ipairs(self.tItems["settings"].tDebugLogs) do
+		str = str .. log .. "\n"
+	end
+	return str
 end
 
 function DKP:ChangelogShow()
@@ -1532,6 +1543,7 @@ end
 function DKP:OnChatMessage(channelCurrent, tMessage)	
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
 		if strLocale == "enUS" then
+			self:dbglog("---New PopUp Query---")
 			local itemStr = ""
 			local strName = ""
 			local strTextLoot = ""
@@ -1546,7 +1558,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				table.insert(words,word)
 			end
 			
-			if words[1] ~= "The"  then return end
+			if words[1] ~= "The"  then self:dbglog(">Query Fail > Reason: 'msg type check'") return end
 	
 			local collectingItem = true
 			for i=5 , table.getn(words) do
@@ -1557,24 +1569,27 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					strName = strName .. " " .. words[i]
 				end
 			end
+			self:dbglog(string.format(">Query updated > %s > %s",strName,itemStr))
 			
 			for word in string.gmatch(string.sub(itemStr,2),"%S+") do
 				for fWord in string.gmatch(self.tItems["settings"].strFilteredKeywords, '([^;]+)') do
 					if self.tItems["settings"].strLootFiltering == "WL" then
 						if string.lower(fWord) == string.lower(word) then bFound = true break end
 					elseif self.tItems["settings"].strLootFiltering == "BL" then
-						if string.lower(fWord) == string.lower(word) then return end
+						if string.lower(fWord) == string.lower(word) then self:dbglog(">Query Fail > Reason: 'Blacklisted'") return end
 					end
 				end
 				if bFound then break end
 			end
-			
+			self:dbglog(">Query passed > blacklist")
+
 			if self.ItemDatabase and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
 				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
 				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
-				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then return end
+				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then self:dbglog(">Query Fail > Reason: 'Filtered out'") return end
 			elseif self.tItems["settings"].strLootFiltering == "WL" and not bFound then
+				self:dbglog(">Query Fail > Reason: 'No item record + not whitelisted'")
 				return
 			end
 		
@@ -1584,9 +1599,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 			if not self.tItems["settings"].bLLAfterPopUp then self:LLAddLog(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
 
 			if strName ~= "" and itemStr ~= "" then
-				if self.tItems["settings"].PopupEnable == 1 then self:PopUpWindowOpen(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
+				if self.tItems["settings"].PopupEnable == 1 then self:dbglog(">Query Success > Passed to pop-up ---Query End----") self:PopUpWindowOpen(strName:sub(1, #strName - 1),string.sub(itemStr,2)) end
 			end
-		
 		elseif strLocale == "deDE" then
 			local strItem = ""
 			local strName = ""
@@ -2409,37 +2423,39 @@ function DKP:RefreshMainItemList()
 			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 					if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
-						if self:IsPlayerRoleDesired(player.role) then	
-							if not self.MassEdit then
-								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-							else
-								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-							end
-							
-							-- Cheking for alt
-							
-							self:UpdateItem(player)
-							if not self.MassEdit then
-								if player.strName == selectedPlayer then
-									self.wndSelectedListItem = player.wnd
-									player.wnd:SetCheck(true)	
+						if self:IsPlayerRoleDesired(player.role) then
+							if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
+								if not self.MassEdit then
+									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+								else
+									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 								end
-							else
-								local found = false
 								
-								for k,prevPlayer in ipairs(selectedPlayer) do
-									if prevPlayer == player.strName then
-										found = true
-										break
+								-- Cheking for alt
+								
+								self:UpdateItem(player)
+								if not self.MassEdit then
+									if player.strName == selectedPlayer then
+										self.wndSelectedListItem = player.wnd
+										player.wnd:SetCheck(true)	
 									end
+								else
+									local found = false
+									
+									for k,prevPlayer in ipairs(selectedPlayer) do
+										if prevPlayer == player.strName then
+											found = true
+											break
+										end
+									end
+									if found then
+										table.insert(selectedMembers,player.wnd)
+										player.wnd:SetCheck(true)
+									end
+									
 								end
-								if found then
-									table.insert(selectedMembers,player.wnd)
-									player.wnd:SetCheck(true)
-								end
-								
+								player.wnd:SetData(playerId)
 							end
-							player.wnd:SetData(playerId)
 						end
 					end
 				end
@@ -3081,40 +3097,42 @@ function DKP:RefreshMainItemListAndGroupByClass()
 				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 					if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
 						if self:IsPlayerRoleDesired(player.role) then	
-							if not self.MassEdit then
-								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-							else
-								player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-							end
-							
-							self:UpdateItem(player,k,added)
-							if not self.MassEdit then
-								if player.strName == selectedPlayer then
-									self.wndSelectedListItem = player.wnd
-									player.wnd:SetCheck(true)	
+							if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then
+								if not self.MassEdit then
+									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+								else
+									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 								end
-							else
-								local found = false
 								
-								for k,prevPlayer in ipairs(selectedPlayer) do
-									if prevPlayer == player.strName then
-										found = true
-										break
+								self:UpdateItem(player,k,added)
+								if not self.MassEdit then
+									if player.strName == selectedPlayer then
+										self.wndSelectedListItem = player.wnd
+										player.wnd:SetCheck(true)	
 									end
+								else
+									local found = false
+									
+									for k,prevPlayer in ipairs(selectedPlayer) do
+										if prevPlayer == player.strName then
+											found = true
+											break
+										end
+									end
+									if found then
+										table.insert(selectedMembers,player.wnd)
+										player.wnd:SetCheck(true)
+									end
+									
 								end
-								if found then
-									table.insert(selectedMembers,player.wnd)
-									player.wnd:SetCheck(true)
+								if self.tItems["settings"].bDisplayCounter then
+									player.wnd:FindChild("Counter"):SetText(nCounter..".")
+									player.wnd:FindChild("Counter"):Show(true)
 								end
-								
+								nCounter = nCounter + 1 
+								player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
+								added = true
 							end
-							if self.tItems["settings"].bDisplayCounter then
-								player.wnd:FindChild("Counter"):SetText(nCounter..".")
-								player.wnd:FindChild("Counter"):Show(true)
-							end
-							nCounter = nCounter + 1 
-							player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-							added = true
 						end
 					end
 				end
@@ -3576,7 +3594,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("TrackUndo"):SetCheck(self.tItems["settings"].bTrackUndo)
 	
 	--Networking
-	self.wndSettings:FindChild("ButtonSettingsEnableNetworking"):SetCheck(self.tItems["settings"].networking)
+	self.wndSettings:FindChild("ButtonSettingsHideStandby"):SetCheck(self.tItems["settings"].bHideStandby)
 	self.wndSettings:FindChild("ButtonSettingsEquip"):SetCheck(self.tItems["settings"].FilterEquippable)
 	
 	--Sliders
@@ -3829,14 +3847,14 @@ function DKP:SettingsDisableFilter( wndHandler, wndControl, eMouseButton )
 	self.tItems["settings"].CheckAffiliation = 0
 end
 
-function DKP:SettingsEnableNetworking()
-	self.tItems["settings"].networking = 1
-	self:BidJoinChannel()
+function DKP:SettingsEnableStandbyHide()
+	self.tItems["settings"].bHideStandby = true
+	self:RefreshMainItemList()
 end
 
-function DKP:SettingsDisableNetworking()
-	self.tItems["settings"].networking = 0
-	self.channel = nil
+function DKP:SettingsDisableStandbyHide()
+	self.tItems["settings"].bHideStandby = false
+	self:RefreshMainItemList()
 end
 
 function DKP:SettingGroupByClassOn()
@@ -4276,6 +4294,7 @@ function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 end
 
 function DKP:PopUpWindowOpen(strNameOrig,strItem)
+	self:dbglog(">PopUp Request > Received ---PopUp Request Begin---")
 	local entry = {}
 	local strName = ""
 	for uchar in string.gfind(strNameOrig, "([%z\1-\127\194-\244][\128-\191]*)") do
@@ -4289,13 +4308,14 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 
 	if self.ItemDatabase[strItem] and self:GetPlayerByIDByName(strName) ~= -1 then
 		entry.item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
-	else return end
+	else self:dbglog(">PopUp request fail > Reason: 'wrong player ID or item not found'") return end
 
-	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return end
+	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return self:dbglog(">PopUp request end > random winnder filter") end
 
 	if self:PopUpIsBidWinner(strName) then
 		self:PopUpAssign(entry,self.tPopUpItemGPvalues[strItem])
 		self.tPopUpItemGPvalues[strItem] = nil
+		self:dbglog(">PopUp request end > bid winner")
 		return
 	end
 
@@ -4315,7 +4335,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	-- update if necessary
 
 	self:PopUpCheckUpdate()
-
+	self:dbglog(">PopUp request succes > entry passed to window:" .. string.format(" %s , %s , %s : %s",strName,entry.item:GetName(),entry.item:GetName(),entry.item:GetItemId()))
 end
 
 function DKP:PopUpCheckUpdate()
