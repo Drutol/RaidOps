@@ -1885,13 +1885,12 @@ function DKP:TimeAwardStop( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:TimeAwardStart( wndHandler, wndControl, eMouseButton )
-	if self.tItems["AwardTimer"].running == 0 then
-		if self.tItems["AwardTimer"].amount ~= nil and self.tItems["AwardTimer"].period ~= nil then
-			Apollo.RegisterTimerHandler(1, "TimeAwardTimer", self)
-			self.AwardTimer = ApolloTimer.Create(1, true, "TimeAwardTimer", self)
-			self.NextAward = self.tItems["AwardTimer"].period
-			self.tItems["AwardTimer"].running = 1
-		end
+	if self.tItems["AwardTimer"].running == 0 and self.tItems["AwardTimer"].amount ~= nil and self.tItems["AwardTimer"].period ~= nil then
+		Apollo.RegisterTimerHandler(1, "TimeAwardTimer", self)
+		self.AwardTimer = ApolloTimer.Create(1, true, "TimeAwardTimer", self)
+		self.NextAward = self.tItems["AwardTimer"].period
+		self.tItems["AwardTimer"].running = 1
+		if self.tItems["AwardTimer"].strTrigType == "Start" then self:TimeAwardAward() end
 	end
 	self:TimeAwardRefresh()
 end
@@ -1937,13 +1936,17 @@ function DKP:TimeAwardRestore()
 		self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):SetCheck(true)
 	end
 	
-	if self.tItems["AwardTimer"].Hrs == 1 then
-		self.wndTimeAward:FindChild("Options"):FindChild("HRS"):SetCheck(true)
+	if self.tItems["AwardTimer"].bScreenNotify then
+		self.wndTimeAward:FindChild("Options"):FindChild("ScreenNotify"):SetCheck(true)
 	end
 	
 	if self.tItems["AwardTimer"].Notify == 1 then
 		self.wndTimeAward:FindChild("Options"):FindChild("Notify"):SetCheck(true)
 	end
+
+	self.wndTimeAward:FindChild("Queue"):SetCheck(self.tItems["AwardTimer"].bQueue)
+	if not self.tItems["AwardTimer"].strTrigType then self.tItems["AwardTimer"].strTrigType = "End" end
+	self.wndTimeAward:FindChild("Options"):FindChild(self.tItems["AwardTimer"].strTrigType):SetCheck(true)
 	
 	if self.tItems["AwardTimer"].amount ~= nil then self.wndTimeAward:FindChild("Settings"):FindChild("HowMuch"):SetText(self.tItems["AwardTimer"].amount) end
 	if self.tItems["AwardTimer"].period ~= nil then self.wndTimeAward:FindChild("Settings"):FindChild("Period"):SetText(self.tItems["AwardTimer"].period) end
@@ -1961,15 +1964,6 @@ function DKP:TimeAwardTimer()
 	else
 		self.NextAward = self.NextAward - 1
 	end
-	if self.tItems["AwardTimer"].Hrs == 1 then
-		for i=1,GroupLib.GetMemberCount() do
-			local member = GroupLib.GetGroupMember(i)
-			if self.tItems["AwardTimer"].Hrs == 1 then
-				local ID = self:GetPlayerByIDByName(member.strCharacterName)
-				if ID ~= -1 then self.tItems[ID].Hrs = self.tItems[ID].Hrs + 0.00027 end
-			end
-		end
-	end
 end
 
 function DKP:TimeAwardAward()
@@ -1978,7 +1972,13 @@ function DKP:TimeAwardAward()
 		local unit_member = GroupLib.GetGroupMember(i)
 		table.insert(raidMembers,unit_member.strCharacterName)
 	end
-	table.insert(raidMembers,"Drutol Windchaser")
+	for k,queued in ipairs(self.tItems.tQueuedPlayers) do
+		if self.tItems[queued] then 
+			local bFound = false
+			for k,member in ipairs(raidMembers) do if string.lower(member) == string.lower(self.tItems[queued].strName) then bFound = true break end end
+			if not bFound then table.insert(raidMembers,self.tItems[queued].strName) end
+		end
+	end
 	local tMembers = {}
 	if self.tItems["settings"].bTrackUndo  and self.tItems["settings"].bTrackTimedAwardUndo then	
 		for k, member in ipairs(raidMembers) do
@@ -2011,8 +2011,12 @@ function DKP:TimeAwardAward()
 			end
 		end
 	end
-	
+	if not self.wndNot:IsShown() and self.tItems["AwardTimer"].bQueue then self:NotificationStart("Time Award granted.",10,5) end
 	self:ShowAll()
+end
+
+function DKP:TimeAwardSetTrigType(wndHandler,wndControl)
+	self.tItems["AwardTimer"].strTrigType = wndControl:GetName()
 end
 
 function DKP:TimeAwardSetAmount( wndHandler, wndControl, strText )
@@ -2037,12 +2041,12 @@ function DKP:TimeAwardPeriodChanged( wndHandler, wndControl, strText )
 	end
 end
 
-function DKP:TimeAwardEnableHRS( wndHandler, wndControl, eMouseButton )
-	self.tItems["AwardTimer"].Hrs = 1
+function DKP:TimeAwardEnableScreenNotify( wndHandler, wndControl, eMouseButton )
+	self.tItems["AwardTimer"].bScreenNotify = true
 end
 
-function DKP:TimeAwardDisableHRS( wndHandler, wndControl, eMouseButton )
-	self.tItems["AwardTimer"].Hrs = 0
+function DKP:TimeAwardDisableScreenNotify( wndHandler, wndControl, eMouseButton )
+	self.tItems["AwardTimer"].bScreenNotify = false
 end
 
 function DKP:TimeAwardEnableNotification( wndHandler, wndControl, eMouseButton )
@@ -2053,8 +2057,16 @@ function DKP:TimeAwardDisableNotification( wndHandler, wndControl, eMouseButton 
 	self.tItems["AwardTimer"].Notify = 0
 end
 
+function DKP:TimeAwardEnableQueue()
+	self.tItems["AwardTimer"].bQueue = true
+end
+
+function DKP:TimeAwardDisableQueue()
+	self.tItems["AwardTimer"].bQueue = false
+end
+
 function DKP:TimeAwardPostNotification()
-	ChatSystemLib.Command("/party [EasyDKP] Timed awards have been granted")
+	ChatSystemLib.Command("/party [RaidOps] Timed awards have been granted")
 end
 ---------------------------------------------------------------------------------------------------
 -- Mass Edit

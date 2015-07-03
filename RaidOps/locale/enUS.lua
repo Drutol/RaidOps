@@ -46,7 +46,7 @@ L["#wndMain:Controls:GroupClass"] = "Group by Class"
 L["#wndMain:Controls:NewEntry"] = "Input new entry name"
 --wndMain:TimedAward
 L["#wndMain:TimedAward:CountHRS"] = "Count HRS?"
-L["#wndMain:TimedAward:Notify"] = "Notify?"
+L["#wndMain:TimedAward:Notify"] = "Chat notification?"
 L["#wndMain:TimedAward:Award"] = "Award"
 L["#wndMain:TimedAward:Every"] = "Every"
 L["#wndMain:TimedAward:NextAward"] = "Next Award in:"
@@ -232,3 +232,5 @@ L["#LabelTooltips:Y"] = "Ratio of attended GA raids to all Y-83 sessions."
 L["#LabelTooltips:Total"] = "Ratio of all attended raids to all sessions."
 --v2.20
 L["#wndEPGPSettings:GPThres"] = "Don't allow GP to drop below Base GP value."
+--v2.22
+L["#wndMain:TimedAward:NotifyScreen"] = "On-screen notification?"

@@ -482,11 +482,6 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 				end
 				if self.tItems["settings"].logs == 1 then self:DetailAddLog(self.tItems["EPGP"].nDecayValue .. "% GP Decay","{Decay}",math.floor((nPreGP - self.tItems[i].GP)) * -1 ,i) end
 			end
-			if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-				self.tItems[ID].GP = 1
-			elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-				self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
-			end
 		end
 	end
 	self:EPGPCheckTresholds()
