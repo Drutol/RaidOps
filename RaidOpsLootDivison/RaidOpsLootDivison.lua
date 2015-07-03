@@ -171,8 +171,11 @@ function ML:OnDocLoaded()
 
 		self.wndMasterLoot = Apollo.LoadForm(self.xmlDoc,"MasterLootWindow",nil,self)
 		self.wndMasterLootLooter = Apollo.LoadForm(self.xmlDoc,"LooterForm",nil,self)
+		self.wndReminder = Apollo.LoadForm(self.xmlDoc,"LootReminder",nil,self)
 
+		self.wndReminder:Show(false)
 		--self.wndMasterLoot:Show(false)
+		self.wndMasterLootLooter:Show(false)
 
 		self.wndLooterList = self.wndMasterLoot:FindChild("PlayerPool"):FindChild("RecipientsList")
 		self.wndRandomList = self.wndMasterLoot:FindChild("RandomPool"):FindChild("List")
@@ -226,6 +229,7 @@ function ML:OnSave(eLevel)
 	local tSave = {}
 	tSave.settings = self.settings
 	tSave.wndLoc = self.wndMasterLoot:GetLocation():ToTable()
+	tSave.wndRemLoc = self.wndReminder:GetLocation():ToTable()
 	return tSave
 end
 
@@ -233,6 +237,7 @@ function ML:OnRestore(eLevel,tSave)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 	self.settings = tSave.settings
 	self.wndMasterLootLoc = tSave.wndLoc
+	self.wndReminderLoc = tSave.wndLoc
 end
 
 -----------------------------------------------------------------------------------------------
@@ -246,15 +251,27 @@ end
 
 function ML:CreateLootTable()
 	local tLootPool = GameLib.GetMasterLoot()
-	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24,bIsMaster = false})
-	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25,bIsMaster = true})
+	--table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24,bIsMaster = true})
+	--table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25,bIsMaster = true})
+	--table.insert(tLootPool,{itemDrop = Item.GetDataFromId(60407),nLootId = 26,bIsMaster = true})
 	--Clear old stuff
 	for k , tCache in pairs(tCachedItems or {}) do
 		local bFound = false
 		for k , entry in ipairs(tLootPool or {}) do
-			if entry.nLootId == k then bFound = true end
+			if entry.nLootId == k then bFound = true break end
 		end
-		if not bFound then tCachedItems[k] = nil end
+		if not bFound then 
+			if tCachedItems[k].wnd then tCachedItems[k].wnd:Destroy() end
+			tCachedItems[k] = nil 
+			for j , recipient in ipairs(self.tRecipients) do
+				if tCache.strRecipient == recipient.strName then
+
+					self:RemoveLootFromRecipient(k,recipient)
+				end
+				
+			end
+		end
+
 	end
 
 	--Add new
@@ -263,13 +280,14 @@ function ML:CreateLootTable()
 			local cache = {}
 			cache.lootEntry = entry
 			cache.currentLocation = 1
+			local bSkip = false
 			if entry.bIsMaster then
 				if self:FilterIsRandomed(entry.itemDrop) then
 					if not self:FilterIsAuto(entry.itemDrop) then
 						cache.destination = 2 -- RandomPool
 					else
-						cache.destination = 4
-						-- GameLib.AssignMasterLoot(entry.nLootId,unit)
+						GameLib.AssignMasterLoot(entry.nLootId,self:ChooseRandomLooter(entry))
+						bSkip = true
 					end
 				else
 					cache.destination = 1 -- LootPool
@@ -277,27 +295,37 @@ function ML:CreateLootTable()
 			else
 				cache.destination = 5 -- Looter List
 			end
-			tCachedItems[entry.nLootId] = cache
+			if not bSkip then tCachedItems[entry.nLootId] = cache end
 		end
 	end
 	self:DrawItems()
+	self:FigureShow()
+end
+
+function ML:ChooseRandomLooter(entry)
+	local looters = {}
+	for k , playerUnit in pairs(entry.tLooters or {}) do
+		table.insert(looters,playerUnit)
+	end	
+	return looters[math.random(#looters)]
 end
 
 function ML:DrawItems()
 	for nLootId , entry in pairs(tCachedItems) do
 		if not entry.wnd or entry.currentLocation ~= entry.destination then
+			tCachedItems[nLootId].currentLocation = entry.destination
 			if entry.wnd then entry.wnd:Destroy() end
 			local wndTarget = entry.destination == 1 and self.wndLootList or (entry.destination == 4 and self.wndMasterLoot:FindChild("ActionSlot") or self.wndRandomList)
 			if entry.destination == 1 or entry.destination == 2 or entry.destination == 4 then
-				entry.wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",wndTarget,self)
+				tCachedItems[nLootId].wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",wndTarget,self)
 				entry.wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
 				entry.wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
-				if entry.destination ~= 4 then wndTarget:ArrangeChildrenHorz() end
+				if entry.destination ~= 4 then wndTarget:ArrangeChildrenTiles() end
 				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
 				entry.wnd:SetData(entry.lootEntry)
 			elseif entry.destination == 5 then
 				wndTarget = self.wndMasterLootLooter:FindChild("List")
-				entry.wnd = Apollo.LoadForm(self.xmlDoc,"LooterFormEntry",wndTarget,self)
+				tCachedItems[nLootId].wnd = Apollo.LoadForm(self.xmlDoc,"LooterFormEntry",wndTarget,self)
 				entry.wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
 				entry.wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
 				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
@@ -305,21 +333,24 @@ function ML:DrawItems()
 				wndTarget:ArrangeChildrenVert()
 			end
 			
-			entry.currentLocation = entry.destination
 		end
 	end
+end
+
+function ML:ShowMainWnd()
+	self.wndMasterLoot:Show(true,false)
 end
 
 function ML:CreateRecipients()
 	local targets = {}
 	
-	local rops = Apollo.GetAddon("RaidOps")
+	--[[local rops = Apollo.GetAddon("RaidOps")
 	for k,player in ipairs(rops.tItems) do
 		if k > 20  then break end
 		if player.strName ~= "Guild Bank" then 
 			table.insert(targets,{strName = player.strName})
 		end
-	end
+	end]]
 
 	for k=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetGroupMember(k)
@@ -330,7 +361,7 @@ function ML:CreateRecipients()
 		elseif member.bTank then strRole = "Tank"
 		end
 
-		if not Apollo.GetAddon("RaidOps") or not self.settings.bRopsIntegration then
+		if not Apollo.GetAddon("RaidOps") or not self.settings.bRopsIntegration then -- TODOm
 			table.insert(targets,{strName = member.strCharacterName,role = strRole,class = ktClassToString[member.eClassId],tItemsAssigned = {},tItemsToBeAssigned = {}})
 		else
 			table.insert(targets,{strName = member.strCharacterName})
@@ -520,8 +551,8 @@ end
 function ML:FigureShow()
 	local bML = false
 	local bLooter = false
-	if #tCachedItems > 0 then
-		
+	
+	if 1 > 0 then --#GameLib.GetMasterLoot()
 		for k , entry in pairs(tCachedItems) do
 			if entry.lootEntry.bIsMaster then bML = true
 			else bLooter = true end
@@ -534,8 +565,9 @@ function ML:FigureShow()
 			if bInCombat then
 				bML = false
 				bLooter = false
-			elseif self.settings.bReminder then
-				self.wndReminder:Show(true,false)
+				if self.settings.bReminder then
+					self.wndReminder:Show(true,false)
+				end
 			end
 		end
 
@@ -769,7 +801,7 @@ function ML:ArrangeTiles(wndList,bForce)
 	end
 	local counter = 0
 	for k,child in ipairs(wndList:GetChildren()) do
-		if child:IsShown() then
+		if child:IsShown() and not self.settings.bKeepPositions or self.settings.bKeepPositions then 
 			counter = counter + 1
 			if counter > 1 then
 				local prevL,prevT,prevR,prevB = prevChild:GetAnchorOffsets()
@@ -898,24 +930,48 @@ end
 
 function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
 	if wndHandler ~= wndControl or not wndControl:GetData() then return end
-	if wndControl:GetName() == "BubbleItemTile" then
-		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().itemDrop:GetIcon(), wndControl:GetData().nLootId)
-	elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
-		Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().lootEntry.itemDrop:GetIcon(), wndControl:GetData().lootEntry.nLootId)
-	end
-
-	for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
-		if not self.settings.bHideInapp then
-			wnd:FindChild("NonApp"):Show(not self:IsRecipientApplicable(wnd,wndControl))
-		else
-			wnd:Show(self:IsRecipientApplicable(wnd,wndControl))
+	if eMouseButton == GameLib.CodeEnumInputMouse.Left then
+		if wndControl:GetName() == "BubbleItemTile" then
+			Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().itemDrop:GetIcon(), wndControl:GetData().nLootId)
+		elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
+			Apollo.BeginDragDrop(wndControl, "MLLootTransfer", wndControl:GetData().lootEntry.itemDrop:GetIcon(), wndControl:GetData().lootEntry.nLootId)
 		end
+
+		for k , wnd in ipairs(self.wndLooterList:GetChildren()) do
+			if not self.settings.bHideInapp then
+				wnd:FindChild("NonApp"):Show(not self:IsRecipientApplicable(wnd,wndControl))
+			else
+				wnd:Show(self:IsRecipientApplicable(wnd,wndControl))
+			end
+		end
+		if self.settings.bHideInapp then
+			self:ArrangeTiles(self.wndLooterList,true)
+		end
+		
+		if wndHandler:GetName() == "RecipientEntry" then wndHandler:FindChild("NonApp"):Show(false) end
+	else
+		local nLootId 
+		if wndControl:GetName() == "BubbleItemTile" then
+			nLootId = wndControl:GetData().nLootId
+		elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
+			nLootId = wndControl:GetData().lootEntry.nLootId
+		end
+
+		if tCachedItems[nLootId] then
+			for k , recipient in ipairs(self.tRecipients) do
+				if recipient.strName == tCachedItems[nLootId].strRecipient then
+					tCachedItems[nLootId].strRecipient = nil
+					for j , item in ipairs(recipient.tItemsToBeAssigned) do
+						if item == nLootId then table.remove(recipient.tItemsToBeAssigned,j) self:UpdateRecipientWnd(recipient) break end
+					end
+				end
+			end
+
+			tCachedItems[nLootId].destination = 1
+		end
+
+		self:DrawItems()
 	end
-	if self.settings.bHideInapp then
-		self:ArrangeTiles(self.wndLooterList,true)
-	end
-	
-	if wndHandler:GetName() == "RecipientEntry" then wndHandler:FindChild("NonApp"):Show(false) end
 end
 
 function ML:EnableActionSlotButtons()
@@ -929,6 +985,7 @@ function ML:EnableActionSlotButtons()
 end
 
 function ML:IsRecipientApplicable(wndTarget,wndSource)
+	if not wndTarget or not wndSource then return end
 	local tData = wndSource:GetName() == "BubbleItemTile" and wndSource:GetData() or wndSource:GetData().lootEntry
 
 	local bCanLoot
@@ -937,11 +994,91 @@ function ML:IsRecipientApplicable(wndTarget,wndSource)
 		if wndTarget:GetData().strName == playerUnit:GetName() then bCanLoot = true break end
 	end	
 	for k , playerUnit in pairs(tCachedItems[tData.nLootId].lootEntry.tLootersOutOfRange or {}) do
-		if wndTarget:GetData().strName == playerUnit:GetName() then bInRange = false break end
+		Print(playerUnit)
+		if wndTarget:GetData().strName == playerUnit then bInRange = false break end
 	end
 	
-	if wndTarget:GetData().strName == "Cpt Bicard" then return true end
-	if bInRange and bCanLoot then return true else return false end
+	--if wndTarget:GetData().strName == "Cpt Bicard" then return true end
+	--bInRange = true
+	--bCanLoot = true
+	if bInRange and bCanLoot then if self.settings.bClassFilter then return self:IsClassApplicable(tData,wndTarget:GetData()) else return false end else return false end
+end
+
+function ML:IsClassApplicable(tData,tRecipient)
+	local bWantEsp = true
+	local bWantWar = true
+	local bWantSpe = true
+	local bWantMed = true
+	local bWantSta = true
+	local bWantEng = true
+	
+	if string.find(tData.itemDrop:GetName(),"Imprint") then
+	    bWantEsp = false
+	    bWantWar = false
+	    bWantSpe = false
+	    bWantMed = false
+	    bWantSta = false
+	    bWantEng = false
+		
+		local tDetails = tData.itemDrop:GetDetailedInfo()
+		if tDetails.tPrimary.arClassRequirement then
+			for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do
+				if class == 1 then bWantWar = true
+				elseif class == 2 then bWantEng = true
+				elseif class == 3 then bWantEsp = true
+				elseif class == 4 then bWantMed = true
+				elseif class == 5 then bWantSta = true
+				elseif class == 7 then bWantSpe = true
+				end
+			end
+		end
+	else
+		local strCategory = tData.itemDrop:GetItemCategoryName()
+		if strCategory ~= "" then
+			if string.find(strCategory,"Light") then
+				bWantEng = false
+				bWantWar = false
+				bWantSta = false
+				bWantMed = false
+			elseif string.find(strCategory,"Medium") then
+				bWantEng = false
+				bWantWar = false
+				bWantSpe = false
+				bWantEsp = false
+			elseif string.find(strCategory,"Heavy") then
+				bWantEsp = false
+				bWantSpe = false
+				bWantSta = false
+				bWantMed = false
+			end
+			
+			if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+				bWantEsp = false
+				bWantWar = false
+				bWantSpe = false
+				bWantMed = false
+				bWantSta = false
+				bWantEng = false
+			end 
+			
+			if string.find(strCategory,"Psyblade") then bWantEsp = true
+			elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
+			elseif string.find(strCategory,"Pistols") then bWantSpe = true
+			elseif string.find(strCategory,"Claws") then bWantSta = true
+			elseif string.find(strCategory,"Greatsword") then bWantWar = true
+			elseif string.find(strCategory,"Resonators") then bWantMed = true
+			end 
+		end
+	end
+
+	if tRecipient.class == "Esper" then return bWantEsp
+	elseif tRecipient.class == "Stalker" then return bWantSta 
+	elseif tRecipient.class == "Medic" then return bWantMed
+	elseif tRecipient.class == "Warrior" then return bWantWar
+	elseif tRecipient.class == "Spellslinger" then return bWantSpe
+	elseif tRecipient.class == "Engineer" then return bWantEng
+	end
+
 end
 -----------------------------------------------------------------------------------------------
 -- Helpers
@@ -1088,8 +1225,8 @@ function ML:FilterIsAuto(item)
 	if self.settings.tFilters.bSignsAuto and containsWord(words,"Sign") then return true end
 	if self.settings.tFilters.bPatternsAuto and containsWord(words,"Pattern") then return true end
 	if self.settings.tFilters.bSchemAuto and containsWord(words,"Schematic") then return true end
-	if self.settings.tFilters.bWhiteAuto and item:GetItemQuality() == 1 then return true end
-	if self.settings.tFilters.bGrayAuto and item:GetItemQuality() == 2 then return true end
+	if self.settings.tFilters.bGrayAuto and item:GetItemQuality() == 1 then return true end
+	if self.settings.tFilters.bWhiteAuto and item:GetItemQuality() == 2 then return true end
 	if self.settings.tFilters.bGreenAuto and item:GetItemQuality() == 3 then return true end
 	if self.settings.tFilters.bBlueAuto and item:GetItemQuality() == 4 then return true end
 
@@ -1248,31 +1385,49 @@ function ML:SummaryOpen()
 			if not unit then 
 				wnd:Destroy()
 			else
-				wnd:SetData({nLootId = j,unit = unit})
+				wnd:SetData({nLootId = j,unit = unit,tRecipient = player})
 			end
 		end
 	end
 	list:ArrangeChildrenVert()
-	self.wndSummary:Show(true,false)
+	if #list:GetChildren() > 0 then self.wndSummary:Show(true,false) else self.wndSummary:Show(false,false) end
 	self.wndSummary:ToFront()
 end
 
 function ML:SummaryEntryAssign(wndHandler,wndControl)
 	GameLib.AssignMasterLoot(wndControl:GetParent():GetData().nLootId,wndControl:GetParent():GetData().unit)
+	self:RemoveLootFromRecipient(child:GetParent():GetData().nLootId,child:GetParent():GetData().tRecipient)
 	self:SummaryOpen()
 end
 
 function ML:SummaryEntryRemove(wndHandler,wndControl)
-	tCachedItems[wndControl:GetParent():GetData().nLootId].strRecipient = nil
-	tCachedItems[wndControl:GetParent():GetData().nLootId].destination = 1
+	local nLootId = wndControl:GetParent():GetData().nLootId
+
+	for k , recipient in ipairs(self.tRecipients) do
+		if recipient.strName == tCachedItems[nLootId].strRecipient then
+			tCachedItems[nLootId].strRecipient = nil
+			for j , item in ipairs(recipient.tItemsToBeAssigned) do
+				if item == nLootId then table.remove(recipient.tItemsToBeAssigned,j) self:UpdateRecipientWnd(recipient) break end
+			end
+		end
+	end
+	tCachedItems[nLootId].destination = 1
+	self:DrawItems()
 	self:SummaryOpen()
 end
 
 function ML:SummaryAssignAll()
 	for k , child in ipairs(self.wndSummary:FindChild("List"):GetChildren()) do
-		GameLib.AssignMasterLoot(child:GetParent():GetData().nLootId,child:GetParent():GetData().unit)
+		GameLib.AssignMasterLoot(child:GetData().nLootId,child:GetData().unit)
+		self:RemoveLootFromRecipient(child:GetData().nLootId,child:GetData().tRecipient)
 	end
 	self:SummaryOpen()
+end
+
+function ML:RemoveLootFromRecipient(nLootId,tRecipient)
+	for j , item in ipairs(tRecipient.tItemsToBeAssigned) do
+		if item == nLootId then table.remove(tRecipient.tItemsToBeAssigned,j) self:UpdateRecipientWnd(tRecipient) break end
+	end
 end
 -----------------------------------------------------------------------------------------------
 -- Settings
@@ -1292,6 +1447,8 @@ function ML:SettingsInit()
 	if self.settings.bRopsIntegration == nil then self.settings.bRopsIntegration = true end
 	if self.settings.bGroup == nil then self.settings.bGroup = true end
 	if self.settings.bHideInapp == nil then self.settings.bHideInapp = false end
+	if self.settings.bClassFilter == nil then self.settings.bClassFilter = false end
+	if self.settings.bKeepPositions == nil then self.settings.bKeepPositions = false end
 
 	if not self.settings.tClassOrder then self.settings.tClassOrder = ktClassOrderDefault end
 	self:SetClassOrderPopulate()
@@ -1305,6 +1462,8 @@ function ML:SettingsInit()
 	self.wndSet:FindChild("SortPR"):Enable(self.settings.bRopsIntegration)
 	self.wndSet:FindChild("Group"):SetCheck(self.settings.bGroup)
 	self.wndSet:FindChild("HideInapp"):SetCheck(self.settings.bHideInapp)
+	self.wndSet:FindChild("ClassFilter"):SetCheck(self.settings.bClassFilter)
+	self.wndSet:FindChild("KeepPosition"):SetCheck(self.settings.bKeepPositions)
 
 	--Class Weight
 	self:SetBuildClassWeightTable()
@@ -1373,6 +1532,14 @@ function ML:SetSummaryDisable()
 	self.settings.bSummary = false
 end
 
+function ML:SetClassFilterEnable()
+	self.settings.bClassFilter = true
+end
+
+function ML:SetClassFilterDisable()
+	self.settings.bClassFilter = false
+end
+
 function ML:SetRaidOpsIntegrationEnable()
 	self.settings.bRopsIntegration = true
 	self.wndSet:FindChild("SortPR"):Enable(true)
@@ -1405,11 +1572,17 @@ function ML:SetGroupDisable()
 	self.settings.bGroup = false
 	self:DrawRecipients()
 end
+
+function ML:SetKeppRecipientsPostionsEnable()
+	self.settings.bKeepPositions = true
+end
+
+function ML:SetKeppRecipientsPostionsDisable()
+	self.settings.bKeepPositions = false
+end
 -----------------------------------------------------------------------------------------------
 -- Drag&Drop - Settings Class Order
 -----------------------------------------------------------------------------------------------
-
-
 function ML:SetClassOrderPopulate()
 	self.wndSet:FindChild("ClassOrder"):FindChild("List"):DestroyChildren()
 	for k , class in ipairs(self.settings.tClassOrder) do
