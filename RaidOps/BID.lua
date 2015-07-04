@@ -2293,12 +2293,11 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		local SelectedLooter = luaCaller.tMasterLootSelectedLooter
 		local SelectedItemLootId = luaCaller.tMasterLootSelectedItem.nLootId
 
-		if SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner  = prevLuckyChild end
-		
 		luaCaller.tMasterLootSelectedLooter = nil
 		luaCaller.tMasterLootSelectedItem = nil
 		if #DKPInstance.tSelectedItems > 1 then
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
+				if SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner  = prevLuckyChild end
 				GameLib.AssignMasterLoot(item,SelectedLooter)
 				DKPInstance:MLRegisterItemWinner()
 			end
@@ -2306,10 +2305,7 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		else
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
-		
-
 	end
-
 end
 
 function DKP:OnLootAssigned(luaCaller,objItem, strLooter)

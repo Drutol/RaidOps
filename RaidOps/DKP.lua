@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 20, 0, 0
+local Major, Minor, Patch, Suffix = 2, 22, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -188,8 +188,16 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.22---
+{03/07/2015}
+Added Raid Queue option to Timed Award.
+Added On-screen notification for Timed Award.
+Added option to grant award on timer's start for Timed Award.
+After value in logs will be now present for '{Decay}' log.
+Data for Hrs label is now pulled from Raid Sessions.
+
 ---RaidOps version 2.21---
-{xx/07/2015}
+{03/07/2015}
 Added option to hide Standby players from main roster.
 Fixed error on raid session start.
 Raid types in Raid Summaries are now colored.
@@ -1249,7 +1257,6 @@ function DKP:OnSave(eLevel)
 				tSave[k].strName = player.strName
 				tSave[k].net = player.net
 				tSave[k].tot = player.tot
-				tSave[k].Hrs = player.Hrs
 				tSave[k].TradeCap = player.TradeCap
 				tSave[k].EP = player.EP
 				tSave[k].GP = player.GP
@@ -1972,11 +1979,13 @@ function DKP:TimeAwardAward()
 		local unit_member = GroupLib.GetGroupMember(i)
 		table.insert(raidMembers,unit_member.strCharacterName)
 	end
-	for k,queued in ipairs(self.tItems.tQueuedPlayers) do
-		if self.tItems[queued] then 
-			local bFound = false
-			for k,member in ipairs(raidMembers) do if string.lower(member) == string.lower(self.tItems[queued].strName) then bFound = true break end end
-			if not bFound then table.insert(raidMembers,self.tItems[queued].strName) end
+	if self.tItems["AwardTimer"].bQueue then
+		for k,queued in ipairs(self.tItems.tQueuedPlayers) do
+			if self.tItems[queued] then 
+				local bFound = false
+				for k,member in ipairs(raidMembers) do if string.lower(member) == string.lower(self.tItems[queued].strName) then bFound = true break end end
+				if not bFound then table.insert(raidMembers,self.tItems[queued].strName) end
+			end
 		end
 	end
 	local tMembers = {}
@@ -2011,7 +2020,7 @@ function DKP:TimeAwardAward()
 			end
 		end
 	end
-	if not self.wndNot:IsShown() and self.tItems["AwardTimer"].bQueue then self:NotificationStart("Time Award granted.",10,5) end
+	if self.wndNot and not self.wndNot:IsShown() and self.tItems["AwardTimer"].bScreenNotify then self:NotificationStart("Time Award granted.",5,2) end
 	self:ShowAll()
 end
 
@@ -2615,7 +2624,16 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 					end
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Hrs" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%.4f",playerItem.Hrs))
+				local nSecs = 0
+				for k ,tAtt in ipairs(playerItem.tAtt or {}) do
+					nSecs = nSecs + tAtt.nSecs
+				end
+				if nSecs > 0 then
+					nSecs = nSecs / 3600
+					playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%.4f",nSecs))
+				else
+					playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(0)
+				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Spent" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(tonumber(playerItem.tot)-tonumber(playerItem.net))
 			elseif self.tItems["settings"].LabelOptions[i] == "Priority" then
@@ -2924,7 +2942,7 @@ function DKP:LabelAddTooltipByValue(value)
 end
 
 function DKP:LabelGetColumnNumberForValue(value)
-	for i=1,self.currentLabelCount do
+	for i=1,self.currentLabelCount or 9 do
 		if self.tItems["settings"].LabelOptions[i] == value then return i end
 	end
 	return -1
@@ -2969,7 +2987,17 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 			elseif sortBy == "Net" then return tonumber(a.net) > tonumber(b.net)
 			elseif sortBy == "Tot" then return tonumber(a.tot) > tonumber(b.tot) 
 			elseif sortBy == "Spent" then return tonumber(a.tot) - tonumber(a.net) > tonumber(b.tot) - tonumber(b.net)
-			elseif sortBy == "Hrs" then return a.Hrs > b.Hrs
+			elseif sortBy == "Hrs" then 
+			 	local nSecsA = 0
+				for k ,tAtt in ipairs(a.tAtt or {}) do
+					nSecsA = nSecsA + tAtt.nSecs
+				end			 	
+
+				local nSecsB = 0
+				for k ,tAtt in ipairs(b.tAtt or {}) do
+					nSecsB = nSecsB + tAtt.nSecs
+				end
+				return nSecsA > nSecsB
 			elseif sortBy == "Priority" then 
 				if tonumber(a.tot)-tonumber(a.net) == 0 then return b end
 				if tonumber(b.tot)-tonumber(b.net) == 0 then return a end
@@ -2989,7 +3017,17 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 			elseif sortBy == "Net" then return tonumber(a.net) < tonumber(b.net)
 			elseif sortBy == "Tot" then return tonumber(a.tot) < tonumber(b.tot) 
 			elseif sortBy == "Spent" then return tonumber(a.tot) - tonumber(a.net) < tonumber(b.tot) - tonumber(b.net)
-			elseif sortBy == "Hrs" then return a.Hrs < b.Hrs
+			elseif sortBy == "Hrs" then  
+				local nSecsA = 0
+				for k ,tAtt in ipairs(a.tAtt or {}) do
+					nSecsA = nSecsA + tAtt.nSecs
+				end			 	
+
+				local nSecsB = 0
+				for k ,tAtt in ipairs(b.tAtt or {}) do
+					nSecsB = nSecsB + tAtt.nSecs
+				end
+				return nSecsA < nSecsB
 			elseif sortBy == "Priority" then 
 				if tonumber(a.tot)-tonumber(a.net) == 0 then return b end
 				if tonumber(b.tot)-tonumber(b.net) == 0 then return a end
@@ -3974,6 +4012,7 @@ function DKP:ExportExport()
 			tPlayer.net = player.net
 			tPlayer.tot = player.tot
 			tPlayer.Hrs = player.Hrs
+			tPlayer.logs = player.logs
 			tPlayer.EP = player.EP
 			tPlayer.GP = player.GP
 			tPlayer.class = player.class
@@ -3981,15 +4020,17 @@ function DKP:ExportExport()
 			tPlayer.role = player.role
 			tPlayer.offrole = player.offrole
 			tPlayer.tLLogs = player.tLLogs
+			tPlayer.tAtt = player.tAtt
 			table.insert(exportTables.tPlayers,tPlayer)
 		end
+		exportTables.tRaids = self.tItems.tRaids
 		exportTables.tSettings = self.tItems["settings"]
 		exportTables.tEPGP = self.tItems["EPGP"]
 		exportTables.tStandby = self.tItems["Standby"]
 		exportTables.tCE = self.tItems["CE"]
 		
 
-		self:ExportSetOutputText(Base64.Encode(serpent.dump(exportTables)))
+		self:ExportSetOutputText(serpent.dump(exportTables))
 
 	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
 		self.wndExport:FindChild("ClearString"):Show(false)
@@ -3997,7 +4038,7 @@ function DKP:ExportExport()
 		local strImportString = strConcatedString
 		strConcatedString = nil
 		if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
-		if string.sub(strImportString, 1, 1) == '[' or string.sub(strImportString, 1, 1) == '{' then
+		if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{' then
 			local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 			local tImportedPlayers = JSON.decode(strImportString)
 			if tImportedPlayers then
@@ -4026,7 +4067,13 @@ function DKP:ExportExport()
 			end
 			ChatSystemLib.Command("/reloadui")
 		else
-			local tImportedTables = serpent.load(Base64.Decode(strImportString))
+			local tImportedTables
+			if string.sub(strImportString, 1, 2) == 'do' then
+				tImportedTables = serpent.load(strImportString)
+			else
+				tImportedTables = serpent.load(Base64.Decode(strImportString))
+			end
+
 			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
 				for k,player in ipairs(self.tItems) do
 					self.tItems[k] = nil
@@ -4035,12 +4082,13 @@ function DKP:ExportExport()
 					table.insert(self.tItems,player)
 				end
 				for k,player in ipairs(self.tItems) do
-					self.tItems[k].logs = {}
+					if not self.tItems[k].logs then self.tItems[k].logs = {} end
 				end
 				self.tItems["settings"] = tImportedTables.tSettings
 				self.tItems["EPGP"] = tImportedTables.tEPGP
 				self.tItems["Standby"] = tImportedTables.tStandby
 				self.tItems["CE"] = tImportedTables.tCE
+				self.tItems.tRaids = tImportedTables.tRaids
 				self:AltsBuildDictionary()
 				for alt , owner in ipairs(self.tItems["alts"]) do
 					for k , player in ipairs(self.tItems) do
@@ -4975,7 +5023,7 @@ end
 function DKP:LogsExport()
 	strExport = ""
 	for k,entry in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
-		strExport = strExport .. entry.strComment .. ";" .. entry.strType .. ";" .. entry.strModifier .. ";" .. entry.strTimestamp .. "\n"
+		strExport = strExport .. entry.strComment .. ";" .. entry.strType .. ";" .. entry.strModifier .. ";" .. (entry.strTimestamp and entry.strTimestamp or self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate)) .. "\n"
 	end
 	self:ExportShowPreloadedText(strExport)
 end
@@ -5038,7 +5086,11 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 		if strType == "{EP}" then after = self.tItems[ID].EP
 		elseif strType == "{GP}" then after = self.tItems[ID].GP
 		elseif strType == "{DKP}" then after = self.tItems[ID].net
+		elseif strType == "{Decay}" and string.find(strComment,"GP") then after = self.tItems[ID].GP
+		elseif strType == "{Decay}" and string.find(strComment,"EP") then after = self.tItems[ID].EP
 		end
+
+		if strType == "{Decay}" and self.tItems[ID].strName == "Guild Bank" then return end
 
 		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after)})
 		if #self.tItems[ID].logs >= 15 then 
