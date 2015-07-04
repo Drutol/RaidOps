@@ -5426,6 +5426,7 @@ function DKP:CECreate()
 			if self.wndCEL:IsShown() then self:CELPopulate() end
 			self.wndCE:FindChild("Success"):SetOpacity(1)
 			self:delay(3,self.CEHideSuccess)
+			Event_FireGenericEvent("CEEventCreated")
 		end
 	end
 end
@@ -5967,6 +5968,7 @@ end
 function DKP:LLMShow()
 	self.wndLLM:Show(true,false)
 	self.wndLLM:ToFront()
+	Event_FireGenericEvent("LLMoreOpen")
 end
 
 function DKP:LLMHide()

@@ -306,6 +306,7 @@ local ktTutIndex =
 			[3] = "MAProceed",
 		},
 		highlight = true,
+		bCantGOTO = true
 	},
 	[10] = 
 	{
@@ -341,7 +342,124 @@ local ktTutIndex =
 			[8] = "PopUpAccepted",
 		},
 		highlight = true,
+		bCantGOTO = true
 	},
+	[11] = 
+	{
+		title = "Loot Logs",
+		window = "LL",
+		anchor = 
+		{
+			[1] = "List",
+			[2] = "Right",
+			[3] = "Right",
+			[4] = "More",
+		},
+		text = 
+		{
+			[1] = "In this window you will be able to review your loot. This module works on the 'bubble' concept , if you have added loot previously you shold see one in the highlighted container.",
+			[2] = "Each bubble contains different set of items based on how you chose them to be groupped. (Day,category,recipient)",
+			[3] = "Loot logs can operate in different scopes:\n1.Whole roster\n2.Selected players\n3.Single players\n4.Raid loot\n5.Master Loot entries",
+			[4] = "This button leads to item filtering. Press it."
+		},
+		events = 
+		{
+			[4] = "LLMoreOpen",
+		},
+		func = function(tContext)
+			tContext.wndLL:Show(true,false)
+			tContext.wndLL:ToFront()
+		end,
+		highlight = true,
+	},
+	[12] = 
+	{
+		title = "Loot Logs - Filters and settings",
+		window = "LLM",
+		anchor = 
+		{
+			[1] = "Mid",
+			[2] = "Only",
+			[3] = "Settings",
+			[4] = "SettingsMisc",
+		},
+		text = 
+		{
+			[1] = "You can extensively filter what you want to see.",
+			[2] = "This section allows you to specify what item type and rarity you want to see. Minimum iLvl , GP cost and equippability.",
+			[3] = "Here you can change tabs'(slot,class,quality) relations. If disabled it won't be taken to consideration , if its relation is 'OR' then item will be shown regardless of other tabs.",
+			[4] = "Some sliders to customize bubbles.\nIn order to report item you need to right click on item tile in bubble and choose it from menu"
+		},
+		events = 
+		{
+		
+		},
+		func = function(tContext)
+			tContext.wndLLM:Show(true,false)
+			tContext.wndLLM:ToFront()
+		end,
+		highlight = true,
+	},
+	[13] = 
+	{
+		title = "Timed awards",
+		window = "TA",
+		anchor = 
+		{
+			[1] = "Mid",
+			[2] = "Mid",
+		},
+		text = 
+		{
+			[1] = "This window allows you to schedule EP/GP/DKP awards.",
+			[2] = "There's not much to it. Just input award value and timer interval (remember to press enter).When timer is running spinning circle will appear around button showind this window.",
+		},
+		events = 
+		{
+			
+		},
+		func = function(tContext)
+			tContext.wndMain:Show(true,false)
+			tContext.wndTimeAward:Show(true,false)
+			tContext.wndMain:ToFront()
+			tContext.wndMain:FindChild("ShowTimedAwards"):SetCheck(true)
+		end,
+		highlight = true,
+	},
+	[14] = 
+	{
+		title = "Custom Events",
+		window = "CE",
+		anchor = 
+		{
+			[1] = "Right",
+			[2] = "MainFrame",
+			[3] = "Right",
+			[4] = "Right",
+			[5] = "RecentFrame",
+			[6] = "Settings",
+			[7] = "Button1",
+		},
+		text = 
+		{
+			[1] = "This 'Custom Events' window enables you to specify rewards for raid members when boss or unit dies.",
+			[2] = "In order to create event look at this window.",
+			[3] = "You are creating this event simply by filling in the statement. Depending on what dies (unit/boss) you are presented with input box for unit's name , let it be miniboss or player or dropdown button with bosses in GA/DS.",
+			[4] = "Create an event. If everything goes well message will appear.",
+			[5] = "Great! When your newly created event triggers it will be listed here.",
+			[6] = "Some settings for you to check out.",
+			[7] = "If you want to check your events or remove them press this button.",
+		},
+		events = 
+		{
+			[4] = "CEEventCreated",	
+		},
+		func = function(tContext)
+			tContext.wndCE:Show(true,false)
+			tContext.wndCE:ToFront()
+		end,
+		highlight = true,
+	}
 
 }
 
@@ -349,6 +467,7 @@ local ktTutIndex =
 local currTut
 local addedHandlers = {}
 function DKP:TutInit()
+
 	self.wndTut = Apollo.LoadForm(self.xmlDoc3,"Tutorial",nil,self)
 	self.wndTut:Show(false)
 
@@ -397,7 +516,11 @@ function DKP:TutStart(nTut,nProgress)
 		elseif currTut.window == "GI" then currTut.wnd = self.wndGuildImport 
 		elseif currTut.window == "ManualAssign" then currTut.wnd = self.wndMA 
 		elseif currTut.window == "PopUp" then currTut.wnd = self.wndPopUp 
-		elseif currTut.window == "Con" then currTut.wnd = self.wndContext 
+		elseif currTut.window == "Con" then currTut.wnd = self.wndContext  
+		elseif currTut.window == "LL" then currTut.wnd = self.wndLL  
+		elseif currTut.window == "TA" then currTut.wnd = self.wndMain  
+		elseif currTut.window == "CE" then currTut.wnd = self.wndCE  
+		elseif currTut.window == "LLM" then currTut.wnd = self.wndLLM  
 		end
 		-- Determine Pos
 		if currTut.anchor[nProgress] == "Mid" then
@@ -408,7 +531,7 @@ function DKP:TutStart(nTut,nProgress)
 			self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 		else
 			currTut.targetControl = currTut.wnd:FindChild(currTut.anchor[nProgress])
-			if currTut.window == "Settings" or currTut.window == "GI" or currTut.window == "PopUp" or currTut.window == "ManualAssign" or currTut.window == "Con" then
+			if currTut.window == "Settings" or currTut.window == "GI" or currTut.window == "PopUp" or currTut.window == "ManualAssign" or currTut.window == "Con" or currTut.window == "LL" or currTut.widnow == "TA" or currTut.window == "LLM" or currTut.window == "CE" then
 				local x,y = currTut.wnd:GetAnchorOffsets()
 				self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 			else
@@ -455,14 +578,27 @@ end
 
 function DKP:TutNextTut()
 	if currTut and currTut.wndGlow then currTut.wndGlow:Destroy() end
-	self.tItems["settings"].nTutProgress = self.tItems["settings"].nTutProgress + 1
+	local bFound = false
+	local counter = self.tItems["settings"].nTutProgress
+	while not bFound do
+		counter = counter + 1
+		if not ktTutIndex[counter].bCantGOTO then bFound = true end
+
+	end
+	self.tItems["settings"].nTutProgress = counter
 
 	self:TutStart()
 end
 
 function DKP:TutPrevTut()
 	if currTut and currTut.wndGlow then currTut.wndGlow:Destroy() end
-	self.tItems["settings"].nTutProgress = self.tItems["settings"].nTutProgress - 1
+	local bFound = false
+	local counter = self.tItems["settings"].nTutProgress
+	while not bFound do
+		counter = counter - 1
+		if not ktTutIndex[counter].bCantGOTO then bFound = true end
+	end
+	self.tItems["settings"].nTutProgress = counter
 	self:TutStart()
 end
 
@@ -471,9 +607,9 @@ function DKP:TutListInit()
 	self.wndTutList:Show(false)
 	
 	for k , tut in ipairs(ktTutIndex) do
-		if k ~= 9 and k ~= 10 then 
-			self.wndTutList:FindChild("Grid"):AddRow(k..".")
-			self.wndTutList:FindChild("Grid"):SetCellData(k,1,tut.title)
+		if not tut.bCantGOTO then 
+			self.wndTutList:FindChild("Grid"):AddRow(tut.title)
+			self.wndTutList:FindChild("Grid"):SetCellText(k,1,tut.title)
 		end
 	end
 
@@ -489,8 +625,12 @@ function DKP:TutListHide()
 	self.wndTutList:Show(false,false)
 end
 
-function DKP:TutListOpenTut(wndHandler,wndCotrol,iRow,iCol)
-	self.tItems["settings"].nTutProgress = iRow
+function DKP:TutListOpenTut(wndHandler,wndControl,iRow,iCol)
+	local strTut = wndControl:GetCellText(iRow,iCol)
+	for k , tut in ipairs(ktTutIndex) do
+		if tut.title == strTut then self.tItems["settings"].nTutProgress = k break end
+	end
+	
 	self:TutStart()
 	self.wndTutList:Show(false,false)
 end
