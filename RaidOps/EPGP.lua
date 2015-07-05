@@ -103,7 +103,7 @@ function DKP:EPGPInit()
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
 	
-	Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
+	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
 end
@@ -638,39 +638,75 @@ function DKP:EPGPGPBaseThresDisable()
 	self.wndEPGPSettings:FindChild("GPDecayThreshold"):SetCheck(false)
 end
 
-
 -- Hook Part
-
+local originalTootltipFunction
+function DKP:HookToTooltip()
+	-- Based on EToolTip implementation
+	if originalTootltipFunction then return end
+	aAddon = Apollo.GetAddon("ToolTips")
+	self.originalTootltipFunction = Tooltip.GetItemTooltipForm
+    local origCreateCallNames = aAddon.CreateCallNames
+    if not origCreateCallNames then return end
+    aAddon.CreateCallNames = function(luaCaller)
+        origCreateCallNames(luaCaller) 
+        originalTootltipFunction = Tooltip.GetItemTooltipForm
+        Tooltip.GetItemTooltipForm  = function (luaCaller, wndControl, item, bStuff, nCount)
+        	return self.EnhanceItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
+        end
+    end
+    aAddon.CreateCallNames()
+end
 
 function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
-	if Apollo.GetAddon("ETooltip") == nil then
-		self.tItems["EPGP"].Tooltips = 0
-		Print("Couldn't find EToolTip Addon")
-		if wndControl ~= nil then wndControl:SetCheck(false) end
-		return
-	end
-	if not Apollo.GetAddon("ETooltip").tSettings["bShowItemID"] then
-		self.tItems["EPGP"].Tooltips = 0
-		Print("Enable option to Show item ID in EToolTip")
-		if wndControl ~= nil then wndControl:SetCheck(false) end
-		return
-	end
-	self.tItems["EPGP"].Tooltips = 1
-	if not self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then
-		self:RawHook(Apollo.GetAddon("ETooltip"),"AttachBelow")
+	if not Apollo.GetAddon("ETooltip") then
+		self.tItems["EPGP"].Tooltips = 1
+		self:HookToTooltip()
+	else
+		if Apollo.GetAddon("ETooltip") == nil then
+			self.tItems["EPGP"].Tooltips = 0
+			Print("Couldn't find EToolTip Addon")
+			if wndControl ~= nil then wndControl:SetCheck(false) end
+			return
+		end
+		if not Apollo.GetAddon("ETooltip").tSettings["bShowItemID"] then
+			self.tItems["EPGP"].Tooltips = 0
+			Print("Enable option to Show item ID in EToolTip")
+			if wndControl ~= nil then wndControl:SetCheck(false) end
+			return
+		end
+		self.tItems["EPGP"].Tooltips = 1
+		if not self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then
+			self:RawHook(Apollo.GetAddon("ETooltip"),"AttachBelow")
+		end
 	end
 end
 
 function DKP:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 	self.tItems["EPGP"].Tooltips = 0
 	self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow")
+	if originalTootltipFunction then
+		Tooltip.GetItemTooltipForm = originalTootltipFunction
+	end
 end
 
+function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
+    local this = Apollo.GetAddon("RaidOps")
+    wndControl:SetTooltipDoc(nil)
+    local wndTooltip, wndTooltipComp = this.originalTootltipFunction(self, wndControl, item, tOpt, nCount)
+    if wndTooltip and wndTooltip:FindChild("SeparatorDiagonal") and item then
+    	wndTooltip:FindChild("SeparatorDiagonal"):SetText(this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP")
+    	wndTooltip:FindChild("SeparatorDiagonal"):SetTextColor("xkcdAmber")
+    	wndTooltip:FindChild("SeparatorDiagonal"):SetFont("Nameplates")
+    	wndTooltip:FindChild("SeparatorDiagonal"):SetTextFlags("DT_VCENTER", true)
+    	wndTooltip:FindChild("SeparatorDiagonal"):SetTextFlags("DT_CENTER", true)
+    end
+    return wndTooltip , wndTooltipComp
+end
 
 function DKP:AttachBelow(luaCaller,strText, wndHeader)
 	local words = {}
 	for word in string.gmatch(strText,"%S+") do
-	  	    table.insert(words,word)
+	  	  table.insert(words,word)
 	end
 	-- Old but working
 	--[[wndAML = Apollo.LoadForm(luaCaller.xmlDoc, "MLItemID", wndHeader, luaCaller)

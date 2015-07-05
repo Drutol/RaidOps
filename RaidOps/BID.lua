@@ -179,6 +179,7 @@ function DKP:BidCompleteInit()
 	self.SelectedLooterItem = nil
 	self.SelectedMasterItem = nil
 
+
 	if self.tItems["settings"]["ML"].bStandardLayout then
 		self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
 		self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertNetworkBidding",Hook.wndMasterLoot,self)
@@ -204,6 +205,7 @@ function DKP:BidCompleteInit()
 		Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(37,238,-128,282)
 		self.wndInsertedSearch:SetAnchorOffsets(-122,238,-40,282)
 	end
+
 	Hook.wndMasterLoot:SetSizingMinimum(800, 310)
 	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-325,63)
 	--Asc/Desc
@@ -229,7 +231,7 @@ function DKP:BidCompleteInit()
 	
 
 	self:BidUpdateItemDatabase()
-	
+
 	-- Proper Bidding window
 	self.CurrentItemChatStr = nil
 	self.wndBid = Apollo.LoadForm(self.xmlDoc2,"BiddingUI",nil,self)
@@ -292,6 +294,7 @@ function DKP:BidCompleteInit()
 		wndCmd:FindChild(k):Enable(tCommand.bEnable)
 		wndCmd:FindChild(k.."Enable"):SetCheck(tCommand.bEnable)
 	end
+
 	
 	self.bIsBidding = false
 	--Post Update To generate Labels for Main DKP window
@@ -309,7 +312,6 @@ function DKP:BidCompleteInit()
 		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
 		self:EPGPHookToETooltip()
 	end
-
 	--Hook.wndMasterLoot:Show(true,false)
 end
 

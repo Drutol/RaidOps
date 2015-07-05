@@ -776,6 +776,15 @@ function DKP:AttCheckReset()
 			end
 		end
 	end
+	for k , player in ipairs(self.tItems) do
+		for i , tAtt in ipairs(player.tAtt or {}) do
+			local counter = 0
+			for j , tAttCh in ipairs(player.tAtt or {}) do
+				if tAtt.nTime == tAttCh.nTime then counter = counter + 1 end
+				if tAtt.nTime == tAttCh.nTime and counter > 1 then table.remove(player.tAtt,i) end
+			end
+		end
+	end
 	self:RefreshMainItemList()
 end
 

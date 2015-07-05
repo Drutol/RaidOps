@@ -189,13 +189,16 @@ local RAID_Y = 2
 local strChangelog = 
 [===[
 ---RaidOps version 2.22---
-{03/07/2015}
+{05/07/2015}
 Added Raid Queue option to Timed Award.
 Added On-screen notification for Timed Award.
 Added option to grant award on timer's start for Timed Award.
 After value in logs will be now present for '{Decay}' log.
 Data for Hrs label is now pulled from Raid Sessions.
-
+Dropped Base64 Encoding for import/export.
+Added 4 new tutorials.
+Item tooltip no longer requires EToolTip addon , compatibilty remains.
+Added some condition checks to players' attendances.
 ---RaidOps version 2.21---
 {03/07/2015}
 Added option to hide Standby players from main roster.
@@ -261,26 +264,7 @@ Added option to display loot that was awarded during particular raid. (loot logs
 Fixed attendance setting for reset type.
 Fixed Y-83 not being detected.
 Fixed attendance sorting in group by class mode.
-Fixed website import.
----RaidOps version 2.15---
-{8/06/2015}
-Added attendance module.
-Added attendance settings.
-Added raid session sub-module.
-Added following attendance labels:
-	- %GA
-	- %DS
-	- %Y    (Y-83)
-	- %Total
-	- GA
-	- DS
-	- Y     (Y-83)
-	- Total
-Now 2nd default label profile will contain all attendance labels.
-Added Raid Session toolbar.
-Added Raid Session pop-up prompt.
-Fixed bug where I attepted to use uninitialized data.
-Website export now includes attendance.
+Fixed website import.cv
  ]===]
 
 -- Localization stuff
@@ -4183,14 +4167,14 @@ end
 
 function DKP:ExportAsCSVList()
 	local strCSV = ""
-	for k=1,5 do
+	for k=1,self.currentLabelCount do
 		if self.tItems["settings"].LabelOptions[k] then
 			strCSV = strCSV .. self.tItems["settings"].LabelOptions[k] .. ";"
 		end
 	end
 	strCSV = strCSV .. "\n"
 	for k,child in ipairs(self.wndItemList:GetChildren()) do
-		for j=1,5 do
+		for j=1,self.currentLabelCount do
 			strCSV = strCSV .. child:FindChild("Stat"..j):GetText() .. ";"
 		end
 		strCSV = strCSV .. "\n"
@@ -4231,7 +4215,7 @@ function DKP:ExportAsHTMLList()
 	local strHTML = "<!DOCTYPE html><html><head><style>\ntable, th, td {    border: 1px solid black;    border-collapse: collapse;}th, td {    padding: 5px;}</style></head>\n<body><table style=".."width:100%"..">\n"
 	strHTML = strHTML .. "<tr><th>" .. self.tItems["settings"].LabelOptions[1] .. "</th><th>" .. self.tItems["settings"].LabelOptions[2] .. "</th><th>" .. self.tItems["settings"].LabelOptions[3] .. "</th><th>" .. self.tItems["settings"].LabelOptions[4] .."</th><th>" .. self.tItems["settings"].LabelOptions[5] ..  "</th></tr>\n<tr>"
 	for k,child in ipairs(self.wndItemList:GetChildren()) do
-		for j=1,5 do
+		for j=1,self.currentLabelCount do
 			strHTML = strHTML .. "<th>" .. child:FindChild("Stat"..j):GetText() .. "</th>"
 		end
 		strHTML = strHTML .. "</tr>\n<tr>"
