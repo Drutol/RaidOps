@@ -188,6 +188,10 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.23---
+{xx/07/2015}
+Added Decay reminder.
+Fixed Gp values not showing on ceratin item types.
 ---RaidOps version 2.22---
 {05/07/2015}
 Added Raid Queue option to Timed Award.
@@ -520,6 +524,7 @@ function DKP:OnDocLoaded()
 		self:RSInit()
 		self:TutInit()
 		self:TutListInit()
+		self:DRInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -4350,7 +4355,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 
 	-- Cheking if not to skip and if data is valid 
 
-	if self.ItemDatabase[strItem] and self:GetPlayerByIDByName(strName) ~= -1 then
+	if self.ItemDatabase and self.ItemDatabase[strItem] and self:GetPlayerByIDByName(strName) ~= -1 then
 		entry.item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
 	else self:dbglog(">PopUp request fail > Reason: 'wrong player ID or item not found'") return end
 
@@ -7337,6 +7342,75 @@ end
 
 function DKP:COTileDragDropCancel()
 	self.bClassOrderDragDrop = false
+end
+-----------------------------------------------------------------------------------------------
+-- Decay Reminder
+-----------------------------------------------------------------------------------------------
+function DKP:DRInit()
+	self.wndDR = Apollo.LoadForm(self.xmlDoc,"DecayReminder",nil,self)
+	self.wndDR:Show(false)
+
+	if self.tItems["settings"].bRemindDecay == nil then self.tItems["settings"].bRemindDecay = false end
+	if not self.tItems["settings"].strRemindMessage then self.tItems["settings"].strRemindMessage = "It's time to decay!" end
+	if not self.tItems["settings"].nRemindInterval then self.tItems["settings"].nRemindInterval = 7 end
+
+	self.wndDR:FindChild("Enable"):SetCheck(self.tItems["settings"].bRemindDecay)
+	self.wndDR:FindChild("Period"):SetText(self.tItems["settings"].nRemindInterval)
+	self.wndDR:FindChild("Msg"):SetText(self.tItems["settings"].strRemindMessage)
+
+	if self.tItems["settings"].bRemindDecay and os.time() > self.tItems["settings"].nRemindTime then
+		self.wndReminderGlow = Apollo.LoadForm(self.xmlDoc,"TutGlow","EPGPDecayShow",self)
+		self:NotificationStart(self.tItems["settings"].strRemindMessage,10,5)
+	end
+	self:DRUpdateReminderLabel()
+end
+
+function DKP:DRShow()
+	if not self.wndDR:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndDR:Move(tCursor.x - 400, tCursor.y - 250, self.wndDR:GetWidth(), self.wndDR:GetHeight())
+	end
+
+	self.wndDR:Show(true,false)
+	self.wndDR:ToFront()
+end
+
+function DKP:DRClose()
+	self.wndDR:Show(false,false)
+end
+
+function DKP:DREnable()
+	self.tItems["settings"].bRemindDecay = true
+	self.tItems["settings"].nRemindTime = os.time() + (24 * 3600 * self.tItems["settings"].nRemindInterval)
+	self:DRUpdateReminderLabel()
+end
+
+function DKP:DRDisable()
+	self.tItems["settings"].bRemindDecay = false
+	self:DRUpdateReminderLabel()
+end
+
+function DKP:DRSetInterval(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.tItems["settings"].nRemindInterval = val
+	else
+		wndControl:SetText(self.tItems["settings"].nRemindInterval)
+	end
+	self:DRUpdateReminderLabel()
+end
+
+function DKP:DRUpdateReminderLabel()
+	if not self.tItems["settings"].nRemindTime or not self.tItems["settings"].bRemindDecay then 
+		self.wndMain:FindChild("ReminderLabel"):SetText("--Disabled--") 
+	else
+		self.wndMain:FindChild("ReminderLabel"):SetText(self:ConvertDate(os.date("%x",self.tItems["settings"].nRemindTime)) .. " " .. os.date("%X",self.tItems["settings"].nRemindTime))
+	end
+end
+
+function DKP:DROnDecay()
+	if self.wndReminderGlow then self.wndReminderGlow:Destroy() end
+	self:DRUpdateReminderLabel()
 end
 -----------------------------------------------------------------------------------------------
 -- DKP Instance

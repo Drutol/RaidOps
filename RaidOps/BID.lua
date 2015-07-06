@@ -2192,7 +2192,7 @@ function DKP:Bid2CloseOnAssignDisable()
 end
 
 function DKP:Bid2CloseOnAssign(strItem)
-	if not self.ItemDatabase[strItem] or not self.tItems["settings"]["Bid2"].bCloseOnAssign then return end
+	if not self.ItemDatabase or not self.ItemDatabase[strItem] or not self.tItems["settings"]["Bid2"].bCloseOnAssign then return end
 	local itemID = self.ItemDatabase[strItem].ID
 	
 	for k,auction in ipairs(self.ActiveAuctions) do

@@ -120,7 +120,7 @@ L["#wndSettings:DataSync"] = "Data Sync"
 --wndSettings:Tooltips
 L["#wndSettings:Tooltips:AccCreation"] = "Account will be created only if player's Nameplate Affiliation is the same as your guild's name."
 L["#wndSettings:Tooltips:PopUPDec"] = "When assigning for offspec."
-L["#wndSettings:Tooltips:GPTooltip"] = "In order to use this feature you have to install addon EToolTip and enable ID Display."
+L["#wndSettings:Tooltips:GPTooltip"] = ""
 L["#wndSettings:Tooltips:EnableBidding"] = "The effect will take place after UI is reloaded."
 L["#wndSettings:Tooltips:InvErr"] = "Error means anything different than Accepted / Declined."
 L["#wndSettings:Tooltips:FixNames"] = "This will get rid of umlauts and other non-standard character as they may cause some problems when it comes to player identification."

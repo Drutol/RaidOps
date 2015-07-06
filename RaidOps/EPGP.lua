@@ -660,7 +660,7 @@ end
 function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 	if not Apollo.GetAddon("ETooltip") then
 		self.tItems["EPGP"].Tooltips = 1
-		self:HookToTooltip()
+		self:delay(2,function(tContext) tContext:HookToTooltip() end)
 	else
 		if Apollo.GetAddon("ETooltip") == nil then
 			self.tItems["EPGP"].Tooltips = 0
@@ -686,20 +686,44 @@ function DKP:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 	self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow")
 	if originalTootltipFunction then
 		Tooltip.GetItemTooltipForm = originalTootltipFunction
+		originalTootltipFunction = nil
 	end
 end
-
+local bFirst = true
 function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     local this = Apollo.GetAddon("RaidOps")
     wndControl:SetTooltipDoc(nil)
     local wndTooltip, wndTooltipComp = this.originalTootltipFunction(self, wndControl, item, tOpt, nCount)
-    if wndTooltip and wndTooltip:FindChild("SeparatorDiagonal") and item then
-    	wndTooltip:FindChild("SeparatorDiagonal"):SetText(this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP")
-    	wndTooltip:FindChild("SeparatorDiagonal"):SetTextColor("xkcdAmber")
-    	wndTooltip:FindChild("SeparatorDiagonal"):SetFont("Nameplates")
-    	wndTooltip:FindChild("SeparatorDiagonal"):SetTextFlags("DT_VCENTER", true)
-    	wndTooltip:FindChild("SeparatorDiagonal"):SetTextFlags("DT_CENTER", true)
+    local wndTarget
+   	if wndTooltip then wndTarget = wndTooltip:FindChild("SeparatorDiagonal") and wndTooltip:FindChild("SeparatorDiagonal") or wndTooltip:FindChild("SeparatorSmallLine") end
+    if wndTooltip and wndTarget and item and item:IsEquippable() then
+    	local val = this:EPGPGetItemCostByID(item:GetItemId(),true)
+    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")
+    	wndTarget:SetTextColor("xkcdAmber")
+    	wndTarget:SetFont("Nameplates")
+    	wndTarget:SetTextFlags("DT_VCENTER", true)
+    	wndTarget:SetTextFlags("DT_CENTER", true)
+    	if wndTarget:GetName() == "SeparatorSmallLine" then 
+    		wndTarget:SetSprite("CRB_Tooltips:sprTooltip_HorzDividerDiagonal") 
+    		local l,t,r,b = wndTarget:GetAnchorOffsets()
+    		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
+    	end
     end
+    if wndTooltipComp then wndTarget = wndTooltipComp:FindChild("SeparatorDiagonal") and wndTooltipComp:FindChild("SeparatorDiagonal") or wndTooltipComp:FindChild("SeparatorSmallLine") end
+    if wndTooltipComp and wndTarget and tOpt.itemCompare and tOpt.itemCompare:IsEquippable() then
+    	local val = this:EPGPGetItemCostByID(tOpt.itemCompare:GetItemId(),true)
+    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")
+    	wndTarget:SetTextColor("xkcdAmber")
+    	wndTarget:SetFont("Nameplates")
+    	wndTarget:SetTextFlags("DT_VCENTER", true)
+    	wndTarget:SetTextFlags("DT_CENTER", true)
+    	if wndTarget:GetName() == "SeparatorSmallLine" then 
+    		wndTarget:SetSprite("CRB_Tooltips:sprTooltip_HorzDividerDiagonal") 
+    		local l,t,r,b = wndTarget:GetAnchorOffsets()
+    		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
+    	end
+    end
+
     return wndTooltip , wndTooltipComp
 end
 
