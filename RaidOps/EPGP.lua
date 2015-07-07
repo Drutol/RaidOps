@@ -484,6 +484,7 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 			end
 		end
 	end
+	self:DROnDecay()
 	self:EPGPCheckTresholds()
 	self:ShowAll()
 end
@@ -689,6 +690,7 @@ function DKP:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 		originalTootltipFunction = nil
 	end
 end
+
 local bFirst = true
 function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     local this = Apollo.GetAddon("RaidOps")

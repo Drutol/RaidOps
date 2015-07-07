@@ -608,6 +608,7 @@ function DKP:AttInit()
 	if not self.tItems["settings"].nMinTime then self.tItems["settings"].nMinTime = 5 end
 	if not self.tItems["settings"].strResetType then self.tItems["settings"].strResetType = "E" end
 	if self.tItems["settings"].bAttRaidQueue == nil then self.tItems["settings"].bAttRaidQueue = true end
+	if self.tItems["settings"].bAttStartTA == nil then self.tItems["settings"].bAttStartTA = false end
 
 	self.wndAttSettings:FindChild("AllowPopUp"):SetCheck(self.tItems["settings"].bAttAllowPopUp)
 	self.wndAttSettings:FindChild("Min"):SetText(self.tItems["settings"].nTimePer)
@@ -615,6 +616,7 @@ function DKP:AttInit()
 	self.wndAttSettings:FindChild(self.tItems["settings"].strResetType == "D" and "D" or "E"):SetCheck(true)
 	self.wndAttSettings:FindChild("MinTime"):SetText(self.tItems["settings"].nMinTime)
 	self.wndAttSettings:FindChild("AttRaidQueue"):SetCheck(self.tItems["settings"].bAttRaidQueue)
+	self.wndAttSettings:FindChild("AttStartTA"):SetCheck(self.tItems["settings"].bAttStartTA)
 
 
 
@@ -715,6 +717,14 @@ end
 
 function DKP:AttRaidQueueDisable()
 	self.tItems["settings"].bAttRaidQueue = false
+end
+
+function DKP:AttStartTAEnable()
+	self.tItems["settings"].bAttStartTA = true
+end
+
+function DKP:AttStartTADisable()
+	self.tItems["settings"].bAttStartTA = false
 end
 
 function DKP:AttSetMinTime(wndHandler,wndControl,strText)
@@ -858,6 +868,8 @@ function DKP:AttStart()
 		nRaidSessionStatus = SESSION_RUN
 		nRaidTime = 0
 
+		if self.tItems["settings"].bAttStartTA then self:TimeAwardStart() end
+
 		self.wndSessionToolbar:Show(true,false)
 
 		self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)	
@@ -934,6 +946,8 @@ function DKP:AttEndSession()
 			end
 		end
 	end
+
+	if self.tItems["settings"].bAttStartTA then self:TimeAwardStop() end
 
 	nRaidSessionStatus = SESSION_STOP
 	self.raidTimer:Stop()

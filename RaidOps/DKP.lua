@@ -191,7 +191,10 @@ local strChangelog =
 ---RaidOps version 2.23---
 {xx/07/2015}
 Added Decay reminder.
-Fixed Gp values not showing on ceratin item types.
+Fixed Gp values not showing on certain item types - for standalone tooltips.
+Added option to start and stop 'Timed Award' on raid session start/end.
+Fixed small Attendace + Raid Queue UI bug.
+Time award timer is now saved between sessions.
 ---RaidOps version 2.22---
 {05/07/2015}
 Added Raid Queue option to Timed Award.
@@ -1283,6 +1286,7 @@ function DKP:OnSave(eLevel)
 			end
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
+			tSave.nTATimer = self.NextAward
 			if self.ActiveAuctions then
 				for k,auction in ipairs(self.ActiveAuctions) do
 					if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
@@ -1315,6 +1319,7 @@ function DKP:OnRestore(eLevel, tData)
 		if tData["alts"] == nil then
 			self.tItems["alts"] = {}
 		end
+		self.NextAward = tData.nTATimer
 		self.wndMainLoc = WindowLocation.new(tData.wndMainLoc)
 		if self.tItems["purged"] then self.bPostPurge = true end
 		self.tItems["purged"] = nil
@@ -1678,9 +1683,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 	if self.tItems["settings"].whisp == 1 then
 		if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper then
 			local senderStr = tMessage.strSender
-			if self.tItems["settings"].lowercase == 1 then senderStr = string.lower(senderStr) end
-
-			if self.tItems["settings"].lowercase == 1 and senderStr == string.lower(GameLib.GetPlayerUnit():GetName()) then return end
+			if string.lower(senderStr) == string.lower(GameLib.GetPlayerUnit():GetName()) then return end
 			
 			
 			
@@ -1880,11 +1883,11 @@ function DKP:TimeAwardStop( wndHandler, wndControl, eMouseButton )
 	self:TimeAwardRefresh()
 end
 
-function DKP:TimeAwardStart( wndHandler, wndControl, eMouseButton )
+function DKP:TimeAwardStart(bReset)
 	if self.tItems["AwardTimer"].running == 0 and self.tItems["AwardTimer"].amount ~= nil and self.tItems["AwardTimer"].period ~= nil then
 		Apollo.RegisterTimerHandler(1, "TimeAwardTimer", self)
 		self.AwardTimer = ApolloTimer.Create(1, true, "TimeAwardTimer", self)
-		self.NextAward = self.tItems["AwardTimer"].period
+		if not bReset then self.NextAward = self.tItems["AwardTimer"].period end
 		self.tItems["AwardTimer"].running = 1
 		if self.tItems["AwardTimer"].strTrigType == "Start" then self:TimeAwardAward() end
 	end
@@ -1912,9 +1915,9 @@ function DKP:TimeAwardRestore()
 	if self.tItems["AwardTimer"] == nil then self.tItems["AwardTimer"] = {} end
 
 	if self.tItems["AwardTimer"].running == 1 then
-		self.NextAward = self.tItems["settings"].period
+		if not self.NextAward then self.NextAward = self.tItems["settings"].period end
 		self.tItems["AwardTimer"].running = 0
-		self:TimeAwardStart()
+		self:TimeAwardStart(true)
 	end
 	if self.tItems["AwardTimer"].running == nil then 
 		self.tItems["AwardTimer"].running = 0
@@ -7394,6 +7397,7 @@ function DKP:DRSetInterval(wndHandler,wndControl,strText)
 	local val = tonumber(strText)
 	if val and val > 0 then
 		self.tItems["settings"].nRemindInterval = val
+		self.tItems["settings"].nRemindTime = os.time() + (24 * 3600 * self.tItems["settings"].nRemindInterval)
 	else
 		wndControl:SetText(self.tItems["settings"].nRemindInterval)
 	end
@@ -7409,6 +7413,7 @@ function DKP:DRUpdateReminderLabel()
 end
 
 function DKP:DROnDecay()
+	self.tItems["settings"].nRemindTime = os.time() + (24 * 3600 * self.tItems["settings"].nRemindInterval)
 	if self.wndReminderGlow then self.wndReminderGlow:Destroy() end
 	self:DRUpdateReminderLabel()
 end
