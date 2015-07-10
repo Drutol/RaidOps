@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 22, 0, 0
+local Major, Minor, Patch, Suffix = 2, 23, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -189,7 +189,7 @@ local RAID_Y = 2
 local strChangelog = 
 [===[
 ---RaidOps version 2.23---
-{xx/07/2015}
+{08/07/2015}
 Added Decay reminder.
 Fixed Gp values not showing on certain item types - for standalone tooltips.
 Added option to start and stop 'Timed Award' on raid session start/end.
@@ -7362,8 +7362,8 @@ function DKP:DRInit()
 	self.wndDR:FindChild("Msg"):SetText(self.tItems["settings"].strRemindMessage)
 
 	if self.tItems["settings"].bRemindDecay and os.time() > self.tItems["settings"].nRemindTime then
-		self.wndReminderGlow = Apollo.LoadForm(self.xmlDoc,"TutGlow","EPGPDecayShow",self)
-		self:NotificationStart(self.tItems["settings"].strRemindMessage,10,5)
+		self.wndReminderGlow = Apollo.LoadForm(self.xmlDoc3,"TutGlow",self.wndMain:FindChild("EPGPDecayShow"),self)
+		self:delay(2,function (tContext) tContext:NotificationStart(tContext.tItems["settings"].strRemindMessage,10,5) end)
 	end
 	self:DRUpdateReminderLabel()
 end
