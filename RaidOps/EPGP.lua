@@ -661,7 +661,7 @@ end
 function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 	if not Apollo.GetAddon("ETooltip") then
 		self.tItems["EPGP"].Tooltips = 1
-		self:delay(2,function(tContext) tContext:HookToTooltip() end)
+		self:delay(3,function(tContext) tContext:HookToTooltip() end)
 	else
 		if Apollo.GetAddon("ETooltip") == nil then
 			self.tItems["EPGP"].Tooltips = 0
@@ -725,6 +725,11 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
     	end
     end
+    if wndTooltip and string.find(item:GetName(),"Imprint") then
+    	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
+    	wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. self:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    end   
+
 
     return wndTooltip , wndTooltipComp
 end

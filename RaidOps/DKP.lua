@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 23, 0, 0
+local Major, Minor, Patch, Suffix = 2, 24, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -188,6 +188,17 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.24---
+{08/07/2015}
+Fixed GP values on tokens' tooltips - standalone.
+Added option to import/export settings only.
+Fixed LUA error on attemting to clear raids based on days.
+Small UI fixes and enhancements.
+Another iteration of Custom events UI maybe the final one.
+From versions 2.23 b and c :
+Added option to filter out trash items in website export.
+Added option to filter Item label with Loot Logs filtering.
+
 ---RaidOps version 2.23---
 {08/07/2015}
 Added Decay reminder.
@@ -1887,7 +1898,7 @@ function DKP:TimeAwardStart(bReset)
 	if self.tItems["AwardTimer"].running == 0 and self.tItems["AwardTimer"].amount ~= nil and self.tItems["AwardTimer"].period ~= nil then
 		Apollo.RegisterTimerHandler(1, "TimeAwardTimer", self)
 		self.AwardTimer = ApolloTimer.Create(1, true, "TimeAwardTimer", self)
-		if not bReset then self.NextAward = self.tItems["AwardTimer"].period end
+		if not self.NextAward then self.NextAward = self.tItems["AwardTimer"].period end
 		self.tItems["AwardTimer"].running = 1
 		if self.tItems["AwardTimer"].strTrigType == "Start" then self:TimeAwardAward() end
 	end
@@ -2603,7 +2614,26 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
 				if playerItem.tLLogs and #playerItem.tLLogs > 0 then
-					local item = Item.GetDataFromId(playerItem.tLLogs[1].itemID)
+					local itemID 
+					local counter = 1
+					local item
+					while not itemID do
+						if playerItem.tLLogs[counter] then
+							item = Item.GetDataFromId(playerItem.tLLogs[counter].itemID)
+							if self.tItems["settings"].bUseFilterForItemLabel then
+								if self:LLMeetsFilters(item,playerItem,playerItem.tLLogs[counter].nGP) then
+									itemID = playerItem.tLLogs[counter].itemID
+								end
+							else
+								itemID = playerItem.tLLogs[counter].itemID
+							end
+						end
+						if counter > #playerItem.tLLogs then
+							itemID = 'lol'
+						end
+						counter = counter + 1
+					end
+					item = Item.GetDataFromId(itemID)
 					if item then
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
 						local wnd = Apollo.LoadForm(self.xmlDoc,"LoadIconToStat",playerItem.wnd:FindChild("Stat"..tostring(i)),self)
@@ -3588,6 +3618,10 @@ function DKP:SettingsSkipGBAssignDisable()
 	self.tItems["settings"].bPopUpRandomSkip = false
 end
 
+function DKP:SettingsExportSettings()
+	self:ExportShowPreloadedText(serpent.dump({["settings"] = self.tItems["settings"],["EPGP"] = self.tItems["EPGP"],["CE"] = self.tItems["CE"]}))
+end
+
 
 
 function DKP:SettingsRestore()
@@ -3627,7 +3661,8 @@ function DKP:SettingsRestore()
 	--RANDOM
 	self.wndSettings:FindChild("EditBoxDefaultDKP"):SetText(tostring(self.tItems["settings"].default_dkp))
 	if self.tItems["removed"] ~= nil then removed = self.tItems["removed"] end
-	
+	self.wndSettings:FindChild("ExportSettings"):SetRotation(180)
+
 	--GroupByClass
 	self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):SetCheck(self.tItems["settings"].GroupByClass)
 	-- PopUp reduction
@@ -3652,6 +3687,8 @@ function DKP:SettingsRestore()
 	if not self.tItems["settings"].bSkipBidders then self.tItems["settings"].bSkipBidders = false end
 	if self.tItems["settings"].bLLAfterPopUp == nil then self.tItems["settings"].bLLAfterPopUp = false end
 
+	if self.tItems["settings"].bUseFilterForItemLabel == nil then self.tItems["settings"].bUseFilterForItemLabel = true end
+
 	-- Sorry for this abomination above :(
 	
 	self.wndSettings:FindChild("UseColorIcons"):SetCheck(self.tItems["settings"].bColorIcons)
@@ -3668,6 +3705,11 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("SkipWinner"):SetCheck(self.tItems["settings"].bSkipBidders)
 	self.wndSettings:FindChild("LLonPopUp"):SetCheck(self.tItems["settings"].bLLAfterPopUp)
 	self.wndSettings:FindChild(self.tItems["settings"].strDateFormat):SetCheck(true)
+	self.wndSettings:FindChild("FilterItemLabel"):SetCheck(self.tItems["settings"].bUseFilterForItemLabel)
+
+	--Export
+	if self.tItems["settings"].bUseFilterForWebsiteExport == nil then self.tItems["settings"].bUseFilterForWebsiteExport = true end
+	self.wndExport:FindChild("LLogsFromExport"):SetCheck(self.tItems["settings"].bUseFilterForWebsiteExport)
 	
 	self.wndSettings:FindChild("MinLvl"):SetText(self.tItems["settings"].nMinIlvl)
 	if self.tItems["settings"].strLootFiltering ~= "Nil" then self.wndSettings:FindChild(self.tItems["settings"].strLootFiltering):SetCheck(true) end
@@ -3782,6 +3824,14 @@ end
 function DKP:SettingsDisplayCounterDisable()
 	self.tItems["settings"].bDisplayCounter = false
 	self:RefreshMainItemList()
+end
+
+function DKP:SettingsFilterItemLabelEnable()
+	self.tItems["settings"].bUseFilterForItemLabel = true
+end
+
+function DKP:SettingsFilterItemLabelDisable()
+	self.tItems["settings"].bUseFilterForItemLabel = true
 end
 
 function DKP:SettingsAutoLogsEnable()
@@ -4090,6 +4140,11 @@ function DKP:ExportExport()
 				end
 				self:AltsBuildDictionary()
 				ChatSystemLib.Command("/reloadui")
+			elseif tImportedTables["settings"] and tImportedTables["EPGP"] then
+				self.tItems["settings"] = tImportedTables["settings"]
+				self.tItems["EPGP"] = tImportedTables["EPGP"]
+				self.tItems["CE"] = tImportedTables["CE"]
+				ChatSystemLib.Command("/reloadui")
 			else
 				Print("Error processing database")
 			end
@@ -4102,19 +4157,38 @@ function DKP:ExportExport()
 		tTestTable['tMembers'] = {}
 		tTestTable['tRaids'] = self.tItems.tRaids
 		for k , player in ipairs(self.tItems) do
-			table.insert(tTestTable['tMembers'],player)
-			tTestTable['tMembers'][#tTestTable['tMembers']].wnd = nil
-			if tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs then
-				for k , entry in ipairs(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs) do
-					if not entry.nGP then
-						entry.nGP = tonumber(string.sub(self:EPGPGetItemCostByID(entry.itemID),36))
-					end 
-				end
+			local tCopy = {}
+			tCopy.strName = player.strName
+			tCopy.net = player.net
+			tCopy.tot = player.tot
+			tCopy.EP = player.EP
+			tCopy.GP = player.GP
+			tCopy.class = player.class
+			tCopy.alts = player.alts
+			tCopy.logs = player.logs
+			tCopy.role = player.role
+			tCopy.offrole = player.offrole
+			tCopy.tLLogs = player.tLLogs
+			tCopy.tAtt = player.tAtt
+			tCopy.tLLogs = {}
+			table.insert(tTestTable['tMembers'],tCopy)
+			for k , entry in ipairs(player.tLLogs) do
+				if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
+					table.insert(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs,entry)
+				end 
 			end
 		end
 		self:ExportSetOutputText(JSON.encode(tTestTable))
 	    
 	end
+end
+
+function DKP:ExportEnableLootFiltering()
+	self.tItems["settings"].bUseFilterForWebsiteExport = true
+end
+
+function DKP:ExportDisableLootFiltering()
+	self.tItems["settings"].bUseFilterForWebsiteExport = false
 end
 
 function DKP:ExportAddStringPart()
@@ -4154,6 +4228,7 @@ end
 function DKP:ExportShowPreloadedText(exportString)
 	self.wndExport:Show(true,false)
 	self.wndExport:FindChild("ExportBox"):SetText(exportString)
+	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, exportString)
 	self.wndExport:ToFront()
 	self.wndExport:FindChild("ButtonExportHTML"):SetCheck(false)
 	self.wndExport:FindChild("ButtonExportCSV"):SetCheck(false)
@@ -5211,6 +5286,7 @@ function DKP:CEInit()
 	self.wndCE:FindChild("Success"):SetOpacity(0)
 	if self.tItems["settings"].CEEnable then Apollo.RegisterEventHandler("CombatLogDamage","CEOnUnitDamage", self) end
 	
+	self.wndCE:FindChild("ArrowArt"):SetRotation(270)
 	
 	if self.tItems["CE"] == nil then self.tItems["CE"] = {} end
 end
@@ -5255,24 +5331,24 @@ end
 -- Dropdowns
 
 function DKP:CEExpandRecipents()
-	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(127,87,335,192)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(210,87,418,192)
 	self.wndCE:FindChild("RecipentTypeSelection"):SetText("")
 	self.wndCE:FindChild("RecipentTypeSelection"):ToFront()
 end
 
 function DKP:CECollapseRecipents()
-	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(127,87,335,113)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetAnchorOffsets(210,87,418,113)
 	self.wndCE:FindChild("RecipentTypeSelection"):SetText(tCreatedEvent.rType == "RM" and "Raid Members" or "Raid Members + Queue")
 end
 
 function DKP:CEExpandUnits()
-	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(127,47,252,143)
+	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(121,47,246,143)
 	self.wndCE:FindChild("UnitTypeSelection"):SetText("")
 	self.wndCE:FindChild("UnitTypeSelection"):ToFront()
 end
 
 function DKP:CECollapseUnits()
-	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(127,47,252,73)
+	self.wndCE:FindChild("UnitTypeSelection"):SetAnchorOffsets(121,47,246,72)
 	self.wndCE:FindChild("UnitTypeSelection"):SetText(tCreatedEvent.uType)
 end
 
@@ -5280,11 +5356,15 @@ function DKP:CEExpandBosses()
 	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetAnchorOffsets(68,7,288,131)
 	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetText("")
 	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):ToFront()
+	self.wndCE:FindChild("RecipentTypeSelection"):SetOpacity(0)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetStyle("IgnoreMouse", true)
 end
 
 function DKP:CECollapseBosses()
 	self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetAnchorOffsets(69,7,288,29)
 	if tCreatedEvent.bType then self.wndCE:FindChild("IfBoss"):FindChild("BossItemSelection"):SetText(tCreatedEvent.bType) end
+	self.wndCE:FindChild("RecipentTypeSelection"):SetOpacity(1)
+	self.wndCE:FindChild("RecipentTypeSelection"):SetStyle("IgnoreMouse", false)
 end
 
 function DKP:UnitTypeSelected(wndHandler,wndControl)
@@ -7390,6 +7470,7 @@ end
 
 function DKP:DRDisable()
 	self.tItems["settings"].bRemindDecay = false
+	if self.wndReminderGlow then self.wndReminderGlow:Destroy() end
 	self:DRUpdateReminderLabel()
 end
 

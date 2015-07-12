@@ -902,9 +902,16 @@ function DKP:BidPerformCountdown()
 		Apollo.RemoveEventHandler("BidPerformCountdown",self)
 		
 		if self.tItems["settings"].bAutoSelect and not self.CurrentBidSession.strSelected then 
-			local strWinner = self:BidSelectWinner(1) 
+			local strWinner= self:BidSelectWinner(1) 
 			if strWinner ~= "" then
 				self.CurrentBidSession.strSelected = strWinner
+				for k , bidder in ipairs(self.CurrentBidSession.Bidders or {}) do
+					if bidder.strName == strWinner then
+						self.CurrentBidSession.nSelectedOpt = bidder.nOpt
+						break
+					end
+				end
+				
 				for k , wnd in ipairs(self.wndBid:FindChild("List"):GetChildren()) do
 					if wnd:GetData().strName == strWinner then wnd:SetCheck(true) break end
 				end
@@ -2299,12 +2306,13 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		luaCaller.tMasterLootSelectedItem = nil
 		if #DKPInstance.tSelectedItems > 1 then
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
-				if SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner  = prevLuckyChild end
+				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner = prevLuckyChild end
 				GameLib.AssignMasterLoot(item,SelectedLooter)
 				DKPInstance:MLRegisterItemWinner()
 			end
 			DKPInstance.tSelectedItems = {}
 		else
+			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner = prevLuckyChild end
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
 	end

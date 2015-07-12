@@ -767,7 +767,7 @@ function DKP:AttCheckReset()
 		for k , raid in ipairs(self.tItems.tRaids or {}) do
 			local diff = os.date("*t",os.time()-raid.finishTime)
 			if diff.day > self.tItems["settings"].nReset then
-				table.remove(player.tAtt,k)
+				table.remove(self.tItems.tRaids,k)
 			end
 		end
 	else

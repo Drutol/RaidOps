@@ -234,3 +234,5 @@ L["#LabelTooltips:Total"] = "Ratio of all attended raids to all sessions."
 L["#wndEPGPSettings:GPThres"] = "Don't allow GP to drop below Base GP value."
 --v2.22
 L["#wndMain:TimedAward:NotifyScreen"] = "On-screen notification?"
+--v2.23 and a half
+L["#wndSettings:ItemLabelFilter"] = "Filter Item label with Loot Logs filtering."
