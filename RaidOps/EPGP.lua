@@ -272,7 +272,6 @@ function DKP:EPGPChangeUI()
 		controls:FindChild("ButtonGP"):Show(true,false)
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(true)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(true)
-		
 	else
 		--Main Controls
 		local controls = self.wndMain:FindChild("Controls")
@@ -282,7 +281,7 @@ function DKP:EPGPChangeUI()
 		controls:FindChild("ButtonGP"):Show(false,false)
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(false)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(false)
-		if self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then self:UnhookAll() end
+		if self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow") end
 	end
 end
 

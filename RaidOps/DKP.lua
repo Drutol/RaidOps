@@ -167,6 +167,8 @@ local ktUndoActions =
 	["itreass"] = "Reassigned %s from %s to %s",
 	["itrem"] = "Removed %s from %s",
 	["maward"] = "Awarded %s with %s",
+	--Decay
+	["dkpdec"] = "DKP Decay"
 
 }
 local ktQual = 
@@ -189,16 +191,15 @@ local RAID_Y = 2
 local strChangelog = 
 [===[
 ---RaidOps version 2.24---
-{08/07/2015}
+{12/07/2015}
 Fixed GP values on tokens' tooltips - standalone.
 Added option to import/export settings only.
-Fixed LUA error on attemting to clear raids based on days.
+Fixed LUA error on attemting to clear raids based on day difference.
 Small UI fixes and enhancements.
 Another iteration of Custom events UI maybe the final one.
 From versions 2.23 b and c :
 Added option to filter out trash items in website export.
 Added option to filter Item label with Loot Logs filtering.
-
 ---RaidOps version 2.23---
 {08/07/2015}
 Added Decay reminder.
@@ -476,6 +477,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].LabelSortOrder == nil then self.tItems["settings"].LabelSortOrder = "asc" end
 		if self.tItems["settings"].Precision == nil then self.tItems["settings"].Precision = 1 end
 		if self.tItems["settings"].PrecisionEPGP == nil then self.tItems["settings"].PrecisionEPGP = 1 end
+		if self.tItems["settings"].nPrecisionDKP == nil then self.tItems["settings"].nPrecisionDKP = 2 end
 		if self.tItems["settings"].CheckAffiliation == nil then self.tItems["settings"].CheckAffiliation = 0 end
 		if self.tItems["settings"].GroupByClass == nil then  self.tItems["settings"].GroupByClass = false end
 		if self.tItems["settings"].FilterEquippable == nil then self.tItems["settings"].FilterEquippable = false end
@@ -539,6 +541,7 @@ function DKP:OnDocLoaded()
 		self:TutInit()
 		self:TutListInit()
 		self:DRInit()
+		self:DecayInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -564,7 +567,7 @@ function DKP:OnDocLoaded()
 		self:LabelUpdateList() --<<<< With Show ALL
 		self:UpdateItemCount()
 		self.wndMain:FindChild("Decay"):Show(false)
-		self:DecayRestore()
+
 		self:ControlsUpdateQuickAddButtons()
 		self:EnableActionButtons()
 		self.wndChangelog:FindChild("Log"):SetText(strChangelog)
@@ -1107,15 +1110,19 @@ function DKP:SetDKP(cycling)
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
-				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
-					comment = "Set EP"
-				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
-					comment = "Set GP"
+				if self.tItems["EPGP"].Enable == 1 then
+					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+						comment = "Set EP"
+					elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+						comment = "Set GP"
+					end
+				else
+					comment = "Set DKP"
 				end
 			end
 			if self.tItems["EPGP"].Enable == 0 then	
 				if cycling ~= true and self.tItems["settings"].bTrackUndo then self:UndoAddActivity(ktUndoActions["setdkp"],value,{[1] = self.tItems[ID]},nil,comment) end
-				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(value)
+				self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",value))
 				local ID = self:GetPlayerByIDByName(strName)
 				
 				local oldTot = tonumber(self.tItems[ID].net)
@@ -1127,7 +1134,7 @@ function DKP:SetDKP(cycling)
 				local wndTot = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Tot")))
 				self.tItems[ID].tot = currentTot
 				if wndTot ~= nil then
-					wndTot:SetText(tostring(currentTot))
+					wndTot:SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",self.tItems[ID].tot))
 				end
 				self:DetailAddLog(comment,"{DKP}",modifierTot,ID)
 			else
@@ -1356,10 +1363,14 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
-				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
-					comment = "Add EP"
-				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
-					comment = "Add GP"
+				if self.tItems["EPGP"].Enable == 1 then
+					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+						comment = "Add EP"
+					elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+						comment = "Add GP"
+					end
+				else
+					comment = "Add DKP"
 				end
 			end
 			local ID = self:GetPlayerByIDByName(strName)
@@ -1371,10 +1382,10 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 					self.tItems[ID].tot = self.tItems[ID].tot + value
 					modifier = self.tItems[ID].net - modifier
 					if self:LabelGetColumnNumberForValue("Net") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(self.tItems[ID].net)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",self.tItems[ID].net))
 					end
 					if self:LabelGetColumnNumberForValue("Tot") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Tot"))):SetText(self.tItems[ID].tot)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Tot"))):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",self.tItems[ID].tot))
 					end
 					
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
@@ -1443,10 +1454,14 @@ function DKP:SubtractDKP(cycling)
 			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			local ID = self:GetPlayerByIDByName(strName)
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
-				if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
-					comment = "Subtract EP"
-				elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
-					comment = "Subtract GP"
+				if self.tItems["EPGP"].Enable == 1 then
+					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+						comment = "Subtract EP"
+					elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+						comment = "Subtract GP"
+					end
+				else
+					comment = "Subtract DKP"
 				end
 			end
 			if ID ~= -1 then
@@ -1456,7 +1471,7 @@ function DKP:SubtractDKP(cycling)
 					self.tItems[ID].net = self.tItems[ID].net - value
 					modifier = self.tItems[ID].net - modifier
 					if self:LabelGetColumnNumberForValue("Net") ~= -1 then
-						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(self.tItems[ID].net)
+						self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Net"))):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",self.tItems[ID].net))
 					end
 					
 					self:DetailAddLog(comment,"{DKP}",modifier,ID)
@@ -2142,6 +2157,10 @@ function DKP:MassEditLL()
 	self:LLOpen(tIDs)
 end
 
+function DKP:MassEditCreditAtt()
+	
+end
+
 function DKP:MassEditInviteContinue()
 	local strRealm = GameLib.GetRealmName()
 	local strMsg = "Raid time!"
@@ -2607,9 +2626,9 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 					wnd:SetAnchorOffsets(l-20,t,r+20,b)
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Net" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.net)
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",playerItem.net))
 			elseif self.tItems["settings"].LabelOptions[i] == "Tot" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.tot)
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",playerItem.tot))
 			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
@@ -3307,243 +3326,18 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Decay Functions
 ---------------------------------------------------------------------------------------------------
-function DKP:DecayCheckPeriod( wndHandler, wndControl, eMouseButton )
-	if self.wndMain:FindChild("Decay"):FindChild("Raidly"):IsChecked() == false and self.wndMain:FindChild("Decay"):FindChild("Monthly"):IsChecked() == false and self.wndMain:FindChild("Decay"):FindChild("Weekly"):IsChecked()==false then
-		if self.tItems["settings"].DecayPeriod == "w" then
-			self.wndMain:FindChild("Decay"):FindChild("Weekly"):SetCheck(true)
-		elseif self.tItems["settings"].DecayPeriod == "m" then
-			self.wndMain:FindChild("Decay"):FindChild("Monthly"):SetCheck(true)
-		elseif self.tItems["settings"].DecayPeriod == "r" then
-			self.wndMain:FindChild("Decay"):FindChild("Raidly"):SetCheck(true)
-		end
-	end
+function DKP:DecayInit()
+	if self.tItems["settings"].bDecayNegativeHelp == nil then self.tItems["settings"].bDecayNegativeHelp = true end
+	if self.tItems["settings"].bDecayMinValue == nil then self.tItems["settings"].bDecayMinValue = false end
+	if self.tItems["settings"].nDecayMinValue == nil then self.tItems["settings"].nDecayMinValue = 0 end
+	if self.tItems["settings"].nDecayValue == nil then self.tItems["settings"].nDecayValue = 25 end
+
+	local wndDecay = self.wndMain:FindChild("Decay")
+	wndDecay:FindChild("NegativeHelp"):SetCheck(self.tItems["settings"].bDecayNegativeHelp)
+	wndDecay:FindChild("MinNet"):SetCheck(self.tItems["settings"].bDecayMinValue)
+	wndDecay:FindChild("MinNetValue"):SetText(self.tItems["settings"].nDecayMinValue)
+	wndDecay:FindChild("DecayValue"):SetText(self.tItems["settings"].nDecayValue)
 end
-
-function DKP:DecayChangeValue( wndHandler, wndControl, strText )
-	if strText == "" or tonumber(strText) == nil then
-		wndControl:SetText("Value")
-		self.tItems["settings"].DecayVal = nil 
-	elseif tonumber(strText) ~= nil then
-		local num = tonumber(strText)
-		if num >= 1 and num <= 100 then
-			self.tItems["settings"].DecayVal = tonumber(strText)
-		else
-			wndControl:SetText("Value")
-			self.tItems["settings"].DecayVal = nil
-		end
-	end
-	self:DecayCheckConditions()
-end
-
-function DKP:DecayEnable( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].Decay = 1
-	self:DecayUpdateTimer()
-	self:DecayUpdateHelp()
-	self:DecayCheckConditions()
-
-end
-
-function DKP:DecayDisable( wndHandler, wndControl, eMouseButton )
-	self.tItems["settings"].Decay = 0
-	self:DecayUpdateTimer()
-	self:DecayUpdateHelp()
-	self:DecayCheckConditions()
-	
-end
-
-function DKP:DecayPeriodChanged( wndHandler, wndControl, eMouseButton )
-	if wndControl:GetText() == "Weekly" then
-		self.tItems["settings"].DecayPeriod = "w"
-	elseif wndControl:GetText() == "Monthly" then
-		self.tItems["settings"].DecayPeriod = "m"
-	elseif wndControl:GetText() == "After Raid" then
-		self.tItems["settings"].DecayPeriod = "r"
-	end
-	
-	if self.wndMain:FindChild("Decay"):FindChild("Raidly"):IsChecked() == false and self.wndMain:FindChild("Decay"):FindChild("Monthly"):IsChecked() == false and self.wndMain:FindChild("Decay"):FindChild("Weekly"):IsChecked()==false then
-		if self.tItems["settings"].DecayPeriod == "w" then
-			self.wndMain:FindChild("Decay"):FindChild("Weekly"):SetCheck(true)
-		elseif self.tItems["settings"].DecayPeriod == "m" then
-			self.wndMain:FindChild("Decay"):FindChild("Monthly"):SetCheck(true)
-		elseif self.tItems["settings"].DecayPeriod == "r" then
-			self.wndMain:FindChild("Decay"):FindChild("Raidly"):SetCheck(true)
-		end
-	end
-	self:DecayUpdateTimer()
-	self:DecayUpdateHelp()
-end
-
-function DKP:Decay( wndHandler, wndControl, eMouseButton )
-	if self.tItems["settings"].Decay == 1 and self.tItems["settings"].DecayVal ~= nil  then
-		for i=1 , table.maxn(self.tItems) do
-			if self.tItems[i] ~= nil and self.tItems["Standby"][string.lower(self.tItems[i].strName)] == nil  then
-				if tonumber(self.tItems[i].net) > 0 and math.abs(tonumber(self.tItems[i].net)) >= tonumber(self.tItems["settings"].DecayTreshold) then
-					local modifier = self.tItems[i].net
-					self:DetailAddLog("Decay","--",math.floor(self.tItems[i].net * ((100 -self.tItems["settings"].DecayVal) / 100)) - modifier ,i)
-					self.tItems[i].net = math.floor(self.tItems[i].net * ((100 -self.tItems["settings"].DecayVal) / 100))
-				elseif tonumber(self.tItems[i].net) < 0 and tonumber(self.tItems[i].net) >= tonumber(self.tItems["settings"].DecayTreshold) then
-					local val = math.abs(tonumber(self.tItems[i].net))
-					local modifier = val
-					val = math.floor(val * ((100  + self.tItems["settings"].DecayVal) / 100))
-					modifier = val - modifier
-					self.tItems[i].net = val * -1
-					self:DetailAddLog("Decay","--",modifier,i)
-				end
-			end
-		end
-	end
-	self:ShowAll()
-end
-
-function DKP:DecayAddStandby( wndHandler, wndControl, eMouseButton )
-	self:StandbyListAdd(nil,nil,self.tItems[detailedEntryID].strName)
-end
-
-function DKP:DecayRemoveStandby( wndHandler, wndControl, eMouseButton )
-	self.tItems["Standby"][string.lower(self.tItems[detailedEntryID].strName)] = nil 
-end
-
-function DKP:DecayRestore()
-	if self.tItems["settings"].DecayPeriod == nil then
-		self.tItems["settings"].DecayPeriod = "w"
-	end
-	
-	
-	
-	if self.tItems["settings"].Decay == nil then
-		self.tItems["settings"].Decay = 0
-	end
-	if self.tItems["settings"].DecayVal ~= nil then
-		self.wndMain:FindChild("Decay"):FindChild("DecayValue"):SetText(self.tItems["settings"].DecayVal)
-	end
-	
-	if self.tItems["settings"].DecayTreshold == nil then self.tItems["settings"].DecayTreshold = 0 end
-	self.wndMain:FindChild("Decay"):FindChild("DecayExt"):FindChild("EditBox"):SetText(self.tItems["settings"].DecayTreshold)
-	if self.tItems["settings"].DecayPeriod == "w" then
-		self.wndMain:FindChild("Decay"):FindChild("Weekly"):SetCheck(true)
-	elseif self.tItems["settings"].DecayPeriod == "m" then
-		self.wndMain:FindChild("Decay"):FindChild("Monthly"):SetCheck(true)
-	elseif self.tItems["settings"].DecayPeriod == "r" then
-		self.wndMain:FindChild("Decay"):FindChild("Raidly"):SetCheck(true)
-	end
-	if self.tItems["settings"].Decay == 1 then
-		self.wndMain:FindChild("Decay"):FindChild("Enable"):SetCheck(true)
-	end
-	
-	self:DecayUpdateTimer()
-	self:DecayUpdateHelp()
-	self:DecayCheckConditions()
-end
-
-function DKP:DecayUpdateHelp()
-	local tooltip = "Next Decay"
-	
-	if self.tItems["settings"].Decay == 1 and self.tItems["settings"].DecayStart ~= nil and self.tItems["settings"].DecayVal ~= nil then
-		local diff = os.difftime(os.time() - self.tItems["settings"].DecayStart)
-		diff = os.date("*t",diff)
-		local daysLeft
-		if self.tItems["settings"].DecayPeriod == "w" then
-			if diff.day == 6 then
-				tooltip = tooltip .. " in " .. tostring(24 - diff.hour) .. "Hours."
-			else
-				daysLeft = 7 - diff.day
-				tooltip = tooltip .. " in " .. daysLeft .. "days."
-			end
-		elseif self.tItems["settings"].DecayPeriod == "m" then
-			if diff.day == 29 then
-				tooltip = tooltip .. " in " .. tostring(24 - diff.hour) .. "Hours"
-			else
-				daysLeft = 30 - diff.day
-				tooltip = tooltip .. " in " .. daysLeft .. "days."
-			end
-		elseif self.tItems["settings"].DecayPeriod == "r" then
-			tooltip = tooltip .. " on next closed Session" 
-		end
-	else
-		tooltip = "Disabled"
-	end
-	
-	
-	self.wndMain:FindChild("Decay"):FindChild("Help"):SetTooltip(tooltip)
-end
-
-function DKP:DecayCheckConditions()
-	if self.tItems["settings"].Decay == 1 and self.tItems["settings"].DecayVal ~= nil then
-		self.wndMain:FindChild("Decay"):FindChild("Now"):Enable(true)
-		self.wndMain:FindChild("Decay"):FindChild("Raidly"):Enable(true)
-		self.wndMain:FindChild("Decay"):FindChild("Weekly"):Enable(true)
-		self.wndMain:FindChild("Decay"):FindChild("Monthly"):Enable(true)
-	else
-		self.wndMain:FindChild("Decay"):FindChild("Now"):Enable(false)
-		self.wndMain:FindChild("Decay"):FindChild("Raidly"):Enable(false)
-		self.wndMain:FindChild("Decay"):FindChild("Weekly"):Enable(false)
-		self.wndMain:FindChild("Decay"):FindChild("Monthly"):Enable(false)
-	end
-end
-
-function DKP:DecayUpdateTimer()
-	if self.tItems["settings"].Decay == 1 and self.tItems["settings"].DecayVal ~= nil  then
-		if self.tItems["settings"].DecayStart == nil then
-			self.tItems["settings"].DecayStart = os.time()
-		end
-			local diff = os.difftime(os.time() - self.tItems["settings"].DecayStart)
-			diff = os.date("*t",diff)
-			if self.tItems["settings"].DecayPeriod == "w" then
-				if diff.day >= 6 and diff.day < 7 then
-					self.DecayTimerVar = ApolloTimer.Create(60, true, "DecayTimer", self)
-					Apollo.RegisterTimerHandler(60, "DecayTimer", self)
-				elseif diff.day >= 7 then
-					self:Decay()
-					self.tItems["settings"].DecayStart = nil
-					self:DecayUpdateTimer()
-				end
-			elseif self.tItems["settings"].DecayPeriod == "m" then
-				if diff.day >= 29 and diff.day < 31 then
-					self.DecayTimerVar  = ApolloTimer.Create(60, true, "DecayTimer", self)
-					Apollo.RegisterTimerHandler(60, "DecayTimer", self)
-				elseif diff.day >= 30 then
-					self:Decay()
-					self.tItems["settings"].DecayStart = nil
-					self:DecayUpdateTimer()
-				end
-			end
-	else
-		if self.DecayTimerVar ~= nil then
-			self.DecayTimerVar:Stop() 
-		end
-	end
-	self:DecayUpdateHelp()
-end
-
-function DKP:DecaySetTreshold( wndHandler, wndControl, strText )
-	if tonumber(strText) ~= nil then
-		self.tItems["settings"].DecayTreshold = math.abs(tonumber(strText))
-	else
-		wndControl:SetText(self.tItems["settings"].DecayTreshold)
-	end
-end
-
-function DKP:DecayTimer()
-
-	local diff = os.difftime(os.time() - self.tItems["settings"].DecayStart)
-		diff = os.date("*t",diff)
-	if self.tItems["settings"].DecayPeriod == "w" then
-		if diff.day >= 7 then
-			self:Decay()
-			self.tItems["settings"].DecayStart = nil
-			self:DecayUpdateTimer()
-			self.DecayTimerVar:Stop()
-		end
-	elseif self.tItems["settings"].DecayPeriod == "m" then
-		if diff.day >= 30 then
-			self:Decay()
-			self.tItems["settings"].DecayStart = nil
-			self:DecayUpdateTimer()
-			self.DecayTimerVar:Stop()
-		end	
-	end
-end
-
 function DKP:DecayShow( wndHandler, wndControl, eMouseButton )
 	self.wndMain:FindChild("Decay"):Show(true,false)
 	
@@ -3554,6 +3348,85 @@ end
 function DKP:DecayHide( wndHandler, wndControl, eMouseButton )
 	self.wndMain:FindChild("Decay"):Show(false,false)
 end
+
+function DKP:DecayNegativeHelpEnable()
+	self.tItems["settings"].bDecayNegativeHelp = true
+end
+
+function DKP:DecayNegativeHelpDisable()
+	self.tItems["settings"].bDecayNegativeHelp = false
+end
+
+function DKP:DecayMinNetEnable()
+	self.tItems["settings"].bDecayMinValue = true
+end
+
+function DKP:DecayMinNetDisable()
+	self.tItems["settings"].bDecayMinValue = false
+end
+
+function DKP:DecaySetMinNetValue(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.tItems["settings"].nDecayMinValue = val
+	else
+		wndControl:SetText(self.tItems["settings"].nDecayMinValue)
+	end
+end
+
+function DKP:DecaySetDecayValue(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val >= 0 and val <= 100 then
+		self.tItems["settings"].nDecayValue = val
+	else
+		wndControl:SetText(self.tItems["settings"].nDecayValue)
+	end
+end
+
+function DKP:DecayDecay()
+	if self.tItems["settings"].bTrackUndo then
+		local tMembers = {}
+		for k,player in ipairs(self.tItems) do
+			if self:DecayIsPlayerEligibleForDecay(player) then
+				table.insert(tMembers,player)
+			end
+		end
+		local strType = ktUndoActions["dkpdec"]
+
+		if #tMembers > 0 then self:UndoAddActivity(strType,self.tItems["settings"].nDecayValue.."%",tMembers) end
+	end
+
+	for k , player in ipairs(self.tItems) do
+
+
+		if self:DecayIsPlayerEligibleForDecay(player) then
+			local mod
+			if self.tItems["settings"].bDecayNegativeHelp and player.net < 0 then
+				mod = player.net*-1 * self.tItems["settings"].nDecayValue / 100
+				player.net = player.net + mod
+			elseif not self.tItems["settings"].bDecayNegativeHelp and player.net < 0 then
+				mod = player.net * self.tItems["settings"].nDecayValue / 100
+				player.net = player.net + mod
+			elseif player.net > 0 then
+				mod = player.net * self.tItems["settings"].nDecayValue / 100
+				player.net = player.net - mod
+				mod = mod * -1
+			end
+			self:DetailAddLog("DKP Decay","{Decay}",mod,k)
+		end
+
+
+
+	end
+	self:RefreshMainItemList()
+end
+
+function DKP:DecayIsPlayerEligibleForDecay(player)
+	if not self.tItems["Standby"][string.lower(player.strName)] == nil then return false end
+	if self.tItems["settings"].bDecayMinValue and player.net < self.tItems["settings"].nDecayMinValue and player.net > 0 then return false end
+	return true
+end
+
 ---------------------------------------------------------------------------------------------------
 -- MemberDetails Functions
 ---------------------------------------------------------------------------------------------------
@@ -3679,7 +3552,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("PrecisionEPGP"):SetValue(self.tItems["settings"].PrecisionEPGP)
 	self.wndSettings:FindChild("PrecisionTitle"):SetText(string.format(self.Locale["#wndSettings:PRPrec"].. " - %d",self.tItems["settings"].Precision))
 	self.wndSettings:FindChild("PrecisionEPGPTitle"):SetText(string.format(self.Locale["#wndSettings:EPGPPrec"].. " - %d",self.tItems["settings"].PrecisionEPGP))
-	
+	self.wndSettings:FindChild("PrecisionDKPTitle"):SetText(string.format(self.Locale["#wndSettings:DKPPrec"].. " - %d",self.tItems["settings"].nPrecisionDKP))
 	--Affiliation
 	if self.tItems["settings"].CheckAffiliation == 1 then self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetCheck(true) end
 
@@ -3999,6 +3872,14 @@ function DKP:SettingsSetPrecisionEPGP( wndHandler, wndControl, fNewValue, fOldVa
 		self.tItems["settings"].PrecisionEPGP = math.floor(fNewValue)
 		self:ShowAll()
 		self.wndSettings:FindChild("PrecisionEPGPTitle"):SetText(string.format(self.Locale["#wndSettings:EPGPPrec"].. " - %d",self.tItems["settings"].PrecisionEPGP))
+	end
+end
+
+function DKP:SettingsSetDKPPrecision( wndHandler, wndControl, fNewValue, fOldValue )
+	if math.floor(fNewValue) ~= self.tItems["settings"].nPrecisionDKP then
+		self.tItems["settings"].nPrecisionDKP = math.floor(fNewValue)
+		self:ShowAll()
+		self.wndSettings:FindChild("PrecisionDKPTitle"):SetText(string.format(self.Locale["#wndSettings:DKPPrec"].. " - %d",self.tItems["settings"].nPrecisionDKP))
 	end
 end
 
@@ -5155,6 +5036,7 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 		elseif strType == "{DKP}" then after = self.tItems[ID].net
 		elseif strType == "{Decay}" and string.find(strComment,"GP") then after = self.tItems[ID].GP
 		elseif strType == "{Decay}" and string.find(strComment,"EP") then after = self.tItems[ID].EP
+		elseif strType == "{Decay}" and string.find(strComment,"DKP") then after = self.tItems[ID].net
 		end
 
 		if strType == "{Decay}" and self.tItems[ID].strName == "Guild Bank" then return end
@@ -7442,7 +7324,7 @@ function DKP:DRInit()
 	self.wndDR:FindChild("Msg"):SetText(self.tItems["settings"].strRemindMessage)
 
 	if self.tItems["settings"].bRemindDecay and os.time() > self.tItems["settings"].nRemindTime then
-		self.wndReminderGlow = Apollo.LoadForm(self.xmlDoc3,"TutGlow",self.wndMain:FindChild("EPGPDecayShow"),self)
+		self.wndReminderGlow = Apollo.LoadForm(self.xmlDoc3,"TutGlow",self.tItems["EPGP"].Enable == 1 and self.wndMain:FindChild("EPGPDecayShow") or self.wndMain:FindChild("DecayShow"),self)
 		self:delay(2,function (tContext) tContext:NotificationStart(tContext.tItems["settings"].strRemindMessage,10,5) end)
 	end
 	self:DRUpdateReminderLabel()
@@ -7488,8 +7370,10 @@ end
 function DKP:DRUpdateReminderLabel()
 	if not self.tItems["settings"].nRemindTime or not self.tItems["settings"].bRemindDecay then 
 		self.wndMain:FindChild("ReminderLabel"):SetText("--Disabled--") 
+		self.wndMain:FindChild("ReminderLabelDKP"):SetText("--Disabled--") 
 	else
 		self.wndMain:FindChild("ReminderLabel"):SetText(self:ConvertDate(os.date("%x",self.tItems["settings"].nRemindTime)) .. " " .. os.date("%X",self.tItems["settings"].nRemindTime))
+		self.wndMain:FindChild("ReminderLabelDKP"):SetText(self:ConvertDate(os.date("%x",self.tItems["settings"].nRemindTime)) .. " " .. os.date("%X",self.tItems["settings"].nRemindTime))
 	end
 end
 
