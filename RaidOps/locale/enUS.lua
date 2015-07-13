@@ -177,7 +177,6 @@ L["#biddingStrings:AuctionEndEarly"] = " [Chat Bidding] Auction ended early , %s
 --EPGPSettings
 
 L["#wndEPGPSettings:Title"] = "EPGP Settings"
-L["#wndEPGPSettings:Enable"] = "Enable"
 L["#wndEPGPSettings:itemcosttitle"] = "Item cost:"
 L["#wndEPGPSettings:ItemCost:Weapon"] = "Weapon"
 L["#wndEPGPSettings:ItemCost:Shield"] = "Shield"
@@ -241,3 +240,4 @@ L["#wndMain:DKPDecay:Title"] = "DKP Decay"
 L["#wndMain:DKPDecay:MinNet"] = "Minimum Net value:"
 L["#wndMain:DKPDecay:HelpNegative"] = "Negative DKP Increment."
 L["#wndSettings:DKPPrec"] = "Set DKP values precision."
+L["#wndEPGPSettings:Enable"] = "Enable EPGP"

@@ -500,17 +500,17 @@ function DKP:RSInit()
 	self.wndRS:Show(false)
 end
 
-function DKP:RSShow()
+function DKP:RSShow(bCrediting,tWho)
 	self.wndRS:Show(true,false)
 	self.wndRS:ToFront()
-	self:RSPopulate()
+	self:RSPopulate(type(bCrediting) == "boolean" and bCrediting or nil,tWho)
 end
 
 function DKP:RSHide()
 	self.wndRS:Show(false,false)
 end
 
-function DKP:RSPopulate()
+function DKP:RSPopulate(bCrediting,tWho)
 	local list = self.wndRS:FindChild("SessionsList")
 	list:DestroyChildren()
 	for k , raid in ipairs(self.tItems.tRaids or {}) do
@@ -532,9 +532,13 @@ function DKP:RSPopulate()
 			wnd:FindChild("SessionName"):SetText(raid.name)
 		end
 
+		if bCrediting then Apollo.LoadForm(self.xmlDoc3,"TutGlow",wnd:FindChild("ButtonShowAttendees"),self) end
+
 		wnd:SetData({raid = raid,id = k})
 
 	end
+	self.wndRS:SetData({bCrediting = bCrediting,tWho = tWho})
+	if bCrediting then self.wndRS:FindChild("TitleSessions"):SetText("Choose raid:") else self.wndRS:FindChild("TitleSessions"):SetText("Saved Sessions:") end
 	list:ArrangeChildrenVert()
 end
 
@@ -551,12 +555,29 @@ function DKP:RSShowAttendees(wndHandler,wndControl)
 	local raid = wndControl:GetParent():GetData().raid
 	local tIDs = {}
 
+	if self.wndRS:GetData().bCrediting then
+		for k ,id in ipairs(self.wndRS:GetData().tWho) do
+			local player = self.tItems[id]
+			local bFound = false
+			for j , att in ipairs(player.tAtt or {}) do
+				if att.nTime == raid.finishTime then bFound = true break end
+			end
+			if not self.tItems[id].tAtt then self.tItems[id].tAtt = {} end
+			if not bFound then table.insert(self.tItems[id].tAtt,{raidType = raid.raidType,nSecs = raid.length,nTime = raid.finishTime}) end
+		end
+
+		for k, child in ipairs(self.wndRS:FindChild("SessionsList"):GetChildren()) do child:FindChild("TutGlow"):Destroy() end
+	end
+
 	for k , player in ipairs(self.tItems) do
 		for j , att in ipairs(player.tAtt or {}) do
 			if att.nTime == raid.finishTime then table.insert(tIDs,k) break end
 		end
 	end
-	self:AddFilterRule(tIDs)
+
+
+
+	self:AddFilterRule(tIDs,wndControl:GetParent():GetData().id)
 end
 
 function DKP:RSShowLoot(wndHandler,wndControl)

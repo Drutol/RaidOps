@@ -168,7 +168,7 @@ local ktUndoActions =
 	["itrem"] = "Removed %s from %s",
 	["maward"] = "Awarded %s with %s",
 	--Decay
-	["dkpdec"] = "DKP Decay"
+	["dkpdec"] = "{DKP Decay}"
 
 }
 local ktQual = 
@@ -190,6 +190,15 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.25---
+{13/07/2015}
+DKP decay overhaul.
+Added DKP precision sliders.
+Fixed Auto Comment not recognizing DKP changes.
+DKP decay is registered in Recent Activity.
+Added Option to credit player with attendance manually. 
+Added Option to remove player's attendance manually. 
+When switching to Mass Edit currently selected player will transition to this mode.
 ---RaidOps version 2.24---
 {12/07/2015}
 Fixed GP values on tokens' tooltips - standalone.
@@ -2100,10 +2109,16 @@ end
 ---------------------------------------------------------------------------------------------------
 
 function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
+	local selectedID
+	if self.wndSelectedListItem then
+		selectedID = self.wndSelectedListItem:GetData()
+	end
+
 	self.wndSelectedListItem = nil
 	selectedMembers = {}
 	self.MassEdit = true
 	self:RefreshMainItemList()
+	if selectedID then for k , child in ipairs(self.wndItemList:GetChildren()) do if child:GetData() == selectedID then child:SetCheck(true) table.insert(selectedMembers,child) break end end end
 	self.wndMain:FindChild("MassEditControls"):SetOpacity(1)
 	self.wndMain:FindChild("MassEditControls"):Show(true,false)
 	self:EnableActionButtons()
@@ -2158,7 +2173,25 @@ function DKP:MassEditLL()
 end
 
 function DKP:MassEditCreditAtt()
-	
+	if not self.tOverrideFilter then
+		local tIDs = {}
+		for k , player in ipairs(selectedMembers) do
+			table.insert(tIDs,player:GetData())
+		end
+		self:RSShow(true,tIDs)
+	else
+		local nTime = self.tItems.tRaids[self.nOverrideSource].finishTime
+		for  k , wnd in ipairs(selectedMembers) do
+			local player = self.tItems[wnd:GetData()]
+			for j , att in ipairs(player.tAtt or {}) do
+				if att.nTime == nTime then 
+					table.remove(player.tAtt,j) 
+					for i , id in ipairs(self.tOverrideFilter) do if id == wnd:GetData() then table.remove(self.tOverrideFilter,i) break end end
+				end
+			end
+		end
+		self:RefreshMainItemList()
+	end
 end
 
 function DKP:MassEditInviteContinue()
@@ -2425,14 +2458,16 @@ function DKP:IsPlayerRoleDesired(strRole)
 	return false
 end
 
-function DKP:AddFilterRule(tIDs)
+function DKP:AddFilterRule(tIDs,nSource)
 	self.tOverrideFilter = tIDs
+	self.nOverrideSource = nSource -- Raid ID
 	self:RefreshMainItemList()
 	self.wndMain:FindChild("FilterAlert"):Show(true)
 end
 
 function DKP:ClearFilterRule()
 	self.tOverrideFilter = nil
+	self.nOverrideSource = nil
 	self:RefreshMainItemList()
 	self.wndMain:FindChild("FilterAlert"):Show(false)
 end
@@ -3418,6 +3453,7 @@ function DKP:DecayDecay()
 
 
 	end
+	self:DROnDecay()
 	self:RefreshMainItemList()
 end
 
