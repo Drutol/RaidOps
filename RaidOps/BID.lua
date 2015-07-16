@@ -305,7 +305,11 @@ function DKP:BidCompleteInit()
 	Apollo.RegisterEventHandler("ChatMessage","BidMessage",self)
 	--self.tItems["settings"].strBidChannel = "/s "
 	Hook.wndMasterLoot:Show(false,false)
-	self.strMyName = GameLib.GetPlayerUnit():GetName()
+	if GameLib.GetPlayerUnit() then
+		self.strMyName = GameLib.GetPlayerUnit():GetName()
+	else
+		self:delay(3, function(tContext) if GameLib.GetPlayerUnit() then tContext.strMyName = GameLib.GetPlayerUnit():GetName() end end ) -- I'm hoping that this delay will be sufficient
+	end
 	
 	-- GP on the tooltips
 	if self.tItems["EPGP"].Tooltips == 1 then
@@ -942,9 +946,34 @@ end
 function DKP:BidAssignItem(wndHandler,wndControl)
 	local bMaster = true
  	
+	if wndControl:GetName() == "AssignRandom" then
+		--we need to select winner
+		if not self.CurrentBidSession then self.CurrentBidSession = {} end
+		local looters = {}
+
+		self.CurrentBidSession.nSelectedOpt = 4
+		self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):GetText()
+		if not Hook.tMasterLootSelectedItem then
+			local children = Hook.wndMasterLoot_ItemList:GetChildren()
+
+			for k,child in ipairs(children) do
+				if self.CurrentBidSession.strItem == child:GetData().itemDrop:GetName() then
+					Hook.tMasterLootSelectedItem = child:GetData()
+					break
+				end
+			end
+		end
+		if not Hook.tMasterLootSelectedItem then return end
+		for k , playerUnit in pairs(Hook.tMasterLootSelectedItem.tLooters or {}) do
+			table.insert(looters,playerUnit)
+		end	
+		self.CurrentBidSession.strSelected = looters[math.random(#looters)]:GetName()
+		prevLuckyChild = self.CurrentBidSession.strSelected
+	end
 	if self.CurrentBidSession == nil or not self.CurrentBidSession.strSelected or not self.CurrentBidSession.nSelectedOpt then return end
-	
+
 	if bMaster then
+		-- Update window
 		for k,child in ipairs(Hook.wndMasterLoot_ItemList:GetChildren()) do
 			if child:IsChecked() then Hook.tMasterLootSelectedItem = child:GetData() break end
 		end
@@ -967,6 +996,7 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 		end
 		children = Hook.wndMasterLoot_ItemList:GetChildren()
 		if not self.ItemDatabase[self.CurrentBidSession.strItem] then return end
+
 		local item = Item.GetDataFromId(self.ItemDatabase[self.CurrentBidSession.strItem].ID)
 		if wndControl:GetText() == "Select" then
 			for k,child in ipairs(children) do
@@ -985,14 +1015,15 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 			Print("Item no longer available")
 			self.bIsBidding = false
 		end
-		
+
 		if not selectedOne or not selectedItem then return end
 		if wndControl:GetText() == "Select" then Hook.wndMasterLoot:FindChild("Assignment"):Enable(true) end
 		Hook.tMasterLootSelectedLooter = selectedOne:GetData()
 		Hook.tMasterLootSelectedItem = selectedItem
 		
-		 
-		if wndControl:GetText() == "Assign" then 
+		
+		if wndControl:GetName() == "Assign" or wndControl:GetName() == "AssignRandom" then 
+			
 			if self.bIsBidding then 
 				ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndEarly"],selectedOne:GetData():GetName()))
 				self.bIsBidding = false
@@ -1001,6 +1032,7 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 					table.insert(self.tPopUpExceptions,self.CurrentBidSession.strSelected)
 				end
 			end
+
 
 
 			local price = self:EPGPGetItemCostByID(selectedItem.itemDrop:GetItemId(),true)
@@ -2316,6 +2348,8 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
 	end
+	-- wipe lucky winner to avoid pop-up oddities
+	prevLuckyChild = nil
 end
 
 function DKP:OnLootAssigned(luaCaller,objItem, strLooter)

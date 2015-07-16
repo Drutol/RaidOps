@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 24, 0, 0
+local Major, Minor, Patch, Suffix = 2, 25, 0, 0
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -248,51 +248,6 @@ Fixed tutorial window not destroying glow on tutorial exit.
 Added all missing Datascape map ids for raid summaries. 
 
 NOTE: Decreased freqency of updates is caused by me developing completly different addon and some irl stuff. More info at a later date.
----RaidOps version 2.19---
-{19/06/2015}
-From now on skipped/closed PopUp window for item assignment will default item price in loot logs to 0.
-Network bidding should be functional again. (not tested during raid)
-Removed 'GuildChannel' field. Addon now uses guild specific channels.
-Data sync may work better , or it may not. I'm still trying different things.
-Changed appearance of Loot Logs a little bit.
-Added option to specify % modifier to GP value based on chat bidding's command.
-Fixed bug where chat bidding would perform countdow despite of item assignment.
-Now either option 'Assign' and 'select' in chatbidding will terminate bidding session.
-Fixed some bugs concerning import.
-Fixed issue when chat bidding wanted to process not bidding related messages (roll).
-Added option to add Loot Log only after PopUp window.
-Fixed (?) issue when raid session pop-up wouldn't pop-up.
-Now when skipping PopUp for bid winners , PopUp will assign this item with price dependent on modifiers.
-Complete rewrite of PopUp backend.
-Slight visual upgrade of pop-up windnow.
-Fixed Phageborn Convergence not triggering custom event.
----RaidOps version 2.18---
-{16/06/2015}
-Added tutorials module with 10 tutorials as of now.
-Tutorial window will appear when upgrading to version v2.18 + and after fresh install only.
-Tutorials' list is accessible from settings window.
-Fixed rare LUA error on item assign.
----RaidOps version 2.17---
-{9/06/2015}
-Added option to specify minium session length to avoid some buggy sessions.
-Added option to remove specific session.
-Added option to include RaidQueue in attendance.
-Fixed issue where new players weren't added to raid session.
-Fixed issue where raid queue would tag wrong players when displaying players from raid session.
-Fixed LUA error when attempting to open them for specific user(s).
-Removed RAID.lua source file.
-Data sync works once again at cost of cutting of some data (still tested).
-Fixed attendance PopUp not understanding "No" answer.
-Added support window with link to the issue tracker.
----RaidOps version 2.16---
-{9/06/2015}
-Added Raid Summaries window.
-Added option to display players that took part in raid. (main roster)
-Added option to display loot that was awarded during particular raid. (loot logs)
-Fixed attendance setting for reset type.
-Fixed Y-83 not being detected.
-Fixed attendance sorting in group by class mode.
-Fixed website import.cv
  ]===]
 
 -- Localization stuff
@@ -551,6 +506,7 @@ function DKP:OnDocLoaded()
 		self:TutListInit()
 		self:DRInit()
 		self:DecayInit()
+		self:GroupInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -612,6 +568,7 @@ function DKP:DebugFetch()
 	local wnd = Apollo.LoadForm(self.xmlDoc3,"DbgOutput",nil,self)
 	local str = self:dbggetlogs()
 	wnd:FindChild("Output"):SetText(#str > 29999 and "Reached limit of 30k" or str)
+	self:RequestRoster()
 end
 
 function DKP:dbglog(strMsg)
@@ -698,6 +655,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 	elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
 	elseif strType == ktUndoActions["remp"] then  strComment = "--" 
 	elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
+	elseif strType == ktUndoActions["dkpdec"] then  strComment = "--" 
 	elseif self.tItems["settings"].logs == 1 then 
 		strComment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 		if strComment == "Comment" or strComment == "Comments Disabled"  then strComment = "--" end
@@ -2494,45 +2452,58 @@ function DKP:RefreshMainItemList()
 	local nameLabel = self:LabelGetColumnNumberForValue("Name")
 	local tOnlineMembers
 	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
-	for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
-		local playerId = type(tIDs) == "table" and player or k
-		if type(tIDs) == "table" then player = self.tItems[player] end
-		if player.strName ~= "Guild Bank" then
-			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-					if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
-						if self:IsPlayerRoleDesired(player.role) then
-							if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
-								if not self.MassEdit then
-									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-								else
-									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-								end
-								
-								-- Cheking for alt
-								
-								self:UpdateItem(player)
-								if not self.MassEdit then
-									if player.strName == selectedPlayer then
-										self.wndSelectedListItem = player.wnd
-										player.wnd:SetCheck(true)	
+	-- For groups sake we need to wrap this thing once more
+	if #self.tItems["settings"].Groups > 0 -- provided that there's something to care about
+		-- prepare free IDs
+	end
+	-- Main display mechanism = tons of condition checks
+	for k , group in ipairs((#self.tItems["settings"].Groups > 0 and --[[self.tItems["settings"].bEnableGroups]] true) and self.tItems["settings"].Groups or {[1] = {tIDs = "all"}}) do -- wrapped in one more for loop to create groups those ppl in groups
+		for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
+			local playerId = type(tIDs) == "table" and player or k
+			local bFound = true
+			if group.tIDs ~= "all" then -- if there's group
+				bFound = false
+				for k , id in ipairs(group.tIDs) do
+					if id == playerId then bFound = true break end
+				end
+			end
+			if type(tIDs) == "table" then player = self.tItems[player] end
+			if player.strName ~= "Guild Bank" and bFound then
+				if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
+					if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
+						if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
+							if self:IsPlayerRoleDesired(player.role) then
+								if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
+									if not self.MassEdit then
+										player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+									else
+										player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 									end
-								else
-									local found = false
-									
-									for k,prevPlayer in ipairs(selectedPlayer) do
-										if prevPlayer == player.strName then
-											found = true
-											break
+									--Creating player's window
+									self:UpdateItem(player)
+
+									if not self.MassEdit then
+										if player.strName == selectedPlayer then
+											self.wndSelectedListItem = player.wnd
+											player.wnd:SetCheck(true)	
 										end
+									else
+										local found = false
+										
+										for k,prevPlayer in ipairs(selectedPlayer) do
+											if prevPlayer == player.strName then
+												found = true
+												break
+											end
+										end
+										if found then
+											table.insert(selectedMembers,player.wnd)
+											player.wnd:SetCheck(true)
+										end
+										
 									end
-									if found then
-										table.insert(selectedMembers,player.wnd)
-										player.wnd:SetCheck(true)
-									end
-									
+									player.wnd:SetData(playerId)
 								end
-								player.wnd:SetData(playerId)
 							end
 						end
 					end
@@ -3459,7 +3430,7 @@ end
 
 function DKP:DecayIsPlayerEligibleForDecay(player)
 	if not self.tItems["Standby"][string.lower(player.strName)] == nil then return false end
-	if self.tItems["settings"].bDecayMinValue and player.net < self.tItems["settings"].nDecayMinValue and player.net > 0 then return false end
+	if self.tItems["settings"].bDecayMinValue and player.net <= self.tItems["settings"].nDecayMinValue and player.net > 0 then return false end
 	return true
 end
 
@@ -4348,13 +4319,18 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 
 	entry.strName = strName
 
-	-- Cheking if not to skip and if data is valid 
+	-- Cheking whether to skip and if data is valid 
 
 	if self.ItemDatabase and self.ItemDatabase[strItem] and self:GetPlayerByIDByName(strName) ~= -1 then
 		entry.item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
 	else self:dbglog(">PopUp request fail > Reason: 'wrong player ID or item not found'") return end
 
 	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return self:dbglog(">PopUp request end > random winnder filter") end
+
+	if self:GetPlayerByIDByName("Guild Bank") ~= -1 and strName == "Guild Bank" and self.tItems["settings"].bSkipGB then 
+		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
+		return
+	end
 
 	if self:PopUpIsBidWinner(strName) then
 		self:PopUpAssign(entry,self.tPopUpItemGPvalues[strItem])

@@ -174,7 +174,7 @@ function ML:OnDocLoaded()
 		self.wndReminder = Apollo.LoadForm(self.xmlDoc,"LootReminder",nil,self)
 
 		self.wndReminder:Show(false)
-		--self.wndMasterLoot:Show(false)
+		self.wndMasterLoot:Show(false)
 		self.wndMasterLootLooter:Show(false)
 
 		self.wndLooterList = self.wndMasterLoot:FindChild("PlayerPool"):FindChild("RecipientsList")
@@ -237,7 +237,7 @@ function ML:OnRestore(eLevel,tSave)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.General then return end
 	self.settings = tSave.settings
 	self.wndMasterLootLoc = tSave.wndLoc
-	self.wndReminderLoc = tSave.wndLoc
+	self.wndReminderLoc = tSave.wndRemLoc
 end
 
 -----------------------------------------------------------------------------------------------
@@ -552,7 +552,7 @@ function ML:FigureShow()
 	local bML = false
 	local bLooter = false
 	
-	if 1 > 0 then --#GameLib.GetMasterLoot()
+	if #GameLib.GetMasterLoot() > 0 then
 		for k , entry in pairs(tCachedItems) do
 			if entry.lootEntry.bIsMaster then bML = true
 			else bLooter = true end
@@ -572,8 +572,15 @@ function ML:FigureShow()
 		end
 
 	end
-	self.wndMasterLoot:Show(bML,false)
-	self.wndMasterLootLooter:Show(bLooter,false)
+	if not self.wndMasterLoot:IsShown() or #GameLib.GetMasterLoot() == 0 then
+		self.wndMasterLoot:Show(bML,false)
+	end
+	if not self.wndMasterLoot:IsShown() or #GameLib.GetMasterLoot() == 0 then
+		self.wndMasterLootLooter:Show(bLooter,false)
+	end
+	if #GameLib.GetMasterLoot() == 0 then
+		self.wndReminder:Show(false,false)
+	end
 end
 
 function ML:FigureSizing()
@@ -607,6 +614,10 @@ function ML:FigureSizing()
 	if self.wndMasterLootLoc ~= nil and self.wndMasterLootLoc.nOffsets[1] ~= 0 then 
 		self.wndMasterLoot:MoveToLocation(WindowLocation.new(self.wndMasterLootLoc))
 		self.wndMasterLootLoc = nil
+	end	
+	if self.wndReminderLoc ~= nil and self.wndReminderLoc.nOffsets[1] ~= 0 then 
+		self.wndReminder:MoveToLocation(WindowLocation.new(self.wndReminderLoc))
+		self.wndReminderLoc = nil
 	end
 end
 
@@ -1001,7 +1012,15 @@ function ML:IsRecipientApplicable(wndTarget,wndSource)
 	--if wndTarget:GetData().strName == "Cpt Bicard" then return true end
 	--bInRange = true
 	--bCanLoot = true
-	if bInRange and bCanLoot then if self.settings.bClassFilter then return self:IsClassApplicable(tData,wndTarget:GetData()) else return false end else return false end
+	if bInRange and bCanLoot then 
+		if self.settings.bClassFilter then 
+			return self:IsClassApplicable(tData,wndTarget:GetData()) 
+		else 
+			return true 
+		end 
+	else 
+		return false 
+	end
 end
 
 function ML:IsClassApplicable(tData,tRecipient)
@@ -1032,7 +1051,7 @@ function ML:IsClassApplicable(tData,tRecipient)
 				end
 			end
 		end
-	else
+	elseif tData.itemDrop:IsEquippable() then
 		local strCategory = tData.itemDrop:GetItemCategoryName()
 		if strCategory ~= "" then
 			if string.find(strCategory,"Light") then
@@ -1386,10 +1405,15 @@ function ML:SummaryOpen()
 				wnd:Destroy()
 			else
 				wnd:SetData({nLootId = j,unit = unit,tRecipient = player})
-			end
+			end		
 		end
 	end
 	list:ArrangeChildrenVert()
+	for k , entry in pairs(tCachedItems) do
+		if entry.currentLocation == 2 then
+			GameLib.AssignMasterLoot(k,self:ChooseRandomLooter(entry.lootEntry))
+		end
+	end		
 	if #list:GetChildren() > 0 then self.wndSummary:Show(true,false) else self.wndSummary:Show(false,false) end
 	self.wndSummary:ToFront()
 end
@@ -1421,6 +1445,11 @@ function ML:SummaryAssignAll()
 		GameLib.AssignMasterLoot(child:GetData().nLootId,child:GetData().unit)
 		self:RemoveLootFromRecipient(child:GetData().nLootId,child:GetData().tRecipient)
 	end
+	for k , entry in pairs(tCachedItems) do
+		if entry.currentLocation == 2 then
+			GameLib.AssignMasterLoot(k,self:ChooseRandomLooter(entry.lootEntry))
+		end
+	end		
 	self:SummaryOpen()
 end
 
@@ -1444,7 +1473,7 @@ function ML:SettingsInit()
 	if self.settings.bOOCAppear == nil then self.settings.bOOCAppear = true end
 	if self.settings.bReminder == nil then self.settings.bReminder = true end
 	if self.settings.bSummary == nil then self.settings.bRPExpand = true end
-	if self.settings.bRopsIntegration == nil then self.settings.bRopsIntegration = true end
+	if self.settings.bRopsIntegration == nil then self.settings.bRopsIntegration = false end
 	if self.settings.bGroup == nil then self.settings.bGroup = true end
 	if self.settings.bHideInapp == nil then self.settings.bHideInapp = false end
 	if self.settings.bClassFilter == nil then self.settings.bClassFilter = false end

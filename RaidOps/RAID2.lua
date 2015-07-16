@@ -971,8 +971,12 @@ function DKP:AttEndSession()
 	if self.tItems["settings"].bAttStartTA then self:TimeAwardStop() end
 
 	nRaidSessionStatus = SESSION_STOP
-	self.raidTimer:Stop()
-	self.raidPreciseTimer:Stop()
+	if self.raidTimer then
+		self.raidTimer:Stop()	
+	end
+	if self.raidPreciseTimer then
+		self.raidPreciseTimer:Stop()
+	end
 	self:AttUpdateToolbar()
 	self.wndSessionToolbar:FindChild("Timer"):SetText("00:00:00")
 	if not self.tItems.tRaids then self.tItems.tRaids = {} end
@@ -1053,6 +1057,123 @@ function DKP:AttPauseResume()
 	end
 end
 
+
+--------------------------------------------------------------------------
+-- Groups
+--------------------------------------------------------------------------
+local ktDefaultGroup =
+{
+	strName = "EPGP - GA",
+	tIDs = {},
+	tAllow = 
+	{
+		DKP = true,
+		EPGP = true,
+	},
+}
+
+
+function DKP:GroupInit()
+	self.wndGroupGUI = Apollo.LoadForm(self.xmlDoc3,"Groups",nil,self)
+	self.wndGroupGUI:Show(false)
+
+	if self.tItems["settings"].bEnableGroups == nil then self.tItems["settings"].bEnableGroups = false end
+	if not self.tItems["settings"].Groups then 
+		self.tItems["settings"].Groups = {} 
+		table.insert(self.tItems["settings"].Groups,ktDefaultGroup)
+	end
+	self:GroupGUIPopulate()
+end
+
+function DKP:GroupGUIShow()
+	self.wndGroupGUI:Show(true,false)
+end
+
+function DKP:GroupGUIHide()
+	self.wndGroupGUI:Show(false,false)
+end
+
+function DKP:GroupGUIPopulate()
+	self.wndGroupGUI:FindChild("List"):DestroyChildren()
+	for k , group in ipairs( self.tItems["settings"].Groups) do
+		local wnd = Apollo.LoadForm(self.xmlDoc3,"GroupEntry",self.wndGroupGUI:FindChild("List"),self)
+		wnd:FindChild("Name"):SetText(group.strName)
+		wnd:FindChild("Name"):Enable(false)
+		wnd:FindChild("Down"):SetRotation(180)
+		wnd:SetData(k)
+	end
+	local wnd = Apollo.LoadForm(self.xmlDoc3,"GroupEntry",self.wndGroupGUI:FindChild("List"),self)
+	wnd:FindChild("Name"):SetText("Input new group name")
+	wnd:FindChild("Up"):Show(false)
+	wnd:FindChild("Down"):Show(false)
+	wnd:FindChild("Rem"):Show(false)
+
+	self:GroupArrangeGroups()
+end
+
+function DKP:GroupAdd(wndHandler,wndControl,strText)
+	table.insert(self.tItems["settings"].Groups,ktDefaultGroup)
+	self.tItems["settings"].Groups[#self.tItems["settings"].Groups].strName = strText
+
+	self:GroupGUIPopulate()
+end
+
+function DKP:GroupRem(wndHandler,wndControl)
+	table.remove(self.tItems["settings"].Groups,wndControl:GetParent():GetData())
+	self:GroupGUIPopulate()
+end
+
+--------------------------------------------------------------------------
+-- Group Dialog
+--------------------------------------------------------------------------
+
+function DKP:GroupDialogInit()
+
+end
+
+function DKP:GroupDialogShow()
+	
+end
+
+function DKP:GroupDialogHide()
+
+end
+
+function DKP:GroupDialogPopulate()
+	
+end
+
+function DKP:GroupDialogSwitchGroup(wndHandler,wndControl)
+	
+end
+
+
+
+local prevWord
+function DKP:GroupArrangeGroups()
+	local list = self.wndGroupGUI:FindChild("List")
+	local children = list:GetChildren()
+	for k , child in ipairs(children) do
+		child:SetAnchorOffsets(0,0,child:GetWidth(),child:GetHeight())
+	end
+	for k , child in ipairs(children) do
+		if k > 1 then
+			local l,t,r,b = prevWord:GetAnchorOffsets()
+			child:SetAnchorOffsets(0,b-50,child:GetWidth(),b+child:GetHeight()-50)
+		end
+		prevWord = child
+	end
+end
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------------
 function tohtml(x)
   return(tohtml_table(x,1))
 end

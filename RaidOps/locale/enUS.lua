@@ -241,3 +241,5 @@ L["#wndMain:DKPDecay:MinNet"] = "Minimum Net value:"
 L["#wndMain:DKPDecay:HelpNegative"] = "Negative DKP Increment."
 L["#wndSettings:DKPPrec"] = "Set DKP values precision."
 L["#wndEPGPSettings:Enable"] = "Enable EPGP"
+--v2.26
+L["#wndBid:AssignRandom"] = "Assign Randomly"
