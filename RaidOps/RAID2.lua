@@ -1070,6 +1070,7 @@ local ktDefaultGroup =
 		DKP = true,
 		EPGP = true,
 	},
+	bExpand = true
 }
 
 
@@ -1082,6 +1083,8 @@ function DKP:GroupInit()
 		self.tItems["settings"].Groups = {} 
 		table.insert(self.tItems["settings"].Groups,ktDefaultGroup)
 	end
+
+	self.wndGroupGUI:FindChild("Enable"):SetCheck(self.tItems["settings"].bEnableGroups)
 	self:GroupGUIPopulate()
 end
 
@@ -1091,6 +1094,24 @@ end
 
 function DKP:GroupGUIHide()
 	self.wndGroupGUI:Show(false,false)
+end
+
+function DKP:GroupEnable()
+	self.tItems["settings"].bEnableGroups = true
+end
+
+function DKP:GroupDisable()
+	self.tItems["settings"].bEnableGroups = false
+end
+
+function DKP:GroupExpand(wndHandler,wndControl)
+	self.tItems["settings"].Groups[wndControl:GetParent():GetData()].bExpand = true
+	self:RefreshMainItemList()
+end
+
+function DKP:GroupCollapse(wndHandler,wndControl)
+	self.tItems["settings"].Groups[wndControl:GetParent():GetData()].bExpand = false
+	self:RefreshMainItemList()
 end
 
 function DKP:GroupGUIPopulate()
@@ -1123,32 +1144,6 @@ function DKP:GroupRem(wndHandler,wndControl)
 	self:GroupGUIPopulate()
 end
 
---------------------------------------------------------------------------
--- Group Dialog
---------------------------------------------------------------------------
-
-function DKP:GroupDialogInit()
-
-end
-
-function DKP:GroupDialogShow()
-	
-end
-
-function DKP:GroupDialogHide()
-
-end
-
-function DKP:GroupDialogPopulate()
-	
-end
-
-function DKP:GroupDialogSwitchGroup(wndHandler,wndControl)
-	
-end
-
-
-
 local prevWord
 function DKP:GroupArrangeGroups()
 	local list = self.wndGroupGUI:FindChild("List")
@@ -1164,6 +1159,97 @@ function DKP:GroupArrangeGroups()
 		prevWord = child
 	end
 end
+
+--------------------------------------------------------------------------
+-- Group Dialog
+--------------------------------------------------------------------------
+
+function DKP:GroupDialogInit()
+	self.wndGroupDialog = Apollo.LoadForm(self.xmlDoc3,'PlayerGroupDialog',nil,self)
+	self.wndGroupDialog:Show(false)
+end
+
+function DKP:GroupDialogShow()
+
+	if not self.wndGroupDialog:IsShown() then 
+		self.wndGroupDialog:SetAnchorOffsets(6,15,238,249)
+		local tCursor = Apollo.GetMouse()
+		self.wndGroupDialog:Move(tCursor.x - 100, tCursor.y - 100, self.wndGroupDialog:GetWidth(), self.wndGroupDialog:GetHeight())
+		
+	end
+
+	self.wndGroupDialog:SetData(self.wndContext:GetData())
+	self:GroupDialogPopulate(self.wndContext:GetData())
+end
+
+function DKP:GroupDialogHide()
+
+end
+
+local knDialogEntryHeight = 26
+
+function DKP:GroupDialogPopulate(forID)
+	local tActive = {}
+	local tAvailable = {}
+
+	
+
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		local bFound = false
+		for j , id in ipairs(group.tIDs) do
+			if id == forID then bFound = true break end
+		end
+		if bFound then
+			table.insert(tActive,k)
+		else
+			table.insert(tAvailable,k)
+		end
+	end
+
+	self.wndGroupDialog:FindChild("Active"):FindChild("List"):DestroyChildren()
+	for k , activeGroup in ipairs(tActive) do
+		local wnd = Apollo.LoadForm(self.xmlDoc3,"PlayerGroupDialogEntry",self.wndGroupDialog:FindChild("Active"):FindChild("List"),self)
+		wnd:SetText(self.tItems["settings"].Groups[activeGroup].strName)
+		wnd:SetData(activeGroup)
+	end	
+
+	self.wndGroupDialog:FindChild("Available"):FindChild("List"):DestroyChildren()
+	for k , availableGroup in ipairs(tAvailable) do
+		local wnd = Apollo.LoadForm(self.xmlDoc3,"PlayerGroupDialogEntry",self.wndGroupDialog:FindChild("Available"):FindChild("List"),self)
+		wnd:SetText(self.tItems["settings"].Groups[availableGroup].strName)
+		wnd:SetData(availableGroup)
+	end
+
+	
+	if not self.wndGroupDialog:IsShown() then
+		local l,t,r,b = self.wndGroupDialog:GetAnchorOffsets()
+		self.wndGroupDialog:SetAnchorOffsets(l,t,r,b+(#tAvailable+#tActive)*knDialogEntryHeight)
+	end
+	self.wndGroupDialog:FindChild("Active"):FindChild("List"):ArrangeChildrenVert()
+	self.wndGroupDialog:FindChild("Available"):FindChild("List"):ArrangeChildrenVert()
+
+	self.wndGroupDialog:Show(true,false)
+	self.wndGroupDialog:ToFront()
+	
+end
+
+function DKP:GroupDialogSwitchGroup(wndHandler,wndControl)
+	if wndControl:GetParent():GetParent():GetName() == "Active" then
+		for k , id in ipairs(self.tItems["settings"].Groups[wndControl:GetData()].tIDs) do
+			if id == self.wndGroupDialog:GetData() then
+				table.remove(self.tItems["settings"].Groups[wndControl:GetData()].tIDs,k)
+				break
+			end
+		end
+	else
+		table.insert(self.tItems["settings"].Groups[wndControl:GetData()].tIDs,self.wndGroupDialog:GetData())
+	end
+	self:GroupDialogPopulate(self.wndGroupDialog:GetData())
+end
+
+
+
+
 
 
 

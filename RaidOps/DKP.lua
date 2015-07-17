@@ -507,6 +507,7 @@ function DKP:OnDocLoaded()
 		self:DRInit()
 		self:DecayInit()
 		self:GroupInit()
+		self:GroupDialogInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -1179,7 +1180,7 @@ end
 function DKP:UpdateItemCount()
 	local count = 0
 	if not self.tItems["settings"].bCountSelected and self.MassEdit or not self.MassEdit then 
-		count = #self.wndItemList:GetChildren()
+		count = #self:MainItemListGetChildren()
 	elseif self.MassEdit then
 		count = #selectedMembers
 	end
@@ -2076,7 +2077,7 @@ function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	selectedMembers = {}
 	self.MassEdit = true
 	self:RefreshMainItemList()
-	if selectedID then for k , child in ipairs(self.wndItemList:GetChildren()) do if child:GetData() == selectedID then child:SetCheck(true) table.insert(selectedMembers,child) break end end end
+	if selectedID then for k , child in ipairs(self:MainItemListGetChildren()) do if child:GetData() == selectedID then child:SetCheck(true) table.insert(selectedMembers,child) break end end end
 	self.wndMain:FindChild("MassEditControls"):SetOpacity(1)
 	self.wndMain:FindChild("MassEditControls"):Show(true,false)
 	self:EnableActionButtons()
@@ -2096,7 +2097,7 @@ function DKP:MassEditSelectRaid( wndHandler, wndControl, eMouseButton )
 		wnd:SetCheck(false)
 	end
 	selectedMembers = {}
-	local children = self.wndItemList:GetChildren()
+	local children = self:MainItemListGetChildren()
 	for k,child in ipairs(children) do
 		if self:IsPlayerInRaid(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()) then
 			child:SetCheck(true)
@@ -2167,7 +2168,7 @@ end
 
 function DKP:MassEditInvert()
 	local newSelectedMembers = {}
-	local children = self.wndItemList:GetChildren()
+	local children = self:MainItemListGetChildren()
 	for k,wnd in ipairs(selectedMembers) do
 		wnd:SetCheck(false)
 	end
@@ -2200,7 +2201,7 @@ function DKP:MassEditSelectConfirmed()
 		wnd:SetCheck(false)
 	end
 	selectedMembers = {}
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
 		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
 			if strConfirmed == self.tItems[child:GetData()].strName then
 				table.insert(selectedMembers,child)
@@ -2219,7 +2220,7 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 		wnd:SetCheck(false)
 	end
 	selectedMembers = {}
-	local children = self.wndItemList:GetChildren()
+	local children = self:MainItemListGetChildren()
 	for k,child in ipairs(children) do
 		table.insert(selectedMembers,child)
 		child:SetCheck(true)
@@ -2430,6 +2431,14 @@ function DKP:ClearFilterRule()
 	self.wndMain:FindChild("FilterAlert"):Show(false)
 end
 
+function DKP:MainItemListGetChildren()
+	local children = self.wndItemList:GetChildren()
+	for k , child in ipairs(children) do
+		if string.find(child:GetName(),"Group") then children[k] = nil end
+	end
+	return children
+end
+
 function DKP:RefreshMainItemList()
 	local tIDs = self.tOverrideFilter
 	self.nHScroll = self.wndItemList:GetVScrollPos()
@@ -2453,56 +2462,64 @@ function DKP:RefreshMainItemList()
 	local tOnlineMembers
 	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
 	-- For groups sake we need to wrap this thing once more
-	if #self.tItems["settings"].Groups > 0 -- provided that there's something to care about
+	if #self.tItems["settings"].Groups > 0 then -- provided that there's something to care about
 		-- prepare free IDs
 	end
 	-- Main display mechanism = tons of condition checks
-	for k , group in ipairs((#self.tItems["settings"].Groups > 0 and --[[self.tItems["settings"].bEnableGroups]] true) and self.tItems["settings"].Groups or {[1] = {tIDs = "all"}}) do -- wrapped in one more for loop to create groups those ppl in groups
-		for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
-			local playerId = type(tIDs) == "table" and player or k
-			local bFound = true
-			if group.tIDs ~= "all" then -- if there's group
-				bFound = false
-				for k , id in ipairs(group.tIDs) do
-					if id == playerId then bFound = true break end
+	for i , group in ipairs((#self.tItems["settings"].Groups > 0 and self.tItems["settings"].bEnableGroups) and self.tItems["settings"].Groups or {[1] = {tIDs = "all"}}) do -- wrapped in one more for loop to create groups those ppl in groups
+		if group.tIDs ~= "all" then
+			local wndGroupBar = Apollo.LoadForm(self.xmlDoc,"ListItemGroupBar",self.wndItemList,self)
+			wndGroupBar:FindChild("GroupName"):SetText(group.strName)
+			wndGroupBar:FindChild("Expand"):SetCheck(group.bExpand)
+			wndGroupBar:SetData(i)
+		end
+		if group.bExpand or group.tIDs == "all" then
+			for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
+				local playerId = type(tIDs) == "table" and player or k
+				local bFound = true
+				if group.tIDs ~= "all" then -- if there's group
+					bFound = false
+					for j , id in ipairs(group.tIDs) do
+						if id == playerId then bFound = true break end
+					end
 				end
-			end
-			if type(tIDs) == "table" then player = self.tItems[player] end
-			if player.strName ~= "Guild Bank" and bFound then
-				if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-					if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-						if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
-							if self:IsPlayerRoleDesired(player.role) then
-								if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
-									if not self.MassEdit then
-										player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-									else
-										player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-									end
-									--Creating player's window
-									self:UpdateItem(player)
+				if type(tIDs) == "table" then player = self.tItems[player] end
+				if player.strName ~= "Guild Bank" and bFound then
+					if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
+						if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
+							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
+								if self:IsPlayerRoleDesired(player.role) then
+									if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
+										if not self.MassEdit then
+											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+										else
+											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
+										end
+										--Creating player's window
+										self:UpdateItem(player)
 
-									if not self.MassEdit then
-										if player.strName == selectedPlayer then
-											self.wndSelectedListItem = player.wnd
-											player.wnd:SetCheck(true)	
-										end
-									else
-										local found = false
-										
-										for k,prevPlayer in ipairs(selectedPlayer) do
-											if prevPlayer == player.strName then
-												found = true
-												break
+										if not self.MassEdit then
+											if player.strName == selectedPlayer then
+												self.wndSelectedListItem = player.wnd
+												player.wnd:SetCheck(true)	
 											end
+										else
+											local found = false
+											
+											for k,prevPlayer in ipairs(selectedPlayer) do
+												if prevPlayer == player.strName then
+													found = true
+													break
+												end
+											end
+											if found then
+												table.insert(selectedMembers,player.wnd)
+												player.wnd:SetCheck(true)
+											end
+											
 										end
-										if found then
-											table.insert(selectedMembers,player.wnd)
-											player.wnd:SetCheck(true)
-										end
-										
+										player.wnd:SetData(playerId)
 									end
-									player.wnd:SetData(playerId)
 								end
 							end
 						end
@@ -2514,7 +2531,7 @@ function DKP:RefreshMainItemList()
 	self:RaidQueueShow()
 	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
 	if self.tItems["settings"].bDisplayCounter then
-		for k,child in ipairs(self.wndItemList:GetChildren()) do
+		for k,child in ipairs(self:MainItemListGetChildren()) do
 			child:FindChild("Counter"):Show(true)
 			child:FindChild("Counter"):SetText(k..".")
 		end
@@ -3270,7 +3287,7 @@ function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
 		self:LabelMenuOpen(wndHandler,wndControl)
 	end
 	if self.tItems["settings"].bDisplayCounter and not self.tItems["settings"].GroupByClass then
-		for k,child in ipairs(self.wndItemList:GetChildren()) do
+		for k,child in ipairs(self:MainItemListGetChildren()) do
 			child:FindChild("Counter"):Show(true)
 			child:FindChild("Counter"):SetText(k..".")
 		end
@@ -3281,7 +3298,7 @@ end
 function DKP:LabelUpdateColorHighlight()
 	if self.SortedLabel then
 		local label = "Stat"..self.SortedLabel
-		for k,child in ipairs(self.wndItemList:GetChildren()) do	
+		for k,child in ipairs(self:MainItemListGetChildren()) do	
 			for j,stat in ipairs(child:GetChildren()) do
 				if stat:GetName() == label then stat:SetTextColor("ChannelAdvice") else stat:SetTextColor("white") end
 			end
@@ -4144,7 +4161,7 @@ function DKP:ExportAsCSVList()
 		end
 	end
 	strCSV = strCSV .. "\n"
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
 		for j=1,self.currentLabelCount do
 			strCSV = strCSV .. child:FindChild("Stat"..j):GetText() .. ";"
 		end
@@ -4185,7 +4202,7 @@ end
 function DKP:ExportAsHTMLList()
 	local strHTML = "<!DOCTYPE html><html><head><style>\ntable, th, td {    border: 1px solid black;    border-collapse: collapse;}th, td {    padding: 5px;}</style></head>\n<body><table style=".."width:100%"..">\n"
 	strHTML = strHTML .. "<tr><th>" .. self.tItems["settings"].LabelOptions[1] .. "</th><th>" .. self.tItems["settings"].LabelOptions[2] .. "</th><th>" .. self.tItems["settings"].LabelOptions[3] .. "</th><th>" .. self.tItems["settings"].LabelOptions[4] .."</th><th>" .. self.tItems["settings"].LabelOptions[5] ..  "</th></tr>\n<tr>"
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
 		for j=1,self.currentLabelCount do
 			strHTML = strHTML .. "<th>" .. child:FindChild("Stat"..j):GetText() .. "</th>"
 		end
@@ -4225,7 +4242,7 @@ end
 
 function DKP:ExportAsFormattedHTMLList()
 	local formatedTable ={}
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
 		table.insert(formatedTable,{[self.tItems["settings"].LabelOptions[1]] = child:FindChild("Stat1"):GetText(),[self.tItems["settings"].LabelOptions[2]] = child:FindChild("Stat2"):GetText(),[self.tItems["settings"].LabelOptions[3]] = child:FindChild("Stat3"):GetText(),[self.tItems["settings"].LabelOptions[4]] = child:FindChild("Stat4"):GetText(),[self.tItems["settings"].LabelOptions[5]] = child:FindChild("Stat5"):GetText()})
 	end
 
@@ -4810,7 +4827,7 @@ function DKP:ConRemoveContextIndicator()
 	if self:LabelGetColumnNumberForValue("Name")  > 0 and self.tItems[self.wndContext:GetData()] then
 		local name = self.tItems[self.wndContext:GetData()].strName
 		local label = "Stat"..self:LabelGetColumnNumberForValue("Name")
-		for k,child in ipairs(self.wndItemList:GetChildren()) do
+		for k,child in ipairs(self:MainItemListGetChildren()) do
 			if child:FindChild(label):GetText() == name then
 				child:FindChild("OnContext"):Show(false,false)
 				break
@@ -5098,7 +5115,7 @@ end
 
 function DKP:RaidQueueClear(bShow)
 	self.tItems.tQueuedPlayers = {}
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
 		child:FindChild("Standby"):SetCheck(false)
 	end
 	if self.wndMain:FindChild("RaidOnly"):IsChecked() then self:RefreshMainItemList() end
@@ -5126,7 +5143,8 @@ function DKP:RaidQueueRestore(tNames)
 end
 
 function DKP:RaidQueueShow()
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
+		Print(child:GetName())
 		if self.wndMain:FindChild("RaidQueue"):IsChecked() then child:FindChild("Standby"):Show(true,false) else child:FindChild("Standby"):Show(false,false) end
 		if self:IsPlayerInQueue(nil,child:GetData()) then 
 			child:FindChild("Standby"):Show(true,false)
@@ -5137,7 +5155,7 @@ function DKP:RaidQueueShow()
 end
 
 function DKP:RaidQueueHide()
-	for k,child in ipairs(self.wndItemList:GetChildren()) do
+	for k,child in ipairs(self:MainItemListGetChildren()) do
 		if not self:IsPlayerInQueue(nil,child:GetData()) then
 			child:FindChild("Standby"):Show(false,false)
 		end
