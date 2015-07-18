@@ -1347,21 +1347,46 @@ end
 
 function DKP:CommitDataSetGroupPlayer(strGroup,strPlayer,playerId)
 	if strGroup == "Ungrouped" then strGroup = "Def" end
-	self.tItems.tDataSets[strGroup][strPlayer] = {EP = self.tItems[playerId].EP,GP = self.tItems[playerId].GP,net = self.tItems[playerId].net,tot = self.tItems[playerId].tot}
+	if self.tItems.tDataSets and self.tItems.tDataSets[strGroup] and self.tItems.tDataSets[strGroup][strPlayer] then
+		self.tItems.tDataSets[strGroup][strPlayer] = {EP = self.tItems[playerId].EP,GP = self.tItems[playerId].GP,net = self.tItems[playerId].net,tot = self.tItems[playerId].tot}
+	end
 end
 
 -- Active group
 
 function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 	--swap active data and saved data
-	local nGroupId = wndControl:GetParent():GetData()
-	local strGroupName = self.tItems["settings"].Groups[nGroupId].strName
+	local nGroupId = wndControl:GetParent():GetData() -- new
+	local strGroupName = self.tItems["settings"].Groups[nGroupId].strName --new
 
-	for k , id in ipairs(self.tItems["settings"].Groups[nGroupId].tIDs) do
-		local newDataSet = self:GetDataSetForGroupPlayer(strGroupName,id)
+	local strOldGroupName  -- origin
+	local nOldGroupId -- origin
+
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		if group.strName == self.tItems["settings"].strActiveGroup then
+			strOldGroupName = group.strName
+			nOldGroupId = k
+			break
+		end
 	end
 
 
+
+
+	for k , id in ipairs(self.tItems["settings"].Groups[nOldGroupId].tIDs) do
+		self:CommitDataSetGroupPlayer(strOldGroupName,self.tItems[id].strName,id)
+	end	
+
+	for k , id in ipairs(self.tItems["settings"].Groups[nGroupId].tIDs) do
+		local newDataSet = self:GetDataSetForGroupPlayer(strGroupName,self.tItems[id].strName)
+		self.tItems[id].EP = newDataSet.EP
+		self.tItems[id].GP = newDataSet.GP
+		self.tItems[id].net = newDataSet.net
+		self.tItems[id].tot = newDataSet.tot
+	end
+
+
+	-- and change active group
 	local strGroup 
 	if self.tItems["settings"].Groups[nGroupId] then
 		strGroup = self.tItems["settings"].Groups[nGroupId].strName

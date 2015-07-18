@@ -2496,6 +2496,20 @@ function DKP:RefreshMainItemList()
 
 	end
 
+	--Commit Data set changes
+	local activeGroupId
+	for k ,group in ipairs(self.tItems["settings"].Groups) do
+		if group.strName == self.tItems["settings"].strActiveGroup then
+			activeGroupId = k
+			break
+		end
+	end
+
+	for k , id in ipairs(self.tItems["settings"].Groups[activeGroupId].tIDs) do
+		self:CommitDataSetGroupPlayer(self.tItems["settings"].strActiveGroup,self.tItems[id].strName,id)
+	end
+
+
 	-- Main display mechanism = tons of condition checks
 	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
 		if type(group.tIDs) == "table" then
@@ -2503,10 +2517,12 @@ function DKP:RefreshMainItemList()
 			wndGroupBar:FindChild("GroupName"):SetText(group.strName)
 			wndGroupBar:FindChild("Expand"):SetCheck(group.bExpand)
 			wndGroupBar:SetData(i)
+			tIDs = group.tIDs
 			if i == #tGroups then wndGroupBar:FindChild("Expand"):Show(false) end
 			if group.strName == self.tItems["settings"].strActiveGroup or group.strName == "Ungrouped" and self.tItems["settings"].strActiveGroup == "Def" then wndGroupBar:FindChild("Active"):SetCheck(true) end
 		end
 		if group.bExpand or type(group.tIDs) == "string" then
+			table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd)
 			for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
 				local playerId = type(tIDs) == "table" and player or k
 				local bFound = true
@@ -2530,9 +2546,6 @@ function DKP:RefreshMainItemList()
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
 										--Using Data set for this group
-										if group.strName == self.tItems["settings"].strActiveGroup then --commit changes to dataset
-											self:CommitDataSetGroupPlayer(group.strName,player.strName,playerId)
-										end
 
 										local tDataSet = self:GetDataSetForGroupPlayer(group.strName,player.strName)
 										self.tItems[playerId].EP = tDataSet.EP
@@ -2579,7 +2592,7 @@ function DKP:RefreshMainItemList()
 		end
 	end
 	self:RaidQueueShow()
-	self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
+	self.wndItemList:ArrangeChildrenVert()
 	if self.tItems["settings"].bDisplayCounter then
 		for k,child in ipairs(self:MainItemListGetChildren()) do
 			child:FindChild("Counter"):Show(true)
@@ -3099,6 +3112,8 @@ end
 
 function easyDKPSortPlayerbyLabelNotWnd(a,b)
 	local DKPInstance = Apollo.GetAddon("RaidOps")
+	if type(a) ~= "table" then a = DKPInstance.tItems[a] end
+	if type(b) ~= "table" then b = DKPInstance.tItems[b] end
 	if DKPInstance.SortedLabel then
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
 		local label = "Stat"..DKPInstance.SortedLabel
@@ -3328,7 +3343,7 @@ function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
 				end
 				self.SortedLabel = self:LabelGetColumnNumberForValue(wndControl:GetText())
 				if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else 
-					self.wndMain:FindChild("ItemList"):ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel) 
+					self:RefreshMainItemList()
 					self:LabelUpdateColorHighlight()
 				end
 			end
