@@ -190,6 +190,16 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.26---
+{17/07/2015}
+Fixed Guild Bank pop-up issue.
+Fixed rare pop-up skip on random players.
+Added 'Assign randomly' button to chat bidding.
+Fixed rare lua error on raid session's end.
+Redesigned bottom part of main window with nicer buttons.
+Added things for new 'Groups' feature - everything disabled right now - more info in future updates.
+Fixed some graphical glitches.
+Doubled attendance verification process , hopefuly no more > 100% att. Sorry.
 ---RaidOps version 2.25---
 {13/07/2015}
 DKP decay overhaul.
@@ -343,9 +353,6 @@ function DKP:OnDocLoaded()
 		self.wndMain:FindChild("CurrentlyListedAmount"):SetTooltip(self.Locale["#wndMain:Tooltips:Counter"])
 		self.wndMain:FindChild("ButtonLL"):SetTooltip(self.Locale["#wndMain:Tooltips:LLButton"])
 		self.wndMain:FindChild("ButtonCE"):SetTooltip(self.Locale["#wndMain:Tooltips:CEButton"])
-		self.wndMain:FindChild("ButtonInv"):SetTooltip(self.Locale["#wndMain:Tooltips:InvButton"])
-		self.wndMain:FindChild("ButtonGBL"):SetTooltip(self.Locale["#wndMain:Tooltips:GBLButton"])
-		self.wndMain:FindChild("ButtonGBL"):SetTooltip(self.Locale["#wndMain:Tooltips:GBLButton"])
 		self.wndMain:FindChild("RaidOnly"):SetTooltip(self.Locale["#wndMain:Tooltips:RaidOnlyButton"])
 		self.wndMain:FindChild("OnlineOnly"):SetTooltip(self.Locale["#wndMain:Tooltips:OnlineOnlyButton"])
 		self.wndMain:FindChild("MassEdit"):SetTooltip(self.Locale["#wndMain:Tooltips:MassEditButton"])
@@ -476,6 +483,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bColorIcons then ktStringToIcon = ktStringToNewIconOrig else ktStringToIcon = ktStringToIconOrig end
 		-- Inits
 		self:TimeAwardRestore()
+		self:GroupInit()
 		self:COInit()
 		self:EPGPInit()
 		self:ConInit()
@@ -506,8 +514,9 @@ function DKP:OnDocLoaded()
 		self:TutListInit()
 		self:DRInit()
 		self:DecayInit()
-		self:GroupInit()
 		self:GroupDialogInit()
+		self:MoreBottomOptionsInit()
+		self:DataSetsInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -790,7 +799,7 @@ function DKP:UndoPopulate()
 		grid:SetCellData(k,1,k)
 		if activity.strAction then grid:SetCellData(k,2,activity.strAction) else
 			grid:SetCellData(k,2,activity.strType)
-			grid:SetCellData(k,3,activity.strMod)
+			grid:SetCellData(k,3,activity.strMod or "")
 			grid:SetCellData(k,4,activity.nAffected)
 			local strAffected = ""
 			for k, affected in ipairs(activity.tAffectedNames) do
@@ -1197,13 +1206,24 @@ end
 
 function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
+	if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
 	self.wndSelectedListItem = wndControl
 	self:EnableActionButtons()
+
+	--for k , child in ipairs(self:MainItemListGetChildren()) do
+	--	Print(child:GetData() .. wndControl:GetData())
+	--	if child:GetData() == wndControl:GetData() then child:SetCheck(true) end
+	--end
 	Event_FireGenericEvent("PlayerEntrySelected")
 end
 
-function DKP:OnListItemDeselected()
+function DKP:OnListItemDeselected(wndHandler,wndControl)
 	self.wndSelectedListItem = nil
+
+	--for k , child in ipairs(self:MainItemListGetChildren()) do
+	--	if child:GetData() == wndControl:GetData() then child:SetCheck(false) end
+	--end
+
 	self:EnableActionButtons()
 end
 
@@ -2070,7 +2090,7 @@ end
 function DKP:MassEditEnable( wndHandler, wndControl, eMouseButton )
 	local selectedID
 	if self.wndSelectedListItem then
-		selectedID = self.wndSelectedListItem:GetData()
+		selectedID = self.wndSelectedListItem:GetData().id
 	end
 
 	self.wndSelectedListItem = nil
@@ -2127,7 +2147,7 @@ end
 function DKP:MassEditLL()
 	if #selectedMembers == 0 then return end
 	local tIDs = {}
-	for k , wnd in ipairs(selectedMembers) do table.insert(tIDs,wnd:GetData()) end
+	for k , wnd in ipairs(selectedMembers) do table.insert(tIDs,wnd:GetData().id) end
 	self:LLOpen(tIDs)
 end
 
@@ -2135,13 +2155,13 @@ function DKP:MassEditCreditAtt()
 	if not self.tOverrideFilter then
 		local tIDs = {}
 		for k , player in ipairs(selectedMembers) do
-			table.insert(tIDs,player:GetData())
+			table.insert(tIDs,player:GetData().id)
 		end
 		self:RSShow(true,tIDs)
 	else
 		local nTime = self.tItems.tRaids[self.nOverrideSource].finishTime
 		for  k , wnd in ipairs(selectedMembers) do
-			local player = self.tItems[wnd:GetData()]
+			local player = self.tItems[wnd:GetData().id]
 			for j , att in ipairs(player.tAtt or {}) do
 				if att.nTime == nTime then 
 					table.remove(player.tAtt,j) 
@@ -2158,7 +2178,7 @@ function DKP:MassEditInviteContinue()
 	local strMsg = "Raid time!"
 	local invitedIDs = {}
 	for k,wnd in ipairs(selectedMembers) do
-		if wnd:GetData() and self.tItems[wnd:GetData()] then
+		if wnd:GetData().id and self.tItems[wnd:GetData().id] then
 			GroupLib.Invite(self.tItems[wnd:GetData()].strName,strRealm,strMessage)
 			table.insert(invitedIDs,wnd:GetData())
 		end
@@ -2203,7 +2223,7 @@ function DKP:MassEditSelectConfirmed()
 	selectedMembers = {}
 	for k,child in ipairs(self:MainItemListGetChildren()) do
 		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
-			if strConfirmed == self.tItems[child:GetData()].strName then
+			if strConfirmed == self.tItems[child:GetData().id].strName then
 				table.insert(selectedMembers,child)
 				child:SetCheck(true)
 				break
@@ -2232,8 +2252,8 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 	self:RaidQueueClear()
 	local tMembers = {}
 	for k,wnd in ipairs(selectedMembers) do
-		if wnd:GetData() and self.tItems[wnd:GetData()] then
-			table.insert(tMembers,self.tItems[wnd:GetData()])
+		if wnd:GetData().id and self.tItems[wnd:GetData().id] then
+			table.insert(tMembers,self.tItems[wnd:GetData().id])
 		end
 	end
 	self:UndoAddActivity(#tMembers == 1 and ktUndoActions["remp"] or ktUndoActions["mremp"],"--",tMembers,true)
@@ -2319,7 +2339,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
-			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
+			if self.tItems["settings"].bTrackUndo and wnd:GetData().id then table.insert(tMembers,self.tItems[wnd:GetData().id]) end
 			self.wndSelectedListItem = wnd
 			self:SubtractDKP(true) 
 		end
@@ -2337,7 +2357,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
-			if self.tItems["settings"].bTrackUndo and wnd:GetData() then table.insert(tMembers,self.tItems[wnd:GetData()]) end
+			if self.tItems["settings"].bTrackUndo and wnd:GetData().id then table.insert(tMembers,self.tItems[wnd:GetData().id]) end
 			self.wndSelectedListItem = wnd
 			self:SetDKP(true) 
 		end
@@ -2432,9 +2452,9 @@ function DKP:ClearFilterRule()
 end
 
 function DKP:MainItemListGetChildren()
-	local children = self.wndItemList:GetChildren()
-	for k , child in ipairs(children) do
-		if string.find(child:GetName(),"Group") then children[k] = nil end
+	local children = {}
+	for k , child in ipairs(self.wndItemList:GetChildren()) do
+		if not string.find(child:GetName(),"Group") then table.insert(children,child) end
 	end
 	return children
 end
@@ -2462,18 +2482,31 @@ function DKP:RefreshMainItemList()
 	local tOnlineMembers
 	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
 	-- For groups sake we need to wrap this thing once more
-	if #self.tItems["settings"].Groups > 0 then -- provided that there's something to care about
-		-- prepare free IDs
+	local tGroups = {}
+	if #self.tItems["settings"].Groups > 0 and self.tItems["settings"].bEnableGroups then -- provided that there's something to care about
+		tGroups = {}
+		for k , group in ipairs(self.tItems["settings"].Groups) do
+			table.insert(tGroups,group)
+		end
+		local tIDs = {}
+		for k , player in ipairs(self.tItems) do
+			if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
+		end
+		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
+
 	end
+
 	-- Main display mechanism = tons of condition checks
-	for i , group in ipairs((#self.tItems["settings"].Groups > 0 and self.tItems["settings"].bEnableGroups) and self.tItems["settings"].Groups or {[1] = {tIDs = "all"}}) do -- wrapped in one more for loop to create groups those ppl in groups
-		if group.tIDs ~= "all" then
+	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
+		if type(group.tIDs) == "table" then
 			local wndGroupBar = Apollo.LoadForm(self.xmlDoc,"ListItemGroupBar",self.wndItemList,self)
 			wndGroupBar:FindChild("GroupName"):SetText(group.strName)
 			wndGroupBar:FindChild("Expand"):SetCheck(group.bExpand)
 			wndGroupBar:SetData(i)
+			if i == #tGroups then wndGroupBar:FindChild("Expand"):Show(false) end
+			if group.strName == self.tItems["settings"].strActiveGroup or group.strName == "Ungrouped" and self.tItems["settings"].strActiveGroup == "Def" then wndGroupBar:FindChild("Active"):SetCheck(true) end
 		end
-		if group.bExpand or group.tIDs == "all" then
+		if group.bExpand or type(group.tIDs) == "string" then
 			for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
 				local playerId = type(tIDs) == "table" and player or k
 				local bFound = true
@@ -2490,13 +2523,30 @@ function DKP:RefreshMainItemList()
 							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
 								if self:IsPlayerRoleDesired(player.role) then
 									if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
+										--Creating player's window
 										if not self.MassEdit then
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 										else
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
-										--Creating player's window
+										--Using Data set for this group
+										if group.strName == self.tItems["settings"].strActiveGroup then --commit changes to dataset
+											self:CommitDataSetGroupPlayer(group.strName,player.strName,playerId)
+										end
+
+										local tDataSet = self:GetDataSetForGroupPlayer(group.strName,player.strName)
+										self.tItems[playerId].EP = tDataSet.EP
+										self.tItems[playerId].GP = tDataSet.GP
+										self.tItems[playerId].net = tDataSet.net
+										self.tItems[playerId].tot = tDataSet.tot
+										--Fill in data
 										self:UpdateItem(player)
+										--Set data according to active group
+										tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].strActiveGroup,player.strName)
+										self.tItems[playerId].EP = tDataSet.EP
+										self.tItems[playerId].GP = tDataSet.GP
+										self.tItems[playerId].net = tDataSet.net
+										self.tItems[playerId].tot = tDataSet.tot
 
 										if not self.MassEdit then
 											if player.strName == selectedPlayer then
@@ -2518,7 +2568,7 @@ function DKP:RefreshMainItemList()
 											end
 											
 										end
-										player.wnd:SetData(playerId)
+										player.wnd:SetData({id = playerId,nGroupId = i})
 									end
 								end
 							end
@@ -2734,7 +2784,10 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				end
 				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount == 0 and "--" or (nYs > 0 and  string.format("%.2f",(raidCount*100)/nYs).. "%" or "--"))
 			elseif self.tItems["settings"].LabelOptions[i] == "%Total" then
-				local raidCount = playerItem.tAtt and #playerItem.tAtt or 0
+				local raidCount = 0
+				for p , v in pairs(playerItem.tAtt or {}) do
+					raidCount = raidCount + 1
+				end 
 				if totalRaids > 0 then
 					playerItem.wnd:FindChild("Stat"..i):SetText(string.format("%.2f",(raidCount*100)/totalRaids).."%")
 				else
@@ -2759,7 +2812,10 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				end
 				playerItem.wnd:FindChild("Stat"..i):SetText(raidCount .. " / " .. nYs)
 			elseif self.tItems["settings"].LabelOptions[i] == "Total" then
-				local raidCount = playerItem.tAtt and #playerItem.tAtt or 0
+				local raidCount = 0
+				for p , v in pairs(playerItem.tAtt or {}) do
+					raidCount = raidCount + 1
+				end 
 				if totalRaids > 0 then
 					playerItem.wnd:FindChild("Stat"..i):SetText(raidCount.. " / " .. totalRaids)
 				else
@@ -5144,7 +5200,6 @@ end
 
 function DKP:RaidQueueShow()
 	for k,child in ipairs(self:MainItemListGetChildren()) do
-		Print(child:GetName())
 		if self.wndMain:FindChild("RaidQueue"):IsChecked() then child:FindChild("Standby"):Show(true,false) else child:FindChild("Standby"):Show(false,false) end
 		if self:IsPlayerInQueue(nil,child:GetData()) then 
 			child:FindChild("Standby"):Show(true,false)
@@ -7412,6 +7467,27 @@ function DKP:DROnDecay()
 	if self.wndReminderGlow then self.wndReminderGlow:Destroy() end
 	self:DRUpdateReminderLabel()
 end
+-----------------------------------------------------------------------------------------------
+-- More Bottom Options
+-----------------------------------------------------------------------------------------------
+
+function DKP:MoreBottomOptionsInit()
+	self.wndBtmOpt = Apollo.LoadForm(self.xmlDoc,"MoreBottomOptions",nil,self)
+	self.wndBtmOpt:Show(false)
+	--self.wndBtmOpt:FindChild("Groups"):Enable(false)
+end
+
+function DKP:MoreBottomOptionsShow()
+
+	if not self.wndBtmOpt:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndBtmOpt:Move(tCursor.x - 100, tCursor.y - 100, self.wndBtmOpt:GetWidth(), self.wndBtmOpt:GetHeight())
+	end
+
+	self.wndBtmOpt:Show(true)
+	self.wndBtmOpt:ToFront()
+end
+
 -----------------------------------------------------------------------------------------------
 -- DKP Instance
 -----------------------------------------------------------------------------------------------

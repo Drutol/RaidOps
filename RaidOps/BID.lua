@@ -1099,7 +1099,7 @@ function DKP:BidSetCommandModifier(wndHandler,wndControl,strText)
 	if val and val >= 0 and val <= 100 then
 		self.tItems["settings"].tBidCategoryModifiers[tonumber(string.sub(wndControl:GetName(),4,4))] = val
 	else
-		wndControl:SetText(self.tItems["settings"].tBidCategoryModifiers[tonumber(string.sub(wndControl:GetName(),3,4))])
+		wndControl:SetText(self.tItems["settings"].tBidCategoryModifiers[tonumber(string.sub(wndControl:GetName(),4,4))])
 	end
 end
 

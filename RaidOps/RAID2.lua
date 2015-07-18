@@ -781,7 +781,7 @@ function DKP:AttCheckReset()
 			for j , entry in ipairs(player.tAtt or {}) do
 				local diff = os.date("*t",os.time()-entry.nTime)
 				if diff.day > self.tItems["settings"].nReset then
-					table.remove(player.tAtt,k)
+					table.remove(self.tItems[k].tAtt,k)
 				end
 			end
 		end
@@ -807,16 +807,33 @@ function DKP:AttCheckReset()
 			end
 		end
 	end
+
+	local tAvailableTimes = {}
+	for k , raid in ipairs(self.tItems.tRaids or {}) do
+		table.insert(tAvailableTimes,raid.finishTime)
+	end
+	for k , player in ipairs(self.tItems) do
+		for i , tAtt in ipairs(player.tAtt or {}) do
+			local bFound = false
+			for p , availableTime in ipairs(tAvailableTimes) do
+				if availableTime == tAtt.nTime then bFound = true break end
+			end
+			if not bFound then
+				table.remove(self.tItems[k].tAtt,i)
+			end
+		end
+	end
 	for k , player in ipairs(self.tItems) do
 		for i , tAtt in ipairs(player.tAtt or {}) do
 			local counter = 0
 			for j , tAttCh in ipairs(player.tAtt or {}) do
 				if tAtt.nTime == tAttCh.nTime then counter = counter + 1 end
-				if tAtt.nTime == tAttCh.nTime and counter > 1 then table.remove(player.tAtt,i) end
+				if tAtt.nTime == tAttCh.nTime and counter > 1 then table.remove(self.tItems[k].tAtt,i) end
 			end
 		end
 	end
 	self:RefreshMainItemList()
+
 end
 
 function DKP:AttInvokePopUp(strQ,strOk,strNo)
@@ -1133,9 +1150,7 @@ function DKP:GroupGUIPopulate()
 end
 
 function DKP:GroupAdd(wndHandler,wndControl,strText)
-	table.insert(self.tItems["settings"].Groups,ktDefaultGroup)
-	self.tItems["settings"].Groups[#self.tItems["settings"].Groups].strName = strText
-
+	table.insert(self.tItems["settings"].Groups,{strName = strText,tIDs = {},bExpand = true})
 	self:GroupGUIPopulate()
 end
 
@@ -1158,6 +1173,15 @@ function DKP:GroupArrangeGroups()
 		end
 		prevWord = child
 	end
+end
+
+function DKP:GroupIsPlayerInAny(ofID)
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		for j , id in ipairs(group.tIDs) do
+			if id == ofID then return true end
+		end
+	end
+	return false
 end
 
 --------------------------------------------------------------------------
@@ -1191,8 +1215,6 @@ local knDialogEntryHeight = 26
 function DKP:GroupDialogPopulate(forID)
 	local tActive = {}
 	local tAvailable = {}
-
-	
 
 	for k , group in ipairs(self.tItems["settings"].Groups) do
 		local bFound = false
@@ -1247,6 +1269,108 @@ function DKP:GroupDialogSwitchGroup(wndHandler,wndControl)
 	self:GroupDialogPopulate(self.wndGroupDialog:GetData())
 end
 
+-- Group Drag&Drop
+
+function DKP:GroupQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if wndControl:GetName() == "ListItemGroupBar" then
+		return Apollo.DragDropQueryResult.Accept
+	end
+	return Apollo.DragDropQueryResult.PassOn
+end
+
+function DKP:GroupOnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData) --iData is an origin
+	if iData > #self.tItems["settings"].Groups and self.tItems["settings"].Groups[iData] then --remove if to ungroupped
+		for k , id in ipairs(self.tItems["settings"].Groups[iData].tIDs) do
+			if id == wndSource:GetData().id then table.remove(self.tItems["settings"].Groups[iData].tIDs,k) break end
+		end
+	end
+	
+	if self.tItems["settings"].Groups[wndControl:GetData()] then
+		local bFound = false
+		for k , id in ipairs(self.tItems["settings"].Groups[wndControl:GetData()].tIDs) do
+			if id == wndSource:GetData().id then bFound = true break end
+		end
+		if not bFound then table.insert(self.tItems["settings"].Groups[wndControl:GetData()].tIDs,wndSource:GetData().id) end
+	end
+	self:RefreshMainItemList()
+end
+
+function DKP:GroupStartDragDrop(wndHandler,wndControl,eMouseButton)
+	if eMouseButton ~= GameLib.CodeEnumInputMouse.Left then return end
+	if wndControl:GetName() ~= "ListItem" then 
+		wndControl = wndControl:GetParent()
+		if not wndControl or wndControl:GetName() ~= "ListItem" then return end
+	end
+	if true then
+		Apollo.BeginDragDrop(wndControl, "RaidOpsGroupTransfer", wndControl:FindChild("ClassIconBigger"):GetSprite(), wndControl:GetData().nGroupId)
+	end
+end
+
+-- Group Data Sets
+
+function DKP:DataSetsInit()
+	if not self.tItems["settings"].strActiveGroup then self.tItems["settings"].strActiveGroup = "Def" end
+
+	if not self.tItems.tDataSets then 
+		self.tItems.tDataSets = {} 
+		if not self.tItems.tDataSets["Def"] then self.tItems.tDataSets["Def"] = {} end
+		for k , player in ipairs(self.tItems) do
+			if not self.tItems.tDataSets["Def"][player.strName] then
+				self.tItems.tDataSets["Def"][player.strName] = {EP = player.EP,GP = player.GP,net = player.net,tot = player.tot}
+			end
+		end
+	end
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		if not self.tItems.tDataSets[group.strName] then 
+			self.tItems.tDataSets[group.strName] = {}
+		end
+		
+		for k , id in ipairs(group.tIDs) do
+			if self.tItems[id] and not self.tItems.tDataSets[group.strName][self.tItems[id].strName] then
+				self.tItems.tDataSets[group.strName][self.tItems[id].strName] = {EP = self.tItems[id].EP,GP = self.tItems[id].GP,net = self.tItems[id].net,tot = self.tItems[id].tot}
+			end
+		end
+
+	end
+end
+
+function DKP:GetDataSetForGroupPlayer(strGroup,strPlayer)
+	if strGroup == "Ungrouped" then strGroup = "Def" end
+	if self.tItems.tDataSets[strGroup] then 
+		if not self.tItems.tDataSets[strGroup][strPlayer] then --if no data set then create one
+			local id = self:GetPlayerByIDByName(strPlayer)
+			self.tItems.tDataSets[strGroup][self.tItems[id].strName] = {EP = self.tItems[id].EP,GP = self.tItems[id].GP,net = self.tItems[id].net,tot = self.tItems[id].tot}
+		end
+		return self.tItems.tDataSets[strGroup][strPlayer]
+	end
+end
+
+function DKP:CommitDataSetGroupPlayer(strGroup,strPlayer,playerId)
+	if strGroup == "Ungrouped" then strGroup = "Def" end
+	self.tItems.tDataSets[strGroup][strPlayer] = {EP = self.tItems[playerId].EP,GP = self.tItems[playerId].GP,net = self.tItems[playerId].net,tot = self.tItems[playerId].tot}
+end
+
+-- Active group
+
+function DKP:ActiveGroupSwitch(wndHandler,wndControl)
+	--swap active data and saved data
+	local nGroupId = wndControl:GetParent():GetData()
+	local strGroupName = self.tItems["settings"].Groups[nGroupId].strName
+
+	for k , id in ipairs(self.tItems["settings"].Groups[nGroupId].tIDs) do
+		local newDataSet = self:GetDataSetForGroupPlayer(strGroupName,id)
+	end
+
+
+	local strGroup 
+	if self.tItems["settings"].Groups[nGroupId] then
+		strGroup = self.tItems["settings"].Groups[nGroupId].strName
+	else
+		strGroup = "Def"
+	end
+	self.tItems["settings"].strActiveGroup = strGroup
+	self:RefreshMainItemList()
+end
 
 
 
