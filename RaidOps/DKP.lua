@@ -2459,29 +2459,36 @@ function DKP:MainItemListGetChildren()
 	return children
 end
 
+-- rare , fully commented method
 function DKP:RefreshMainItemList()
+	-- prepare filter IDs if any
 	local tIDs = self.tOverrideFilter
+	-- save scroll indo
 	self.nHScroll = self.wndItemList:GetVScrollPos()
+	-- redirect to grouping refresh if needed
 	if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() return end
+
+	--handle recheck during refresh by storing wnd's data
 	local selectedPlayer = ""
-	if self:LabelGetColumnNumberForValue("Name") > 0 then
-		if self.MassEdit then
-			selectedPlayer = {}
-			for k,player in ipairs(selectedMembers) do
-				--for k,wnd in ipairs(player:GetChildren()) do Print(wnd:GetName()) end
-				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
-			end
-		elseif self.wndSelectedListItem and self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name"))  then
-			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
+	if self.MassEdit then
+		selectedPlayer = {}
+		for k,player in ipairs(selectedMembers) do
+			table.insert(selectedPlayer,player:GetData())
 		end
+	elseif self.wndSelectedListItem and self.wndSelectedListItem:GetData()  then
+		selectedPlayer = self.wndSelectedListItem:GetData()
 	end
+	--clear mass edit table beacuse there's no more children
 	selectedMembers = {}
 	self.wndSelectedListItem = nil
 	self.wndItemList:DestroyChildren()
-	local nameLabel = self:LabelGetColumnNumberForValue("Name")
+	
+	-- handle online filter
 	local tOnlineMembers
 	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
-	-- For groups sake we need to wrap this thing once more
+	
+
+	-- we have to artificailly create 'ungroupped' group
 	local tGroups = {}
 	if #self.tItems["settings"].Groups > 0 and self.tItems["settings"].bEnableGroups then -- provided that there's something to care about
 		tGroups = {}
@@ -2493,25 +2500,20 @@ function DKP:RefreshMainItemList()
 			if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
 		end
 		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
-
 	end
 
-	--Commit Data set changes
-	local activeGroupId
-	for k ,group in ipairs(self.tItems["settings"].Groups) do
-		if group.strName == self.tItems["settings"].strActiveGroup then
-			activeGroupId = k
-			break
-		end
-	end
+	-- commit data to databse , i'll have to move it somewhere else
+	local activeGroupId = self:GetActiveGroupID()
 
 	for k , id in ipairs(self.tItems["settings"].Groups[activeGroupId].tIDs) do
 		self:CommitDataSetGroupPlayer(self.tItems["settings"].strActiveGroup,self.tItems[id].strName,id)
 	end
 
 
-	-- Main display mechanism = tons of condition checks
+	-- we are set in terms of preparation... let the show begin!
+
 	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
+		-- if it's a group => create group bar
 		if type(group.tIDs) == "table" then
 			local wndGroupBar = Apollo.LoadForm(self.xmlDoc,"ListItemGroupBar",self.wndItemList,self)
 			wndGroupBar:FindChild("GroupName"):SetText(group.strName)
@@ -2519,34 +2521,37 @@ function DKP:RefreshMainItemList()
 			wndGroupBar:SetData(i)
 			tIDs = group.tIDs
 			if i == #tGroups then wndGroupBar:FindChild("Expand"):Show(false) end
+			-- Set active group indicator
 			if group.strName == self.tItems["settings"].strActiveGroup or group.strName == "Ungrouped" and self.tItems["settings"].strActiveGroup == "Def" then wndGroupBar:FindChild("Active"):SetCheck(true) end
+			-- or if it's ungroupped hide it , we don't want not existing group to be active one
+			if group.strName == "Ungrouped" then wndGroupBar:FindChild("Active"):Show(false) end
 		end
+		-- if it's not a group or it'a a group that we want to show
 		if group.bExpand or type(group.tIDs) == "string" then
-			table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd)
+			-- if it's not a group then we won't do anything here and sort afterwards in more optimised way , else we sort it now
+			if type(group.tIDs) == "table" and self.SortedLabel then table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd) end
+			-- counter for ids that passed all condition checks
+			local counter = 0
+			-- finally Ids to display are here , final check whether we want to use this table though
 			for k , player in ipairs(type(tIDs) == "table" and tIDs or self.tItems) do
+				-- checks and generic stuff down there
 				local playerId = type(tIDs) == "table" and player or k
-				local bFound = true
-				if group.tIDs ~= "all" then -- if there's group
-					bFound = false
-					for j , id in ipairs(group.tIDs) do
-						if id == playerId then bFound = true break end
-					end
-				end
 				if type(tIDs) == "table" then player = self.tItems[player] end
-				if player.strName ~= "Guild Bank" and bFound then
+				if player.strName ~= "Guild Bank" then
 					if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 						if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
 								if self:IsPlayerRoleDesired(player.role) then
 									if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
-										--Creating player's window
-										if not self.MassEdit then
+										-- uff , it's all over... you are getting your very own window!
+										if not self.MassEdit then --depending on the mode
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 										else
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
-										--Using Data set for this group
 
+										------------------------TODO
+										--Using Data set for this group
 										local tDataSet = self:GetDataSetForGroupPlayer(group.strName,player.strName)
 										self.tItems[playerId].EP = tDataSet.EP
 										self.tItems[playerId].GP = tDataSet.GP
@@ -2560,9 +2565,16 @@ function DKP:RefreshMainItemList()
 										self.tItems[playerId].GP = tDataSet.GP
 										self.tItems[playerId].net = tDataSet.net
 										self.tItems[playerId].tot = tDataSet.tot
+										--------------------------
 
+
+										-- *underine* key part */underline*--
+										player.wnd:SetData({id = playerId,nGroupId = i})
+										-------------------------------------
+
+										-- using stored info check if we want this window to be selected
 										if not self.MassEdit then
-											if player.strName == selectedPlayer then
+											if playerId == selectedPlayer.id and selectedPlayer.nGroupId == i then
 												self.wndSelectedListItem = player.wnd
 												player.wnd:SetCheck(true)	
 											end
@@ -2570,7 +2582,7 @@ function DKP:RefreshMainItemList()
 											local found = false
 											
 											for k,prevPlayer in ipairs(selectedPlayer) do
-												if prevPlayer == player.strName then
+												if prevPlayer == player.wnd:GetData() then
 													found = true
 													break
 												end
@@ -2579,28 +2591,45 @@ function DKP:RefreshMainItemList()
 												table.insert(selectedMembers,player.wnd)
 												player.wnd:SetCheck(true)
 											end
-											
 										end
-										player.wnd:SetData({id = playerId,nGroupId = i})
+										-- if group then we are changing tactics for counter
+										counter = counter + 1
+										if self.tItems["settings"].bDisplayCounter then
+											player.wnd:FindChild("Counter"):Show(true)
+											player.wnd:FindChild("Counter"):SetText(counter..".")
+										end
 									end
 								end
 							end
-						end
+						end -- weee, down the stairs
 					end
 				end
 			end
 		end
 	end
+	-- raid queue stuff
 	self:RaidQueueShow()
-	self.wndItemList:ArrangeChildrenVert()
-	if self.tItems["settings"].bDisplayCounter then
-		for k,child in ipairs(self:MainItemListGetChildren()) do
-			child:FindChild("Counter"):Show(true)
-			child:FindChild("Counter"):SetText(k..".")
+	
+	-- now it's time for sorting if there's no groups
+	if self.tItems["settings"].bEnableGroups then
+		self.wndItemList:ArrangeChildrenVert()
+	else
+		self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
+
+		-- because groupping is.. well grouping we cannot simply add number to the bar. But if it's not we will do it.
+		if self.tItems["settings"].bDisplayCounter then
+			for k,child in ipairs(self:MainItemListGetChildren()) do
+				child:FindChild("Counter"):Show(true)
+				child:FindChild("Counter"):SetText(k..".")
+			end
 		end
 	end
+	-- use store scroll pos
 	self.wndItemList:SetVScrollPos(self.nHScroll)
+	-- update that counter thingy on the bottom
 	self:UpdateItemCount()
+
+	-- congrats! we have roster now! let's do this again...
 end
 
 function DKP:IsPlayerInRaid(strPlayer)
@@ -3196,14 +3225,30 @@ function DKP:RefreshMainItemListAndGroupByClass()
 		if self.MassEdit then
 			selectedPlayer = {}
 			for k,player in ipairs(selectedMembers) do
-				table.insert(selectedPlayer,player:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+				table.insert(selectedPlayer,player:GetData())
 			end
-		elseif self.wndSelectedListItem and self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")) then
-			selectedPlayer = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
+		elseif self.wndSelectedListItem and self.wndSelectedListItem:GetData() then
+			selectedPlayer = self.wndSelectedListItem:GetData()
 		end
 	end
 	selectedMembers = {}
 	self.wndItemList:DestroyChildren()
+
+	-- we have to artificailly create 'ungroupped' group
+	local tGroups = {}
+	if #self.tItems["settings"].Groups > 0 and self.tItems["settings"].bEnableGroups then -- provided that there's something to care about
+		tGroups = {}
+		for k , group in ipairs(self.tItems["settings"].Groups) do
+			table.insert(tGroups,group)
+		end
+		local tIDs = {}
+		for k , player in ipairs(self.tItems) do
+			if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
+		end
+		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
+	end
+
+
 	local esp = {}
 	local war = {}
 	local spe = {}

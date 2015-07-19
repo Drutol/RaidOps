@@ -684,7 +684,6 @@ function DKP:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 	self.tItems["EPGP"].Tooltips = 0
 	self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow")
 	if self.originalTootltipFunction then
-		Print('lol')
 		Tooltip.GetItemTooltipForm = self.originalTootltipFunction
 		self.originalTootltipFunction = nil
 	end

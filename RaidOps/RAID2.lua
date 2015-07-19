@@ -1347,6 +1347,14 @@ function DKP:GetDataSetForGroupPlayer(strGroup,strPlayer)
 	end
 end
 
+function DKP:GetActiveGroupID()
+	for k ,group in ipairs(self.tItems["settings"].Groups) do
+		if group.strName == self.tItems["settings"].strActiveGroup then
+			return k
+		end
+	end
+end
+
 function DKP:CommitDataSetGroupPlayer(strGroup,strPlayer,playerId)
 	if strGroup == "Ungrouped" then strGroup = "Def" end
 	if self.tItems.tDataSets and self.tItems.tDataSets[strGroup] and self.tItems.tDataSets[strGroup][strPlayer] then

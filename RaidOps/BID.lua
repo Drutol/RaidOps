@@ -2798,12 +2798,22 @@ function DKP:OnItemMouseButtonUp(wndHandler,wndControl,eMouseButton)
 	Hook:OnItemMouseButtonUp(wndHandler,wndControl,eMouseButton)
 end
 
+function raidOpsSortItemList(a,b)
+	a = a.itemDrop
+	b = b.itemDrop
+	if a:GetSlot() ~= b:GetSlot() and b:GetSlot() and a:GetSlot() then
+		return a:GetSlot() < b:GetSlot()
+	else
+		return a:GetName() < b:GetName()
+	end
+end
+
 function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 
 	luaCaller.wndMasterLoot_ItemList:DestroyChildren()
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 
-	
+	table.sort(tMasterLootItemList,raidOpsSortItemList)
 	for idx, tItem in ipairs (tMasterLootItemList) do
 		local wndCurrentItem
 		
