@@ -162,11 +162,13 @@ function DKP:BidCompleteInit()
 		self.wait_timer:Stop()
 		return
 	end
-				bInitialized = true
+	
+	bInitialized = true
 	self.wait_timer:Stop()
 
 	self:InitBid2()
 	self:DSInit()
+
 	Apollo.RegisterSlashCommand("chatbid", "BidOpen", self)
 	if self.ItemDatabase == nil then
 		self.ItemDatabase = {}
@@ -207,13 +209,16 @@ function DKP:BidCompleteInit()
 	end
 
 	Hook.wndMasterLoot:SetSizingMinimum(800, 310)
-	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-325,63)
+	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-350,63)
 	--Asc/Desc
 	if self.tItems["settings"].BidSortAsc == nil then self.tItems["settings"].BidSortAsc = 1 end
 	if self.tItems["settings"].BidMLSorting == nil then self.tItems["settings"].BidMLSorting = 1 end
 	
 	
 	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc2,"InsertMLControls",Hook.wndMasterLoot,self)
+	if self.tItems["EPGP"].Enable == 0 then
+		self.wndInsertedControls:FindChild("SortPR"):SetText("DKP")
+	end
 	
 	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
 	
@@ -433,6 +438,20 @@ function DKP:BidRandomLooter()
 		Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
 		luckyChild:SetCheck(true)
 	end
+end
+
+function DKP:BidDistributeAllAtRandom()
+	for k , item in ipairs(self.tSelectedItems) do
+		GameLib.AssignMasterLoot(item.nLootId,self:ChooseRandomLooter(item))
+	end
+end
+
+function DKP:ChooseRandomLooter(entry)
+	local looters = {}
+	for k , playerUnit in pairs(entry.tLooters or {}) do
+		table.insert(looters,playerUnit)
+	end	
+	return looters[math.random(#looters)]
 end
 
 function DKP:BidUpdateItemDatabase()
@@ -2339,7 +2358,7 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		if #DKPInstance.tSelectedItems > 1 then
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
 				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner = prevLuckyChild end
-				GameLib.AssignMasterLoot(item,SelectedLooter)
+				GameLib.AssignMasterLoot(item.nLootId,SelectedLooter)
 				DKPInstance:MLRegisterItemWinner()
 			end
 			DKPInstance.tSelectedItems = {}
@@ -2761,12 +2780,12 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 end
 
 function DKP:BidAddItem(wndHandler,wndControl)
-	table.insert(self.tSelectedItems,wndControl:GetParent():GetData().nLootId)
+	table.insert(self.tSelectedItems,wndControl:GetParent():GetData())
 end
 
 function DKP:BidRemoveItem(wndHandler,wndControl)
 	for k,item in ipairs(self.tSelectedItems) do
-		if item == wndControl:GetParent():GetData().nLootId then table.remove(self.tSelectedItems,k) end
+		if item == wndControl:GetParent():GetData() then table.remove(self.tSelectedItems,k) end
 	end
 	
 end
@@ -2800,7 +2819,7 @@ function DKP:RefreshMasterLootItemList(luaCaller,tMasterLootItemList)
 			wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonCheck","BidAddItem",DKPInstance)
 			wndCurrentItem:FindChild("Multi"):AddEventHandler("ButtonUncheck","BidRemoveItem",DKPInstance)
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
-				if tItem.nLootId == item then 
+				if tItem.nLootId == item.nLootId then 
 					wndCurrentItem:FindChild("Multi"):SetCheck(true) 
 					break
 				end

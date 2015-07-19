@@ -6,7 +6,7 @@
 require "Window"
 require "ICComm"
 
-local Major, Minor, Patch, Suffix = 1, 14, 0, 0
+local Major, Minor, Patch, Suffix = 1, 16, 0, 0
  
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMM Module Definition
@@ -157,7 +157,6 @@ function RaidOpsMM:OnDocLoaded()
 		if self.CustomModifier == nil then self.CustomModifier = .5 end
 		if self.settings.resize == nil then self.settings.resize = true end
 		if self.settings.bAutoClose == nil then self.settings.bAutoClose = false end
-		if self.settings.tooltips == true then self:EPGPHookToETooltip() end
 		if self.settings.bKeepOnTop == nil then self.settings.bKeepOnTop = true end
 		if self.settings.nReportedVersion == nil then self.settings.nReportedVersion = knVersion end
 		if self.settings.bDisplayApplicable == nil then self.settings.bDisplayApplicable = false end
@@ -215,6 +214,7 @@ function RaidOpsMM:InitDelay()
 	if delay == 0 then 
 		self:Bid2PackAndSend({type = "ArUaML"})
 		self.delayTimer:Stop()
+		if self.settings.tooltips == true then self:EPGPHookToETooltip() self.wndSettings:FindChild("TooltipCost"):SetCheck(true) end
 		Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOpsMM", Major, Minor, Patch)
 		Apollo.RemoveEventHandler("InitDelay",self)
 	end
@@ -250,6 +250,40 @@ function RaidOpsMM:ApplyMyPreviousChoices(forAuction)
 		end
 	end
 end
+
+---------------
+-- Delay
+---------------
+local tDelayActions = {}
+local bDelayRunning = false
+function RaidOpsMM:delay(nSecs,func,args)
+
+	table.insert(tDelayActions,{func = func , delay = nSecs , args = args})
+	if not bDelayRunning then
+		Apollo.RegisterTimerHandler(1,"DelayTimer",self)
+		self.delayTimer = ApolloTimer.Create(1,true,"DelayTimer",self)
+		bDelayRunning = true
+
+	end
+	return #tDelayActions
+end
+
+function RaidOpsMM:DelayTimer()
+	for k , event in ipairs(tDelayActions) do
+		event.delay = event.delay - 1
+		if event.delay == 0 then
+
+			event.func(self)
+			table.remove(tDelayActions,k)
+		end
+	end
+
+	if #tDelayActions == 0 then 
+		self.delayTimer:Stop() 
+		bDelayRunning = false
+	end
+end
+
 function RaidOpsMM:OnChatMessage(channelCurrent, tMessage)
 	if not self.settings.bCloseAssign then return end
 	if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Loot then 
@@ -424,7 +458,6 @@ function RaidOpsMM:SetChannelName( wndHandler, wndControl, strText )
 end
 
 function RaidOpsMM:RestoreSettings()
-	self.wndSettings:FindChild("ChannelName"):SetText(self.settings.strChannel)
 	self.wndSettings:FindChild("DispApplicable"):SetCheck(self.settings.bDisplayApplicable)
 	self.wndSettings:FindChild("AutoCloseDistributed"):SetCheck(self.settings.bCloseAssign)
 	if self.settings.enable then self.wndSettings:FindChild("Enable"):SetCheck(true) end
@@ -448,23 +481,32 @@ end
 -------------------------------------
 
 function RaidOpsMM:JoinGuildChannel()
-	if string.len(self.settings.strChannel) < 5 then self.settings.strChannel = "Input Channel Name" end
-	self.channel = ICCommLib.JoinChannel(self.settings.strChannel,ICCommLib.CodeEnumICCommChannelType.Group)
-	self.channel:SetReceivedMessageFunction("OnReceivedRequest",self)
+	local guilds = GuildLib.GetGuilds() or {}
+	for k,guild in ipairs(guilds) do 
+		if guild:GetType() == GuildLib.GuildType_Guild then
+			self.uGuild = guild
+			break
+		end
+	end
+	if self.uGuild then
+		self.settings.strChannel = "ROPSGuildSpecific"
+		self.channel = ICCommLib.JoinChannel(self.settings.strChannel,ICCommLib.CodeEnumICCommChannelType.Guild,self.uGuild)
+		self.channel:SetReceivedMessageFunction("OnReceivedRequest",self)
+	end
 end
 
 function RaidOpsMM:Bid2PackAndSend(tData)
 	if not tData.type then return end
 	tData.strSender = GameLib.GetPlayerUnit():GetName()
 	local strData = serpent.dump(tData)
-	self.channel:SendMessage("ROPS" .. strData)
+	if self.channel then self.channel:SendMessage("ROPS" .. strData) end
 end
 
 function RaidOpsMM:Bid2PackAndSendPrivate(strTarget,tData)
 	if not tData.type then return end
 	tData.strSender = GameLib.GetPlayerUnit():GetName()
 	local strData = serpent.dump(tData)
-	self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData)
+	if self.channel then self.channel:SendPrivateMessage(strTarget,"ROPS" .. strData) end
 	
 end
 function RaidOpsMM:OnReceivedRequest(channel, strMessage, idMessage)
@@ -960,36 +1002,108 @@ function RaidOpsMM:EPGPGetItemCostByID(itemID)
 		return "                                GP: " .. math.ceil(item:GetItemPower()/self.QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.CustomModifier * self.SlotValues[self:EPGPGetSlotStringByID(slot)])
 	else return "" end
 end
+
+
+local originalTootltipFunction
+function RaidOpsMM:HookToTooltip()
+	-- Based on EToolTip implementation
+	if self.originalTootltipFunction then return end
+	aAddon = Apollo.GetAddon("ToolTips")
+	self.originalTootltipFunction = Tooltip.GetItemTooltipForm
+    local origCreateCallNames = aAddon.CreateCallNames
+    if not origCreateCallNames then return end
+    aAddon.CreateCallNames = function(luaCaller)
+        origCreateCallNames(luaCaller) 
+        originalTootltipFunction = Tooltip.GetItemTooltipForm
+        Tooltip.GetItemTooltipForm  = function (luaCaller, wndControl, item, bStuff, nCount)
+        	return self.EnhanceItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
+        end
+    end
+    aAddon.CreateCallNames()
+    
+end
  
 function RaidOpsMM:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
-	if Apollo.GetAddon("ETooltip") == nil then
-		self.settings.tooltips = false
-		Print("Couldn't find EToolTip Addon")
-		if wndControl ~= nil then wndControl:SetCheck(false) end
-		return
-	end
-	if not Apollo.GetAddon("ETooltip").tSettings["bShowItemID"] then
-		self.settings.tooltips = false
-		Print("Enable option to Show item ID in EToolTip")
-		if wndControl ~= nil then wndControl:SetCheck(false) end
-		return
-	end
-	if Apollo.GetAddon("EasyDKP") then 
+	if Apollo.GetAddon("RaidOps") then 
 		Print("Master addon already installed")
 		self.settings.tooltips = false
 		if wndControl ~= nil then wndControl:SetCheck(false) end
 		return
 	end
-	self.settings.tooltips = true
-	--Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
-	if not self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then
-		self:RawHook(Apollo.GetAddon("ETooltip"),"AttachBelow")
+	if not Apollo.GetAddon("ETooltip") then
+		self.settings.tooltips = true
+		
+		self:HookToTooltip()
+	else
+		if Apollo.GetAddon("ETooltip") == nil then
+			self.settings.tooltips = false
+			Print("Couldn't find EToolTip Addon")
+			if wndControl ~= nil then wndControl:SetCheck(false) end
+			return
+		end
+		if not Apollo.GetAddon("ETooltip").tSettings["bShowItemID"] then
+			self.settings.tooltips = false
+			Print("Enable option to Show item ID in EToolTip")
+			if wndControl ~= nil then wndControl:SetCheck(false) end
+			return
+		end
+		self.settings.tooltips = true
+		--Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
+		if not self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then
+			self:RawHook(Apollo.GetAddon("ETooltip"),"AttachBelow")
+		end
 	end
+end
+
+function RaidOpsMM:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
+    local this = Apollo.GetAddon("RaidOpsMM")
+    wndControl:SetTooltipDoc(nil)
+    local wndTooltip, wndTooltipComp = this.originalTootltipFunction(self, wndControl, item, tOpt, nCount)
+    local wndTarget
+   	if wndTooltip then wndTarget = wndTooltip:FindChild("SeparatorDiagonal") and wndTooltip:FindChild("SeparatorDiagonal") or wndTooltip:FindChild("SeparatorSmallLine") end
+    if wndTooltip and wndTarget and item and item:IsEquippable() then
+    	local val = this:EPGPGetItemCostByID(item:GetItemId(),true)
+    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")
+    	wndTarget:SetTextColor("xkcdAmber")
+    	wndTarget:SetFont("Nameplates")
+    	if wndTarget:GetName() == "SeparatorSmallLine" then 
+    		wndTarget:SetSprite("CRB_Tooltips:sprTooltip_HorzDividerDiagonal") 
+    		local l,t,r,b = wndTarget:GetAnchorOffsets()
+    		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
+    	end
+    	wndTarget:SetTextFlags("DT_VCENTER", true)
+    	wndTarget:SetTextFlags("DT_CENTER", true)
+    end
+    if wndTooltipComp then wndTarget = wndTooltipComp:FindChild("SeparatorDiagonal") and wndTooltipComp:FindChild("SeparatorDiagonal") or wndTooltipComp:FindChild("SeparatorSmallLine") end
+    if wndTooltipComp and wndTarget and tOpt.itemCompare and tOpt.itemCompare:IsEquippable() then
+    	local val = this:EPGPGetItemCostByID(tOpt.itemCompare:GetItemId(),true)
+    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")
+    	wndTarget:SetTextColor("xkcdAmber")
+    	wndTarget:SetFont("Nameplates")
+    	if wndTarget:GetName() == "SeparatorSmallLine" then 
+    		wndTarget:SetSprite("CRB_Tooltips:sprTooltip_HorzDividerDiagonal") 
+    		local l,t,r,b = wndTarget:GetAnchorOffsets()
+    		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
+    	end
+    	wndTarget:SetTextFlags("DT_VCENTER", true)
+    	wndTarget:SetTextFlags("DT_CENTER", true)
+    end
+    if wndTooltip and string.find(item:GetName(),"Imprint") then
+    	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
+    	wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. self:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    end   
+
+
+    return wndTooltip , wndTooltipComp
 end
 
 function RaidOpsMM:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 	self.settings.tooltips = false
-	self:UnhookAll()
+	self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow")
+	if originalTootltipFunction then
+		Tooltip.GetItemTooltipForm = self.originalTootltipFunction
+		self.originalTootltipFunction = nil
+	end
 end
 
 

@@ -639,19 +639,18 @@ function DKP:EPGPGPBaseThresDisable()
 end
 
 -- Hook Part
-local originalTootltipFunction
-function DKP:HookToTooltip()
+function DKP:HookToTooltip(tContext)
 	-- Based on EToolTip implementation
-	if originalTootltipFunction then return end
+	if tContext.originalTootltipFunction then return end
 	aAddon = Apollo.GetAddon("ToolTips")
-	self.originalTootltipFunction = Tooltip.GetItemTooltipForm
+	tContext.originalTootltipFunction = Tooltip.GetItemTooltipForm
     local origCreateCallNames = aAddon.CreateCallNames
     if not origCreateCallNames then return end
     aAddon.CreateCallNames = function(luaCaller)
         origCreateCallNames(luaCaller) 
-        originalTootltipFunction = Tooltip.GetItemTooltipForm
+        tContext.originalTootltipFunction = Tooltip.GetItemTooltipForm
         Tooltip.GetItemTooltipForm  = function (luaCaller, wndControl, item, bStuff, nCount)
-        	return self.EnhanceItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
+        	return tContext.EnhanceItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
         end
     end
     aAddon.CreateCallNames()
@@ -660,7 +659,7 @@ end
 function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 	if not Apollo.GetAddon("ETooltip") then
 		self.tItems["EPGP"].Tooltips = 1
-		self:delay(3,function(tContext) tContext:HookToTooltip() end)
+		self:delay(3,function(tContext) tContext:HookToTooltip(tContext) end)
 	else
 		if Apollo.GetAddon("ETooltip") == nil then
 			self.tItems["EPGP"].Tooltips = 0
@@ -684,13 +683,13 @@ end
 function DKP:EPGPUnHook( wndHandler, wndControl, eMouseButton )
 	self.tItems["EPGP"].Tooltips = 0
 	self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow")
-	if originalTootltipFunction then
-		Tooltip.GetItemTooltipForm = originalTootltipFunction
-		originalTootltipFunction = nil
+	if self.originalTootltipFunction then
+		Print('lol')
+		Tooltip.GetItemTooltipForm = self.originalTootltipFunction
+		self.originalTootltipFunction = nil
 	end
 end
 
-local bFirst = true
 function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     local this = Apollo.GetAddon("RaidOps")
     wndControl:SetTooltipDoc(nil)
