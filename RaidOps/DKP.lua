@@ -2502,12 +2502,11 @@ function DKP:RefreshMainItemList()
 		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 	end
 
-	-- commit data to databse , i'll have to move it somewhere else
-	local activeGroupId = self:GetActiveGroupID()
-
-	for k , id in ipairs(self.tItems["settings"].Groups[activeGroupId].tIDs) do
-		self:CommitDataSetGroupPlayer(self.tItems["settings"].strActiveGroup,self.tItems[id].strName,id)
-	end
+	--commit data to databse , i'll have to move it somewhere else
+	--local activeGroupId = self:GetActiveGroupID()
+	--for k , id in ipairs(self.tItems["settings"].Groups[activeGroupId].tIDs) do
+	--	self:CommitDataSetGroupPlayer(self.tItems["settings"].strActiveGroup,self.tItems[id].strName,id)
+	--end
 
 
 	-- we are set in terms of preparation... let the show begin!
@@ -2550,27 +2549,14 @@ function DKP:RefreshMainItemList()
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
 
-										------------------------TODO
-										--Using Data set for this group
-										local tDataSet = self:GetDataSetForGroupPlayer(group.strName,player.strName)
-										self.tItems[playerId].EP = tDataSet.EP
-										self.tItems[playerId].GP = tDataSet.GP
-										self.tItems[playerId].net = tDataSet.net
-										self.tItems[playerId].tot = tDataSet.tot
-										--Fill in data
-										self:UpdateItem(player)
-										--Set data according to active group
-										tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].strActiveGroup,player.strName)
-										self.tItems[playerId].EP = tDataSet.EP
-										self.tItems[playerId].GP = tDataSet.GP
-										self.tItems[playerId].net = tDataSet.net
-										self.tItems[playerId].tot = tDataSet.tot
-										--------------------------
-
-
 										-- *underine* key part */underline*--
 										player.wnd:SetData({id = playerId,nGroupId = i})
 										-------------------------------------
+										
+
+										--Fill in data
+										self:UpdateItem(player)
+										--------------------------
 
 										-- using stored info check if we want this window to be selected
 										if not self.MassEdit then
@@ -2682,6 +2668,18 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		if string.find(child:GetName(),"Stat") then nStats = nStats + 1 end
 	end
 
+	-- if data is invalid for this group
+	local tDataSet
+	local nGroup = playerItem.wnd:GetData().nGroupId
+	if self:GetActiveGroupID() ~= nGroup and self.tItems["settings"].Groups[nGroup] then
+		tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].Groups[nGroup].strName,playerItem.strName)
+		if tDataSet.GP ~= 0 then
+			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/tDataSet.GP)
+		else
+			tDataSet.PR = 0
+		end
+	end
+
 
 	if nStats < self.currentLabelCount then
 		for k=1,self.currentLabelCount - nStats do
@@ -2741,9 +2739,9 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 					wnd:SetAnchorOffsets(l-20,t,r+20,b)
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Net" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",playerItem.net))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",tDataSet and tDataSet.net or playerItem.net))
 			elseif self.tItems["settings"].LabelOptions[i] == "Tot" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",playerItem.tot))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",tDataSet and tDataSet.tot or playerItem.tot))
 			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
@@ -2799,11 +2797,11 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 					playerItem.wnd:FindChild("Stat"..tostring(i)):SetText("0")
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "EP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.EP))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.EP or playerItem.EP))
 			elseif self.tItems["settings"].LabelOptions[i] == "GP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.GP or playerItem.GP))
 			elseif self.tItems["settings"].LabelOptions[i] == "PR" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(self:EPGPGetPRByName(playerItem.strName))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(tDataSet and tDataSet.PR or self:EPGPGetPRByName(playerItem.strName))
 			elseif self.tItems["settings"].LabelOptions[i] == "RealGP" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP - self.tItems["EPGP"].BaseGP))
 			--Att
@@ -3248,120 +3246,137 @@ function DKP:RefreshMainItemListAndGroupByClass()
 		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 	end
 
-
-	local esp = {}
-	local war = {}
-	local spe = {}
-	local med = {}
-	local sta = {}
-	local eng = {}
-	local unknown = {}
-	if not self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):FindChild("TokenGroup"):IsChecked() then
-		for k,player in ipairs(tIDs and tIDs or self.tItems) do
-			if type(tIDs) == "table" then player = self.tItems[player] end
-			if player.strName ~= "Guild Bank" then
-				if player.class ~= nil then
-					if player.class == self.tItems["settings"].tClassOrder[1] then
-						table.insert(esp,player)
-					elseif player.class == self.tItems["settings"].tClassOrder[2] then
-						table.insert(eng,player)
-					elseif player.class == self.tItems["settings"].tClassOrder[3] then
-						table.insert(med,player)
-					elseif player.class == self.tItems["settings"].tClassOrder[4] then
-						table.insert(war,player)
-					elseif player.class == self.tItems["settings"].tClassOrder[5] then
-						table.insert(sta,player)
-					elseif player.class == self.tItems["settings"].tClassOrder[6] then
-						table.insert(spe,player)
+	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
+		-- if it's a group => create group bar
+		if type(group.tIDs) == "table" then
+			local wndGroupBar = Apollo.LoadForm(self.xmlDoc,"ListItemGroupBar",self.wndItemList,self)
+			wndGroupBar:FindChild("GroupName"):SetText(group.strName)
+			wndGroupBar:FindChild("Expand"):SetCheck(group.bExpand)
+			wndGroupBar:SetData(i)
+			tIDs = group.tIDs
+			if i == #tGroups then wndGroupBar:FindChild("Expand"):Show(false) end
+			-- Set active group indicator
+			if group.strName == self.tItems["settings"].strActiveGroup or group.strName == "Ungrouped" and self.tItems["settings"].strActiveGroup == "Def" then wndGroupBar:FindChild("Active"):SetCheck(true) end
+			-- or if it's ungroupped hide it , we don't want not existing group to be active one
+			if group.strName == "Ungrouped" then wndGroupBar:FindChild("Active"):Show(false) end
+		end
+		-- if it's not a group or it'a a group that we want to show
+		if group.bExpand or type(group.tIDs) == "string" then
+			local esp = {}
+			local war = {}
+			local spe = {}
+			local med = {}
+			local sta = {}
+			local eng = {}
+			local unknown = {}
+			if not self.wndMain:FindChild("Controls"):FindChild("GroupByClass"):FindChild("TokenGroup"):IsChecked() then
+				for k,player in ipairs(tIDs and tIDs or self.tItems) do
+					if type(tIDs) == "table" then player = self.tItems[player] end
+					if player.strName ~= "Guild Bank" then
+						if player.class ~= nil then
+							if player.class == self.tItems["settings"].tClassOrder[1] then
+								table.insert(esp,player)
+							elseif player.class == self.tItems["settings"].tClassOrder[2] then
+								table.insert(eng,player)
+							elseif player.class == self.tItems["settings"].tClassOrder[3] then
+								table.insert(med,player)
+							elseif player.class == self.tItems["settings"].tClassOrder[4] then
+								table.insert(war,player)
+							elseif player.class == self.tItems["settings"].tClassOrder[5] then
+								table.insert(sta,player)
+							elseif player.class == self.tItems["settings"].tClassOrder[6] then
+								table.insert(spe,player)
+							end
+						else
+							table.insert(unknown,player)
+						end
 					end
-				else
-					table.insert(unknown,player)
+				end
+			else
+				for k,player in ipairs(tIDs and tIDs or self.tItems) do
+					if type(tIDs) == "table" then player = self.tItems[player] end
+					if player.strName ~= "Guild Bank" then
+						if player.class ~= nil then
+							if player.class == "Esper" then
+								table.insert(esp,player)
+							elseif player.class == "Engineer" then
+								table.insert(eng,player)
+							elseif player.class == "Medic" then
+								table.insert(med,player)
+							elseif player.class == "Warrior" then
+								table.insert(eng,player)
+							elseif player.class == "Stalker" then
+								table.insert(med,player)
+							elseif player.class == "Spellslinger" then
+								table.insert(esp,player)
+							end
+						else
+							table.insert(unknown,player)
+						end
+					end
 				end
 			end
-		end
-	else
-		for k,player in ipairs(tIDs and tIDs or self.tItems) do
-			if type(tIDs) == "table" then player = self.tItems[player] end
-			if player.strName ~= "Guild Bank" then
-				if player.class ~= nil then
-					if player.class == "Esper" then
-						table.insert(esp,player)
-					elseif player.class == "Engineer" then
-						table.insert(eng,player)
-					elseif player.class == "Medic" then
-						table.insert(med,player)
-					elseif player.class == "Warrior" then
-						table.insert(eng,player)
-					elseif player.class == "Stalker" then
-						table.insert(med,player)
-					elseif player.class == "Spellslinger" then
-						table.insert(esp,player)
-					end
-				else
-					table.insert(unknown,player)
-				end
-			end
-		end
-	end
-	
-	local tables = {}
-	
-	table.insert(tables,esp)
-	table.insert(tables,eng)
-	table.insert(tables,med)
-	table.insert(tables,war)
-	table.insert(tables,sta)
-	table.insert(tables,spe)
-	table.insert(tables,unknown)
+			
+			local tables = {}
+			
+			table.insert(tables,esp)
+			table.insert(tables,eng)
+			table.insert(tables,med)
+			table.insert(tables,war)
+			table.insert(tables,sta)
+			table.insert(tables,spe)
+			table.insert(tables,unknown)
 
-	
-	local tOnlineMembers
-	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
-	
-	for j,tab in ipairs(tables) do
-		table.sort(tab,easyDKPSortPlayerbyLabelNotWnd)
-		local added = false
-		local nCounter = 1
-		for k,player in ipairs(tab) do
-			if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
-				if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-					if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
-						if self:IsPlayerRoleDesired(player.role) then	
-							if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then
-								if not self.MassEdit then
-									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-								else
-									player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
-								end
-								
-								self:UpdateItem(player,k,added)
-								if not self.MassEdit then
-									if player.strName == selectedPlayer then
-										self.wndSelectedListItem = player.wnd
-										player.wnd:SetCheck(true)	
-									end
-								else
-									local found = false
-									
-									for k,prevPlayer in ipairs(selectedPlayer) do
-										if prevPlayer == player.strName then
-											found = true
-											break
+			
+			local tOnlineMembers
+			if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
+			
+			for j,tab in ipairs(tables) do
+				table.sort(tab,easyDKPSortPlayerbyLabelNotWnd)
+				local added = false
+				local nCounter = 1
+				for k,player in ipairs(tab) do
+					if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
+						if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
+							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then	
+								if self:IsPlayerRoleDesired(player.role) then	
+									if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then
+										if not self.MassEdit then
+											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
+										else
+											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
+										player.wnd:SetData({id = self:GetPlayerByIDByName(player.strName),nGroupId = i})
+										self:UpdateItem(player,k,added)
+										if not self.MassEdit then
+											if player.strName == selectedPlayer then
+												self.wndSelectedListItem = player.wnd
+												player.wnd:SetCheck(true)	
+											end
+										else
+											local found = false
+											
+											for k,prevPlayer in ipairs(selectedPlayer) do
+												if prevPlayer == player.strName then
+													found = true
+													break
+												end
+											end
+											if found then
+												table.insert(selectedMembers,player.wnd)
+												player.wnd:SetCheck(true)
+											end
+											
+										end
+										if self.tItems["settings"].bDisplayCounter then
+											player.wnd:FindChild("Counter"):SetText(nCounter..".")
+											player.wnd:FindChild("Counter"):Show(true)
+										end
+										nCounter = nCounter + 1 
+										
+										added = true
 									end
-									if found then
-										table.insert(selectedMembers,player.wnd)
-										player.wnd:SetCheck(true)
-									end
-									
 								end
-								if self.tItems["settings"].bDisplayCounter then
-									player.wnd:FindChild("Counter"):SetText(nCounter..".")
-									player.wnd:FindChild("Counter"):Show(true)
-								end
-								nCounter = nCounter + 1 
-								player.wnd:SetData(self:GetPlayerByIDByName(player.strName))
-								added = true
 							end
 						end
 					end
@@ -5206,13 +5221,13 @@ end
 -----------------------------------------------------------------------------------------------
 
 function DKP:RaidQueueAdd(wndHandler,wndControl)
-	table.insert(self.tItems.tQueuedPlayers,wndControl:GetParent():GetData())
+	table.insert(self.tItems.tQueuedPlayers,wndControl:GetParent():GetData().id)
 	self:RaidQueueShowClearButton()
 end
 
 function DKP:RaidQueueRemove(wndHandler,wndControl)
 	for k,player in ipairs(self.tItems.tQueuedPlayers) do
-		if player == wndControl:GetParent():GetData() then table.remove(self.tItems.tQueuedPlayers,k) break end
+		if player == wndControl:GetParent():GetData().id then table.remove(self.tItems.tQueuedPlayers,k) break end
 	end
 	if not self.wndMain:FindChild("RaidQueue"):IsChecked() then wndControl:Show(false) end
 	if self.wndMain:FindChild("RaidOnly"):IsChecked() then self:RefreshMainItemList() end
@@ -5261,7 +5276,7 @@ end
 function DKP:RaidQueueShow()
 	for k,child in ipairs(self:MainItemListGetChildren()) do
 		if self.wndMain:FindChild("RaidQueue"):IsChecked() then child:FindChild("Standby"):Show(true,false) else child:FindChild("Standby"):Show(false,false) end
-		if self:IsPlayerInQueue(nil,child:GetData()) then 
+		if self:IsPlayerInQueue(nil,child:GetData().id) then 
 			child:FindChild("Standby"):Show(true,false)
 			child:FindChild("Standby"):SetCheck(true) 
 		end
