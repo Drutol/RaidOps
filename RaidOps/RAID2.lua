@@ -1096,12 +1096,14 @@ function DKP:GroupInit()
 	self.wndGroupGUI:Show(false)
 
 	if self.tItems["settings"].bEnableGroups == nil then self.tItems["settings"].bEnableGroups = false end
+	if self.tItems["settings"].bEnableGroupsDrag == nil then self.tItems["settings"].bEnableGroupsDrag = false end
 	if not self.tItems["settings"].Groups then 
 		self.tItems["settings"].Groups = {} 
 		table.insert(self.tItems["settings"].Groups,ktDefaultGroup)
 	end
 
 	self.wndGroupGUI:FindChild("Enable"):SetCheck(self.tItems["settings"].bEnableGroups)
+	self.wndGroupGUI:FindChild("Drag"):SetCheck(self.tItems["settings"].bEnableGroupsDrag)
 	self:GroupGUIPopulate()
 end
 
@@ -1121,6 +1123,14 @@ function DKP:GroupDisable()
 	self.tItems["settings"].bEnableGroups = false
 end
 
+function DKP:GroupDragEnable()
+	self.tItems["settings"].bEnableGroupsDrag = true
+end
+
+function DKP:GroupDragDisable()
+	self.tItems["settings"].bEnableGroupsDrag = false
+end
+
 function DKP:GroupExpand(wndHandler,wndControl)
 	self.tItems["settings"].Groups[wndControl:GetParent():GetData()].bExpand = true
 	self:RefreshMainItemList()
@@ -1137,13 +1147,10 @@ function DKP:GroupGUIPopulate()
 		local wnd = Apollo.LoadForm(self.xmlDoc3,"GroupEntry",self.wndGroupGUI:FindChild("List"),self)
 		wnd:FindChild("Name"):SetText(group.strName)
 		wnd:FindChild("Name"):Enable(false)
-		wnd:FindChild("Down"):SetRotation(180)
 		wnd:SetData(k)
 	end
 	local wnd = Apollo.LoadForm(self.xmlDoc3,"GroupEntry",self.wndGroupGUI:FindChild("List"),self)
 	wnd:FindChild("Name"):SetText("Input new group name")
-	wnd:FindChild("Up"):Show(false)
-	wnd:FindChild("Down"):Show(false)
 	wnd:FindChild("Rem"):Show(false)
 
 	self:GroupArrangeGroups()
@@ -1183,6 +1190,28 @@ function DKP:GroupIsPlayerInAny(ofID)
 	end
 	return false
 end
+local tSavedGroups = {}
+function DKP:GroupSaveMembers()
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		tSavedGroups[group.strName] = {}
+		for  j , id in ipairs(group.tIDs) do
+			table.insert(tSavedGroups[group.strName],self.tItems[id].name)
+		end
+		group.tIDs = {}
+	end
+end
+
+function DKP:GroupRestoreMembers()
+	if not tSavedGroups then return end
+
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		for j , strName in ipairs(tSavedGroups[group.strName]) do
+			table.insert(group.tIDs,self:GetPlayerByIDByName(strName))
+		end
+	end
+end
+
+
 
 --------------------------------------------------------------------------
 -- Group Dialog
@@ -1297,6 +1326,7 @@ end
 
 function DKP:GroupStartDragDrop(wndHandler,wndControl,eMouseButton)
 	if eMouseButton ~= GameLib.CodeEnumInputMouse.Left then return end
+	if not self.tItems["settings"].bEnableGroupsDrag or not self.tItems["settings"].bEnableGroups then return end
 	if wndControl:GetName() ~= "ListItem" then 
 		wndControl = wndControl:GetParent()
 		if not wndControl or wndControl:GetName() ~= "ListItem" then return end
@@ -1406,15 +1436,6 @@ function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 	self.tItems["settings"].strActiveGroup = strGroup
 	self:RefreshMainItemList()
 end
-
-
-
-
-
-
-
-
-
 
 
 

@@ -1241,10 +1241,7 @@ function DKP:OnSave(eLevel)
 		if newImportedDatabaseGlobal ~= nil then self.tItems = newImportedDatabaseGlobal end
 		local tSave = {}
 		if purge_database == 0 then
-			
-			
-			-- Time award awards
-			
+			-- Time award awards	
 			self.tItems["AwardTimer"].EP = self.wndTimeAward:FindChild("Settings"):FindChild("EP"):IsChecked()
 			self.tItems["AwardTimer"].GP = self.wndTimeAward:FindChild("Settings"):FindChild("GP"):IsChecked()
 			self.tItems["AwardTimer"].DKP = self.wndTimeAward:FindChild("Settings"):FindChild("DKP"):IsChecked()
@@ -1280,6 +1277,7 @@ function DKP:OnSave(eLevel)
 			tSave["MyChoices"] = self.MyChoices
 			tSave["MyVotes"] = self.MyVotes
 			tSave["CE"] = self.tItems["CE"]
+			tSave.tDataSets = self.tItems.tDataSets
 			tSave.tRaids = self.tItems.tRaids
 			if self.tItems["settings"].bSaveUndo then tSave["ALogs"] = tUndoActions end
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
@@ -2120,8 +2118,15 @@ function DKP:MassEditSelectRaid( wndHandler, wndControl, eMouseButton )
 	local children = self:MainItemListGetChildren()
 	for k,child in ipairs(children) do
 		if self:IsPlayerInRaid(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()) then
-			child:SetCheck(true)
-			table.insert(selectedMembers,child)
+			if self.tItems["settings"].bEnableGroups then
+				if self.tItems["settings"].Groups[child:GetData().nGroupId] and self.tItems["settings"].strActiveGroup == self.tItems["settings"].Groups[child:GetData().nGroupId].strName then
+					table.insert(selectedMembers,child)
+					child:SetCheck(true)
+				end
+			else
+				table.insert(selectedMembers,child)
+				child:SetCheck(true)
+			end
 		end
 	end
 end
@@ -2197,7 +2202,15 @@ function DKP:MassEditInvert()
 		for j,wnd in ipairs(selectedMembers) do
 			if wnd == child then found = true break end
 		end
-		if not found then table.insert(newSelectedMembers,child) end
+		if not found then 
+			if self.tItems["settings"].bEnableGroups then
+				if self.tItems["settings"].Groups[child:GetData().nGroupId] and self.tItems["settings"].strActiveGroup == self.tItems["settings"].Groups[child:GetData().nGroupId].strName then
+					table.insert(newSelectedMembers,child)
+				end
+			else
+				table.insert(newSelectedMembers,child)
+			end
+		end	
 	end
 	selectedMembers = newSelectedMembers
 	newSelectedMembers = nil 
@@ -2224,8 +2237,15 @@ function DKP:MassEditSelectConfirmed()
 	for k,child in ipairs(self:MainItemListGetChildren()) do
 		for k , strConfirmed in ipairs(self.tItems["settings"].tConfirmed) do
 			if strConfirmed == self.tItems[child:GetData().id].strName then
-				table.insert(selectedMembers,child)
-				child:SetCheck(true)
+				if self.tItems["settings"].bEnableGroups then
+					if self.tItems["settings"].Groups[child:GetData().nGroupId] and self.tItems["settings"].strActiveGroup == self.tItems["settings"].Groups[child:GetData().nGroupId].strName then
+						table.insert(selectedMembers,child)
+						child:SetCheck(true)
+					end
+				else
+					table.insert(selectedMembers,child)
+					child:SetCheck(true)
+				end
 				break
 			end
 		end
@@ -2242,8 +2262,15 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 	selectedMembers = {}
 	local children = self:MainItemListGetChildren()
 	for k,child in ipairs(children) do
-		table.insert(selectedMembers,child)
-		child:SetCheck(true)
+		if self.tItems["settings"].bEnableGroups then
+			if self.tItems["settings"].Groups[child:GetData().nGroupId] and self.tItems["settings"].strActiveGroup == self.tItems["settings"].Groups[child:GetData().nGroupId].strName then
+				table.insert(selectedMembers,child)
+				child:SetCheck(true)
+			end
+		else
+			table.insert(selectedMembers,child)
+			child:SetCheck(true)
+		end		
 	end
 	self:UpdateItemCount()
 end
@@ -2365,6 +2392,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 end
 function DKP:MassEditItemSelected( wndHandler, wndControl, eMouseButton )
 	if wndHandler ~= wndControl then return end
+	if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
 	table.insert(selectedMembers,wndControl)
 	self:UpdateItemCount()
 	self:EnableActionButtons()
@@ -4943,6 +4971,7 @@ end
 
 function DKP:ConRemoveFinal(wndHandler,wndControl)
 	local save = self:RaidQueueSaveRestoreAndClear()
+	self:GroupSaveMembers()
 	self:StandbyListRemove(nil,nil,nil,self.tItems[self.wndContext:GetData()].strName)
 	self:UndoAddActivity(ktUndoActions["remp"],"--",{[1] = self.tItems[self.wndContext:GetData()]},true)
 	self:AltsBuildDictionary()
@@ -4951,6 +4980,7 @@ function DKP:ConRemoveFinal(wndHandler,wndControl)
 	self.wndSelectedListItem = nil
 	wndControl:Show(false,false)
 	self:RaidQueueRestore(save)
+	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 end
 
@@ -5031,6 +5061,7 @@ end
 function DKP:AltsAddMerge()
 	local mergedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
 	local save = self:RaidQueueSaveRestoreAndClear()
+	self:GroupSaveMembers()
 	self.tItems[self.wndAlts:GetData()].net =  self.tItems[self.wndAlts:GetData()].net + mergedPlayer.net
 	self.tItems[self.wndAlts:GetData()].tot =  self.tItems[self.wndAlts:GetData()].tot + mergedPlayer.tot
 	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
@@ -5051,6 +5082,7 @@ function DKP:AltsAddMerge()
 	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
 	self.wndAlts:FindChild("NewAltBox"):SetText("")
 	self:RaidQueueRestore(save)
+	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
 	self:AltsPopulate()
@@ -5059,7 +5091,6 @@ end
 function DKP:AltsDictionaryShow()
 	self.wndAltsDict:Show(true,false)
 	self.wndAltsDict:ToFront()
-	
 	local strAlts = ""
 	for alt , owner in pairs(self.tItems["alts"]) do
 		if self.tItems[owner] then
@@ -5086,6 +5117,7 @@ end
 function DKP:AltsAddConvert()
 	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	local save = self:RaidQueueSaveRestoreAndClear()
+	self:GroupSaveMembers()
 	local convertedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
 	if self.tItems["settings"].bTrackUndo then
 		self:UndoAddActivity(string.format(ktUndoActions["acon"],convertedPlayer.strName,recipent),"--",{[1] = convertedPlayer},true,nil,true)
@@ -5100,6 +5132,7 @@ function DKP:AltsAddConvert()
 	self.tItems["alts"][string.lower(self.wndAlts:FindChild("NewAltBox"):GetText())] = self.wndAlts:GetData()
 	self.wndAlts:FindChild("NewAltBox"):SetText("")
 	self:RaidQueueRestore(save)
+	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
 	self:AltsPopulate()

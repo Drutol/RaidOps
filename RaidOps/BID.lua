@@ -442,7 +442,9 @@ end
 
 function DKP:BidDistributeAllAtRandom()
 	for k , item in ipairs(self.tSelectedItems) do
-		GameLib.AssignMasterLoot(item.nLootId,self:ChooseRandomLooter(item))
+		local luckylooter = self:ChooseRandomLooter(item)
+		GameLib.AssignMasterLoot(item.nLootId,luckylooter)
+		self.strRandomWinner = luckylooter:GetName() 
 	end
 end
 
