@@ -190,6 +190,18 @@ local RAID_Y = 2
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.27 Beta---
+{17/07/2015}
+Added grouping mechanism.
+Added different data sets for each group.
+Added restriction to modify only certain data set.
+Added multiple display mechanisms to accomodate grouping.
+Added grouping interface to context menu.
+Added groups GUI to the bottom part of the indow ('+' button).
+Added sorting to Master Loot loot window.
+Added button to assign multiple items at random each to different person.
+Fixed LUA error concerning chat bidding (roll).
+Fixed Bug that prevented to undo guild import.
 ---RaidOps version 2.26---
 {17/07/2015}
 Fixed Guild Bank pop-up issue.
@@ -237,27 +249,6 @@ Dropped Base64 Encoding for import/export.
 Added 4 new tutorials.
 Item tooltip no longer requires EToolTip addon , compatibilty remains.
 Added some condition checks to players' attendances.
----RaidOps version 2.21---
-{03/07/2015}
-Added option to hide Standby players from main roster.
-Fixed error on raid session start.
-Raid types in Raid Summaries are now colored.
----RaidOps version 2.20---
-{30/06/2015}
-Fixed LUA error when attempting to enable offspec in PopUp window while the GP value equals 0.
-Complete reskin of loot logs.
-Changed sliders appearance.
-Sliders will now indicate the current value.
-Added 'disable' option do Max Days slider in Loot Logs.
-Added option to specify class order when grouping by class.
-Added stock context menu to item label.
-Raid session will now convert all alts' names to their main's name.Solves problem of missing or multiple entries.
-Added option to make GP value unable to drop below BaseGP value.
-Fixed Loot Logs's day filter not counting months.
-Fixed tutorial window not destroying glow on tutorial exit.
-Added all missing Datascape map ids for raid summaries. 
-
-NOTE: Decreased freqency of updates is caused by me developing completly different addon and some irl stuff. More info at a later date.
  ]===]
 
 -- Localization stuff
@@ -916,7 +907,7 @@ function DKP:GIImport()
 			table.insert(tMembers,self.tItems[self:GetPlayerByIDByName(member.strName)])
 		end
 	end
-	self:UndoAddActivity(#tMembers == 1 and ktUndoActions["addp"] or ktUndoActions["addmp"],"--",tMembers,nil,nil,false)
+	self:UndoAddActivity(#tMembers == 1 and ktUndoActions["addp"] or ktUndoActions["addmp"],"--",tMembers,false,nil,false)
 	self:RefreshMainItemList()
 	self:GIUpdateCount()
 	Event_FireGenericEvent("GIImport")
@@ -2523,11 +2514,13 @@ function DKP:RefreshMainItemList()
 		for k , group in ipairs(self.tItems["settings"].Groups) do
 			table.insert(tGroups,group)
 		end
-		local tIDs = {}
-		for k , player in ipairs(self.tItems) do
-			if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
+		if self.tItems["settings"].bGroupDisplayUngroupped then
+			local tIDs = {}
+			for k , player in ipairs(self.tItems) do
+				if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
+			end
+			table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 		end
-		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 	end
 
 	--commit data to databse , i'll have to move it somewhere else
@@ -2538,7 +2531,7 @@ function DKP:RefreshMainItemList()
 
 
 	-- we are set in terms of preparation... let the show begin!
-
+	local bSortAfter = false
 	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
 		-- if it's a group => create group bar
 		if type(group.tIDs) == "table" then
@@ -2547,7 +2540,7 @@ function DKP:RefreshMainItemList()
 			wndGroupBar:FindChild("Expand"):SetCheck(group.bExpand)
 			wndGroupBar:SetData(i)
 			tIDs = group.tIDs
-			if i == #tGroups then wndGroupBar:FindChild("Expand"):Show(false) end
+			if i == #tGroups and self.tItems["settings"].bGroupDisplayUngroupped then wndGroupBar:FindChild("Expand"):Show(false) end
 			-- Set active group indicator
 			if group.strName == self.tItems["settings"].strActiveGroup or group.strName == "Ungrouped" and self.tItems["settings"].strActiveGroup == "Def" then wndGroupBar:FindChild("Active"):SetCheck(true) end
 			-- or if it's ungroupped hide it , we don't want not existing group to be active one
@@ -2556,7 +2549,14 @@ function DKP:RefreshMainItemList()
 		-- if it's not a group or it'a a group that we want to show
 		if group.bExpand or type(group.tIDs) == "string" then
 			-- if it's not a group then we won't do anything here and sort afterwards in more optimised way , else we sort it now
-			if type(group.tIDs) == "table" and self.SortedLabel then table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd) end
+			
+			if  self.SortedLabel then
+				if type(tIDs) == "table" then table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd) else
+					bSortAfter = true
+				end
+			end
+
+
 			-- counter for ids that passed all condition checks
 			local counter = 0
 			-- finally Ids to display are here , final check whether we want to use this table though
@@ -2625,7 +2625,7 @@ function DKP:RefreshMainItemList()
 	self:RaidQueueShow()
 	
 	-- now it's time for sorting if there's no groups
-	if self.tItems["settings"].bEnableGroups then
+	if self.tItems["settings"].bEnableGroups and not bSortAfter then
 		self.wndItemList:ArrangeChildrenVert()
 	else
 		self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
@@ -3267,11 +3267,13 @@ function DKP:RefreshMainItemListAndGroupByClass()
 		for k , group in ipairs(self.tItems["settings"].Groups) do
 			table.insert(tGroups,group)
 		end
-		local tIDs = {}
-		for k , player in ipairs(self.tItems) do
-			if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
+		if self.tItems["settings"].bGroupDisplayUngroupped then
+			local tIDs = {}
+			for k , player in ipairs(self.tItems) do
+				if not self:GroupIsPlayerInAny(k) then table.insert(tIDs,k) end
+			end
+			table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 		end
-		table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 	end
 
 	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
@@ -3282,7 +3284,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			wndGroupBar:FindChild("Expand"):SetCheck(group.bExpand)
 			wndGroupBar:SetData(i)
 			tIDs = group.tIDs
-			if i == #tGroups then wndGroupBar:FindChild("Expand"):Show(false) end
+			if i == #tGroups and self.tItems["settings"].bGroupDisplayUngroupped then wndGroupBar:FindChild("Expand"):Show(false) end
 			-- Set active group indicator
 			if group.strName == self.tItems["settings"].strActiveGroup or group.strName == "Ungrouped" and self.tItems["settings"].strActiveGroup == "Def" then wndGroupBar:FindChild("Active"):SetCheck(true) end
 			-- or if it's ungroupped hide it , we don't want not existing group to be active one
@@ -3431,7 +3433,11 @@ function DKP:LabelSort(wndHandler,wndControl,eMouseButton)
 				end
 				self.SortedLabel = self:LabelGetColumnNumberForValue(wndControl:GetText())
 				if self.tItems["settings"].GroupByClass then self:RefreshMainItemListAndGroupByClass() else 
-					self:RefreshMainItemList()
+						if self.tItems["settings"].bEnableGroups then
+							self:RefreshMainItemList()
+						else
+							self.wndItemList:ArrangeChildrenVert(0,easyDKPSortPlayerbyLabel)
+						end
 					self:LabelUpdateColorHighlight()
 				end
 			end
@@ -5254,14 +5260,26 @@ end
 -----------------------------------------------------------------------------------------------
 
 function DKP:RaidQueueAdd(wndHandler,wndControl)
-	table.insert(self.tItems.tQueuedPlayers,wndControl:GetParent():GetData().id)
+	local newId = wndControl:GetParent():GetData().id
+	table.insert(self.tItems.tQueuedPlayers,newId)
+
+	for k , child in ipairs(self:MainItemListGetChildren()) do
+		if child:GetData().id == newId then child:FindChild("Standby"):SetCheck(true) end
+	end
+
 	self:RaidQueueShowClearButton()
 end
 
 function DKP:RaidQueueRemove(wndHandler,wndControl)
+	local oldId = wndControl:GetParent():GetData().id
 	for k,player in ipairs(self.tItems.tQueuedPlayers) do
-		if player == wndControl:GetParent():GetData().id then table.remove(self.tItems.tQueuedPlayers,k) break end
+		if player == oldId then table.remove(self.tItems.tQueuedPlayers,k) break end
 	end
+	for k , child in ipairs(self:MainItemListGetChildren()) do
+		if child:GetData().id == oldId then child:FindChild("Standby"):SetCheck(false) end
+	end
+
+
 	if not self.wndMain:FindChild("RaidQueue"):IsChecked() then wndControl:Show(false) end
 	if self.wndMain:FindChild("RaidOnly"):IsChecked() then self:RefreshMainItemList() end
 	self:RaidQueueShowClearButton()

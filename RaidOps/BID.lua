@@ -768,9 +768,9 @@ function DKP:BidProcessMessageRoll(tData)
 		return strReturn
 	end
 	
-	
 		
 		local ID = self:GetPlayerByIDByName(strRoller)
+		if ID == -1 then return -1 end
 		for k,bidder in ipairs(self.CurrentBidSession.Bidders) do
 			if bidder.strName == strRoller then
 				strReturn = strRoller.." Already Rolled"

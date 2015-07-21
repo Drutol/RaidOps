@@ -1082,11 +1082,6 @@ local ktDefaultGroup =
 {
 	strName = "EPGP - GA",
 	tIDs = {},
-	tAllow = 
-	{
-		DKP = true,
-		EPGP = true,
-	},
 	bExpand = true
 }
 
@@ -1097,13 +1092,14 @@ function DKP:GroupInit()
 
 	if self.tItems["settings"].bEnableGroups == nil then self.tItems["settings"].bEnableGroups = false end
 	if self.tItems["settings"].bEnableGroupsDrag == nil then self.tItems["settings"].bEnableGroupsDrag = false end
+	if self.tItems["settings"].bGroupDisplayUngroupped == nil then self.tItems["settings"].bGroupDisplayUngroupped = false end
 	if not self.tItems["settings"].Groups then 
 		self.tItems["settings"].Groups = {} 
-		table.insert(self.tItems["settings"].Groups,ktDefaultGroup)
 	end
 
 	self.wndGroupGUI:FindChild("Enable"):SetCheck(self.tItems["settings"].bEnableGroups)
 	self.wndGroupGUI:FindChild("Drag"):SetCheck(self.tItems["settings"].bEnableGroupsDrag)
+	self.wndGroupGUI:FindChild("DispUng"):SetCheck(self.tItems["settings"].bGroupDisplayUngroupped)
 	self:GroupGUIPopulate()
 end
 
@@ -1117,10 +1113,12 @@ end
 
 function DKP:GroupEnable()
 	self.tItems["settings"].bEnableGroups = true
+	self:RefreshMainItemList()
 end
 
 function DKP:GroupDisable()
 	self.tItems["settings"].bEnableGroups = false
+	self:RefreshMainItemList()
 end
 
 function DKP:GroupDragEnable()
@@ -1129,6 +1127,16 @@ end
 
 function DKP:GroupDragDisable()
 	self.tItems["settings"].bEnableGroupsDrag = false
+end
+
+function DKP:GroupDispUngEnable()
+	self.tItems["settings"].bGroupDisplayUngroupped = true
+	self:RefreshMainItemList()
+end
+
+function DKP:GroupDispUngDisable()
+	self.tItems["settings"].bGroupDisplayUngroupped = false
+	self:RefreshMainItemList()
 end
 
 function DKP:GroupExpand(wndHandler,wndControl)
@@ -1159,11 +1167,15 @@ end
 function DKP:GroupAdd(wndHandler,wndControl,strText)
 	table.insert(self.tItems["settings"].Groups,{strName = strText,tIDs = {},bExpand = true})
 	self:GroupGUIPopulate()
+	self:DataSetsInit()
+	self:RefreshMainItemList()
 end
 
 function DKP:GroupRem(wndHandler,wndControl)
 	table.remove(self.tItems["settings"].Groups,wndControl:GetParent():GetData())
 	self:GroupGUIPopulate()
+	self.tDataSets[wndControl:GetParent():FindChild("Name"):GetText()] = nil
+	self:RefreshMainItemList()
 end
 
 local prevWord
@@ -1409,13 +1421,11 @@ function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 			break
 		end
 	end
-
-
-
-
-	for k , id in ipairs(self.tItems["settings"].Groups[nOldGroupId].tIDs) do
-		self:CommitDataSetGroupPlayer(strOldGroupName,self.tItems[id].strName,id)
-	end	
+	if nOldGroupId then
+		for k , id in ipairs(self.tItems["settings"].Groups[nOldGroupId].tIDs) do
+			self:CommitDataSetGroupPlayer(strOldGroupName,self.tItems[id].strName,id)
+		end	
+	end
 
 	for k , id in ipairs(self.tItems["settings"].Groups[nGroupId].tIDs) do
 		local newDataSet = self:GetDataSetForGroupPlayer(strGroupName,self.tItems[id].strName)
