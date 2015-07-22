@@ -5689,6 +5689,10 @@ local tKilledBossesInSession = {
 	born5 = false,
 	bornTriggerred = false,
 
+	daem1 = false,
+	daem2 = false,
+	daemTriggered = false,
+
 }
 
 function DKP:CEOnUnitDamage(tArgs)
@@ -5715,6 +5719,9 @@ function DKP:CEOnUnitDamage(tArgs)
 	if name == "Terex Blightweaver" then tKilledBossesInSession.born3 = true end
 	if name == "Golgox the Lifecrusher" then tKilledBossesInSession.born4 = true  end
 	if name == "Noxmind the Insidious" then tKilledBossesInSession.born5 = true end
+
+	if name == "Binary System Daemon" then tKilledBossesInSession.daem1 = true end
+	if name == "Null System Daemon" then tKilledBossesInSession.daem2 = true end
 		
 		
 	
@@ -5750,6 +5757,12 @@ function DKP:CEOnUnitDamage(tArgs)
 				elseif boss.bType == "Phagetech Prototypes" and not tKilledBossesInSession.techTriggered then
 					if tKilledBossesInSession.tech1 or tKilledBossesInSession.tech2 or tKilledBossesInSession.tech3 or tKilledBossesInSession.tech4 then
 						tKilledBossesInSession.techTriggered = true
+						self:CETriggerEvent(boss.ID)
+						break
+					end
+				elseif boss.bType == "System Daemons" and not tKilledBossesInSession.daemTriggered then
+					if tKilledBossesInSession.daem1 and tKilledBossesInSession.daem2 then
+						tKilledBossesInSession.daemTriggered = true
 						self:CETriggerEvent(boss.ID)
 						break
 					end
@@ -6407,7 +6420,7 @@ function DKP:LLMeetsFilters(item,player,nGP,tTimeWindow)
 		end
 
 		bMeetSlot = self.tItems["settings"].LL.tSlots[strSlot]
-		
+		if string.find(item:GetName(),"Imprint") then bMeetSlot = true end
 		if bMeetSlot == nil then bMeetSlot = false end
 	end
 	--Item Level

@@ -84,6 +84,10 @@ function DKP:EPGPInit()
 	if self.tItems["EPGP"].bMinGP == nil then self.tItems["EPGP"].bMinGP = false end
 	if self.tItems["EPGP"].bDecayPrec == nil then self.tItems["EPGP"].bDecayPrec = false end
 	if self.tItems["EPGP"].bMinGPThres == nil then self.tItems["EPGP"].bMinGPThres = false end
+	if self.tItems["EPGP"].QualityValuesAbove == nil then self.tItems["EPGP"].QualityValuesAbove = defaultQualityValues end
+	if self.tItems["EPGP"].SlotValuesAbove == nil then self.tItems["EPGP"].SlotValuesAbove = defaultSlotValues end
+	if self.tItems["EPGP"].FormulaModifierAbove == nil then self.tItems["EPGP"].FormulaModifierAbove = 0.5 end
+	if self.tItems["EPGP"].nItemPowerThresholdValue == nil then self.tItems["EPGP"].nItemPowerThresholdValue = 0 end
 	
 	self.wndEPGPSettings:FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
 	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
@@ -106,6 +110,16 @@ function DKP:EPGPInit()
 	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
+end
+
+function DKP:EPGPSetPowerThreshold(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.tItems["EPGP"].nItemPowerThresholdValue = val
+	else
+		self.tItems["EPGP"].nItemPowerThresholdValue = 0
+		wndControl:SetText("--")
+	end
 end
 
 function DKP:OnLootedItem(item,bSuspend)
@@ -157,32 +171,58 @@ function DKP:EPGPDecayHide()
 end
 
 function DKP:EPGPFillInSettings()
-	--Slots
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Weapon"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Shield"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Head"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Shoulders"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Chest"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Hands"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Legs"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Feet"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Attachment"])
-	self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Support"])
-          self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Gadget"])
-          self.wndEPGPSettings:FindChild("ItemCost"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Implant"])
-	--Rest
-	self.wndEPGPSettings:FindChild("FormulaLabel"):FindChild("CustomModifier"):SetText(self.tItems["EPGP"].FormulaModifier)
-	self.wndEPGPSettings:FindChild("PurpleQual"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Purple"])
-	self.wndEPGPSettings:FindChild("OrangeQual"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Orange"])
-	self.wndEPGPSettings:FindChild("MinEP"):SetText(self.tItems["EPGP"].MinEP)
-	self.wndEPGPSettings:FindChild("BaseGP"):SetText(self.tItems["EPGP"].BaseGP)
+	self:EPGPFillInSettingsBelow()
+	self:EPGPFillInSettingsAbove()
 	if self.tItems["EPGP"].Enable == 1 then self.wndEPGPSettings:FindChild("Enable"):SetCheck(true) end
-	if self.tItems["EPGP"].ForceItemSave == 1 then self.wndEPGPItems:FindChild("ButtonForceSave"):SetCheck(true) end
 	if self.tItems["EPGP"].Tooltips == 1 then
 		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
 		self:EPGPHookToETooltip()
 	end
-	
+	self.wndEPGPSettings:FindChild("PowerLevelThreshold"):SetText(self.tItems["EPGP"].nItemPowerThresholdValue == 0 and "--" or self.tItems["EPGP"].nItemPowerThresholdValue)
+end
+
+function DKP:EPGPFillInSettingsBelow()
+	--Slots
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Weapon"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Shield"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Head"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Shoulders"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Chest"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Hands"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Legs"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Feet"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Attachment"])
+	self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Support"])
+          self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Gadget"])
+          self.wndEPGPSettings:FindChild("ItemCostBelow"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValues["Implant"])
+	--Rest
+	self.wndEPGPSettings:FindChild("FormulaLabelBelow"):FindChild("CustomModifier"):SetText(self.tItems["EPGP"].FormulaModifier)
+	self.wndEPGPSettings:FindChild("PurpleQualBelow"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Purple"])
+	self.wndEPGPSettings:FindChild("OrangeQualBelow"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Orange"])
+	self.wndEPGPSettings:FindChild("MinEP"):SetText(self.tItems["EPGP"].MinEP)
+	self.wndEPGPSettings:FindChild("BaseGP"):SetText(self.tItems["EPGP"].BaseGP)	
+end
+
+function DKP:EPGPFillInSettingsAbove()
+	--Slots
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Weapon"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Shield"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Head"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Shoulders"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Chest"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Hands"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Legs"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Feet"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Attachment"])
+	self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Support"])
+          self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Gadget"])
+          self.wndEPGPSettings:FindChild("ItemCostAbove"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.tItems["EPGP"].SlotValuesAbove["Implant"])
+	--Rest
+	self.wndEPGPSettings:FindChild("FormulaLabelAbove"):FindChild("CustomModifier"):SetText(self.tItems["EPGP"].FormulaModifierAbove)
+	self.wndEPGPSettings:FindChild("PurpleQualAbove"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValuesAbove["Purple"])
+	self.wndEPGPSettings:FindChild("OrangeQualAbove"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValuesAbove["Orange"])
+	self.wndEPGPSettings:FindChild("MinEP"):SetText(self.tItems["EPGP"].MinEP)
+	self.wndEPGPSettings:FindChild("BaseGP"):SetText(self.tItems["EPGP"].BaseGP)
 end
 
 function DKP:EPGPGetSlotValueByString(strSlot)
@@ -404,19 +444,6 @@ end
 ---------------------------------------------------------------------------------------------------
 
 
-function DKP:EPGPStartListeningForItem( wndHandler, wndControl, eMouseButton )
-	self.tItems["EPGP"].ForceItemSave = 1
-end
-
-function DKP:EPGPStopListeningForItem( wndHandler, wndControl, eMouseButton )
-	self.tItems["EPGP"].ForceItemSave = 0
-end
-
-
-
-
-
-
 function DKP:EPGPGetQualityStringByID(ID)
 	if ID == 5 then return "Purple"
 	elseif ID == 6 then return "Orange"
@@ -509,17 +536,33 @@ end
 
 function DKP:EPGPSetCustomModifier( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		self.tItems["EPGP"].FormulaModifier = tonumber(strText)
+		if wndControl:GetParent():GetName() == "FormulaLabelBelow" then
+			self.tItems["EPGP"].FormulaModifier = tonumber(strText)
+		else
+			self.tItems["EPGP"].FormulaModifierAbove = tonumber(strText)
+		end
 	else
-		wndControl:SetText(self.tItems["EPGP"].FormulaModifier)
+		if wndControl:GetParent():GetName() == "FormulaLabelBelow" then
+			wndControl:SetText(self.tItems["EPGP"].FormulaModifier)
+		else
+			wndControl:SetText(self.tItems["EPGP"].FormulaModifierAbove)
+		end
 	end
 end
 
 function DKP:EPGPItemSlotValueChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		self.tItems["EPGP"].SlotValues[wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
+		if wndControl:GetParent():GetParent():GetName() == "ItemCostAbove" then
+			self.tItems["EPGP"].SlotValuesAbove[wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
+		else
+			self.tItems["EPGP"].SlotValues[wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
+		end
 	else
-		wndControl:SetText(self.tItems["EPGP"].SlotValues[wndControl:GetParent():FindChild("Name"):GetText()])
+		if wndControl:GetParent():GetParent():GetName() == "ItemCostAbove" then
+			wndControl:SetText(self.tItems["EPGP"].SlotValuesAbove[wndControl:GetParent():FindChild("Name"):GetText()])
+		else
+			wndControl:SetText(self.tItems["EPGP"].SlotValues[wndControl:GetParent():FindChild("Name"):GetText()])
+		end
 	end
 end
 
@@ -531,16 +574,32 @@ end
 
 function DKP:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
-			self.tItems["EPGP"].QualityValues["Purple"] = tonumber(strText)
+		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				self.tItems["EPGP"].QualityValues["Purple"] = tonumber(strText)
+			else
+				self.tItems["EPGP"].QualityValues["Orange"] = tonumber(strText)
+			end
 		else
-			self.tItems["EPGP"].QualityValues["Orange"] = tonumber(strText)
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				self.tItems["EPGP"].QualityValuesAbove["Purple"] = tonumber(strText)
+			else
+				self.tItems["EPGP"].QualityValuesAbove["Orange"] = tonumber(strText)
+			end
 		end
 	else
-		if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
-			wndControl:SetText(self.tItems["EPGP"].QualityValues["Purple"])
+		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				wndControl:SetText(self.tItems["EPGP"].QualityValues["Purple"])
+			else
+				wndControl:SetText(self.tItems["EPGP"].QualityValues["Orange"])		
+			end
 		else
-			wndControl:SetText(self.tItems["EPGP"].QualityValues["Orange"])		
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				wndControl:SetText(self.tItems["EPGP"].QualityValuesAbove["Purple"])
+			else
+				wndControl:SetText(self.tItems["EPGP"].QualityValuesAbove["Orange"])		
+			end
 		end
 	end
 end
@@ -578,9 +637,16 @@ function DKP:EPGPGetItemCostByID(itemID,bCut)
 			slot = item:GetSlot()
 		end
 		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
-		if not bCut then 
-			return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
-		else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
+
+		if item:GetItemPower() <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
+			if not bCut then 
+				return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
+		else
+			if not bCut then 
+			return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
+		end
 	else return "" end
 end
 

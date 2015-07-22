@@ -1105,6 +1105,7 @@ end
 
 function DKP:GroupGUIShow()
 	self.wndGroupGUI:Show(true,false)
+	self.wndGroupGUI:ToFront()
 end
 
 function DKP:GroupGUIHide()
@@ -1173,8 +1174,9 @@ end
 
 function DKP:GroupRem(wndHandler,wndControl)
 	table.remove(self.tItems["settings"].Groups,wndControl:GetParent():GetData())
-	self:GroupGUIPopulate()
 	self.tDataSets[wndControl:GetParent():FindChild("Name"):GetText()] = nil
+	if self.tItems["settings"].strActiveGroup == wndControl:GetParent():FindChild("Name"):GetText() then self.tItems["settings"].strActiveGroup = "Def" end
+	self:GroupGUIPopulate()
 	self:RefreshMainItemList()
 end
 
