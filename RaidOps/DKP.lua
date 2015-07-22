@@ -1197,7 +1197,9 @@ end
 
 function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
-	if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
+	if self.tItems["settings"].bEnableGroups then
+		if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
+	end
 	self.wndSelectedListItem = wndControl
 	self:EnableActionButtons()
 
@@ -2292,7 +2294,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 	local tMembers = {}
 	local strType
 	for k,wnd in ipairs(selectedMembers) do
-		local player = self.tItems[wnd:GetData()]
+		local player = self.tItems[wnd:GetData().id]
 		table.insert(tMembers,player)
 	end
 		local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
@@ -2383,7 +2385,9 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 end
 function DKP:MassEditItemSelected( wndHandler, wndControl, eMouseButton )
 	if wndHandler ~= wndControl then return end
-	if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
+	if self.tItems["settings"].bEnableGroups then
+		if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
+	end
 	table.insert(selectedMembers,wndControl)
 	self:UpdateItemCount()
 	self:EnableActionButtons()
@@ -2523,13 +2527,6 @@ function DKP:RefreshMainItemList()
 		end
 	end
 
-	--commit data to databse , i'll have to move it somewhere else
-	--local activeGroupId = self:GetActiveGroupID()
-	--for k , id in ipairs(self.tItems["settings"].Groups[activeGroupId].tIDs) do
-	--	self:CommitDataSetGroupPlayer(self.tItems["settings"].strActiveGroup,self.tItems[id].strName,id)
-	--end
-
-
 	-- we are set in terms of preparation... let the show begin!
 	local bSortAfter = false
 	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
@@ -2596,7 +2593,7 @@ function DKP:RefreshMainItemList()
 											local found = false
 											
 											for k,prevPlayer in ipairs(selectedPlayer) do
-												if prevPlayer == player.wnd:GetData() then
+												if prevPlayer.id == playerId and prevPlayer.nGroupId == i then
 													found = true
 													break
 												end
@@ -3387,7 +3384,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 											local found = false
 											
 											for k,prevPlayer in ipairs(selectedPlayer) do
-												if prevPlayer == player.strName then
+												if prevPlayer.id == player.wnd:GetData().id and prevPlayer.nGroupId == i then
 													found = true
 													break
 												end
@@ -3396,7 +3393,6 @@ function DKP:RefreshMainItemListAndGroupByClass()
 												table.insert(selectedMembers,player.wnd)
 												player.wnd:SetCheck(true)
 											end
-											
 										end
 										if self.tItems["settings"].bDisplayCounter then
 											player.wnd:FindChild("Counter"):SetText(nCounter..".")
@@ -4503,11 +4499,23 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 
 	-- Cheking whether to skip and if data is valid 
 
+	if self:GetPlayerByIDByName(strName) == -1 then return end
+
 	if self.ItemDatabase and self.ItemDatabase[strItem] and self:GetPlayerByIDByName(strName) ~= -1 then
 		entry.item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
-	else self:dbglog(">PopUp request fail > Reason: 'wrong player ID or item not found'") return end
+	else return end
 
-	if self.tItems["settings"].bPopUpRandomSkip and self.strRandomWinner and strName == self.strRandomWinner then self.strRandomWinner = nil return self:dbglog(">PopUp request end > random winnder filter") end
+	if self.tItems["settings"].bPopUpRandomSkip and self.tRandomWinners then
+		local bFound = false
+		for k , winner in ipairs(self.tRandomWinners) do
+			if winner == entry.strName then
+				bFound = true
+				table.remove(self.tRandomWinners,k)
+				break
+			end
+		end
+		if bFound then return end
+	end
 
 	if self:GetPlayerByIDByName("Guild Bank") ~= -1 and strName == "Guild Bank" and self.tItems["settings"].bSkipGB then 
 		self:DetailAddLog(strItem,"{Com}","-",self:GetPlayerByIDByName("Guild Bank")) 
@@ -4517,7 +4525,6 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	if self:PopUpIsBidWinner(strName) then
 		self:PopUpAssign(entry,self.tPopUpItemGPvalues[strItem])
 		self.tPopUpItemGPvalues[strItem] = nil
-		self:dbglog(">PopUp request end > bid winner")
 		return
 	end
 
@@ -4537,7 +4544,6 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	-- update if necessary
 
 	self:PopUpCheckUpdate()
-	self:dbglog(">PopUp request succes > entry passed to window:" .. string.format(" %s , %s , %s : %s",strName,entry.item:GetName(),entry.item:GetName(),entry.item:GetItemId()))
 end
 
 function DKP:PopUpCheckUpdate()

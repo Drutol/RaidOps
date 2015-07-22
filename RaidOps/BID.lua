@@ -315,6 +315,8 @@ function DKP:BidCompleteInit()
 	else
 		self:delay(3, function(tContext) if GameLib.GetPlayerUnit() then tContext.strMyName = GameLib.GetPlayerUnit():GetName() end end ) -- I'm hoping that this delay will be sufficient
 	end
+	-- random winners
+	self.tRandomWinners = {}
 	
 	-- GP on the tooltips
 	if self.tItems["EPGP"].Tooltips == 1 then
@@ -444,7 +446,7 @@ function DKP:BidDistributeAllAtRandom()
 	for k , item in ipairs(self.tSelectedItems) do
 		local luckylooter = self:ChooseRandomLooter(item)
 		GameLib.AssignMasterLoot(item.nLootId,luckylooter)
-		self.strRandomWinner = luckylooter:GetName() 
+		table.insert(self.tRandomWinners,luckylooter:GetName())
 	end
 end
 
@@ -2359,13 +2361,13 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		luaCaller.tMasterLootSelectedItem = nil
 		if #DKPInstance.tSelectedItems > 1 then
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
-				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner = prevLuckyChild end
+				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then table.insert(self.tRandomWinners,prevLuckyChild) end
 				GameLib.AssignMasterLoot(item.nLootId,SelectedLooter)
 				DKPInstance:MLRegisterItemWinner()
 			end
 			DKPInstance.tSelectedItems = {}
 		else
-			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self.strRandomWinner = prevLuckyChild end
+			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then table.insert(self.tRandomWinners,prevLuckyChild) end
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
 	end

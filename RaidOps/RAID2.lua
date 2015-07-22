@@ -1114,11 +1114,13 @@ end
 
 function DKP:GroupEnable()
 	self.tItems["settings"].bEnableGroups = true
+	self:MassEditDeselect()
 	self:RefreshMainItemList()
 end
 
 function DKP:GroupDisable()
 	self.tItems["settings"].bEnableGroups = false
+	self:MassEditDeselect()
 	self:RefreshMainItemList()
 end
 
