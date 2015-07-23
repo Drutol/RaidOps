@@ -50,7 +50,7 @@ local knItemTileVertSpacing = 8
 local knBubbleDefWidth = 250
 local knBubbleDefHeight = 43
 
-local knRecipientHorzSpacing = 10
+local knRecipientHorzSpacing = 6
 local knRecipientVertSpacing = 20
 
 local knRecipientTileWidth = 52
@@ -58,6 +58,8 @@ local knRecipientTileHeight = 52
 
 local knRecipientEntryWidth = 221
 local knRecipientEntryHeight = 86
+
+local knPoolHeight = 150
 
 local ktStringToNewIconOrig =
 {
@@ -214,6 +216,7 @@ function ML:OnDocLoaded()
 			self:ExpandLootPool() 
 		end
 		self:FigureSizing()
+		self:ChangeItemArrangeType()
 	end
 end
 
@@ -251,9 +254,9 @@ end
 
 function ML:CreateLootTable()
 	local tLootPool = GameLib.GetMasterLoot()
-	--table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24,bIsMaster = true})
-	--table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25,bIsMaster = true})
-	--table.insert(tLootPool,{itemDrop = Item.GetDataFromId(60407),nLootId = 26,bIsMaster = true})
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(45323),nLootId = 24,bIsMaster = true})
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(34556),nLootId = 25,bIsMaster = true})
+	table.insert(tLootPool,{itemDrop = Item.GetDataFromId(60407),nLootId = 26,bIsMaster = true})
 	--Clear old stuff
 	for k , tCache in pairs(tCachedItems or {}) do
 		local bFound = false
@@ -300,6 +303,7 @@ function ML:CreateLootTable()
 	end
 	self:DrawItems()
 	self:FigureShow()
+	self.wndMasterLoot:Show(true)
 end
 
 function ML:ChooseRandomLooter(entry)
@@ -310,19 +314,28 @@ function ML:ChooseRandomLooter(entry)
 	return looters[math.random(#looters)]
 end
 
-function ML:DrawItems()
+function ML:DrawItems(bForceRedraw)
 	for nLootId , entry in pairs(tCachedItems) do
-		if not entry.wnd or entry.currentLocation ~= entry.destination then
+		if not entry.wnd or entry.currentLocation ~= entry.destination or bForceRedraw then
 			tCachedItems[nLootId].currentLocation = entry.destination
 			if entry.wnd then entry.wnd:Destroy() end
 			local wndTarget = entry.destination == 1 and self.wndLootList or (entry.destination == 4 and self.wndMasterLoot:FindChild("ActionSlot") or self.wndRandomList)
+			if self.settings.bArrList and entry.destination ~= 4 then wndTarget = self.wndMasterLoot:FindChild("ItemPoolList"):FindChild("List") end
 			if entry.destination == 1 or entry.destination == 2 or entry.destination == 4 then
-				tCachedItems[nLootId].wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",wndTarget,self)
+				if self.settings.bArrList and entry.destination ~= 4 then
+					tCachedItems[nLootId].wnd = Apollo.LoadForm(self.xmlDoc,"LooterFormEntry",wndTarget,self)
+					entry.wnd:FindChild("ItemName"):SetText(entry.lootEntry.itemDrop:GetName())
+					entry.wnd:SetName("BubbleItemTile")
+				else
+					tCachedItems[nLootId].wnd = Apollo.LoadForm(self.xmlDoc,"BubbleItemTile",wndTarget,self)
+				end
+				
 				entry.wnd:FindChild("ItemFrame"):SetSprite(self:GetSlotSpriteByQuality(entry.lootEntry.itemDrop:GetItemQuality()))
 				entry.wnd:FindChild("ItemIcon"):SetSprite(entry.lootEntry.itemDrop:GetIcon())
-				if entry.destination ~= 4 then wndTarget:ArrangeChildrenTiles() end
-				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
 				entry.wnd:SetData(entry.lootEntry)
+				if entry.destination ~= 4 then if self.settings.bArrList then self:ArrangeTiles(wndTarget,true) else wndTarget:ArrangeChildrenTiles() end end
+				Tooltip.GetItemTooltipForm(self,entry.wnd, entry.lootEntry.itemDrop  ,{bPrimary = true, bSelling = false})
+				
 			elseif entry.destination == 5 then
 				wndTarget = self.wndMasterLootLooter:FindChild("List")
 				tCachedItems[nLootId].wnd = Apollo.LoadForm(self.xmlDoc,"LooterFormEntry",wndTarget,self)
@@ -344,13 +357,13 @@ end
 function ML:CreateRecipients()
 	local targets = {}
 	
-	--[[local rops = Apollo.GetAddon("RaidOps")
+	local rops = Apollo.GetAddon("RaidOps")
 	for k,player in ipairs(rops.tItems) do
 		if k > 20  then break end
 		if player.strName ~= "Guild Bank" then 
 			table.insert(targets,{strName = player.strName})
 		end
-	end]]
+	end
 
 	for k=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetGroupMember(k)
@@ -583,32 +596,59 @@ function ML:FigureShow()
 	end
 end
 
+function ML:HideMLWindow(wndHandler)
+	self.wndMasterLoot:Show(false,false)
+end
+
+function ML:ResetLootAssignment()
+	for k , entry in pairs(tCachedItems) do
+		if self:FilterIsRandomed(entry.lootEntry.itemDrop) then
+			entry.destination = 2
+		else
+			entry.destination = 1
+		end
+		if entry.strRecipient then
+			for j , recipient in ipairs(self.tRecipients) do
+				if recipient.strName == entry.strRecipient then
+					self:RemoveLootFromRecipient(k,recipient)
+					break
+				end
+			end
+		end
+	end
+	self:DrawItems()
+end
+
 function ML:FigureSizing()
 	local bRPoolExpanded
 	local bLPoolExpanded
-	if self.wndMasterLoot:FindChild("RandomPool"):GetData() then
-		 bRPoolExpanded = self.wndMasterLoot:FindChild("RandomPool"):GetData().bExpanded
-	else
-		bRPoolExpanded = false
-	end
-	if self.wndMasterLoot:FindChild("ItemPool"):GetData() then
-		bLPoolExpanded = self.wndMasterLoot:FindChild("ItemPool"):GetData().bExpanded
-	else
-		bLPoolExpanded = false
+	
+	if self.settings.bArrList then
+		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
 	end
 
-	if bRPoolExpanded and bLPoolExpanded then 
-		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
-		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-		--self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
-	elseif bRPoolExpanded or bLPoolExpanded then
-		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
-		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-		--self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
-	else
-		self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
-		local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
-		--self.wndMasterLoot:SetAnchorOffsets(l,t,ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
+	if not self.settings.bArrList then
+		if self.wndMasterLoot:FindChild("RandomPool"):GetData() then
+			 bRPoolExpanded = self.wndMasterLoot:FindChild("RandomPool"):GetData().bExpanded
+		else
+			bRPoolExpanded = false
+		end
+		if self.wndMasterLoot:FindChild("ItemPool"):GetData() then
+			bLPoolExpanded = self.wndMasterLoot:FindChild("ItemPool"):GetData().bExpanded
+		else
+			bLPoolExpanded = false
+		end
+
+		if bRPoolExpanded and bLPoolExpanded then 
+			self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp2"].x,ktSizingPairs["Exp2"].y)
+			local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		elseif bRPoolExpanded or bLPoolExpanded then
+			self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp1"].x,ktSizingPairs["Exp1"].y)
+			local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		else
+			self.wndMasterLoot:SetSizingMinimum(ktSizingPairs["Exp0"].x,ktSizingPairs["Exp0"].y)
+			local l,t,r,b = self.wndMasterLoot:GetAnchorOffsets()
+		end
 	end
 
 	if self.wndMasterLootLoc ~= nil and self.wndMasterLootLoc.nOffsets[1] ~= 0 then 
@@ -628,6 +668,7 @@ function ML.sortByClassPR(a,b)
 end
 
 function ML.sortByClassName(a,b)
+	if not ktClassStringToId[a.class] or not ML.tClassWeight[a.class] or not ktClassStringToId[b.class] or not ML.tClassWeight[b.class] then return ML.sortByName(a,b) end
 	local c1 = ktClassStringToId[a.class] + ML.tClassWeight[a.class]
 	local c2 = ktClassStringToId[b.class] + ML.tClassWeight[b.class]
 	if c1 and c2 then return c1 == c2 and ML.sortByName(a,b) or c1 < c2 else return ML.sortByName(a,b) end
@@ -730,6 +771,9 @@ function ML:Search( wndHandler, wndControl, strText )
 			if self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile") then
 				table.insert(tChildren,self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile"))
 			end
+			for k ,wnd in ipairs(self.wndMasterLoot:FindChild("ItemPoolList"):FindChild("List"):GetChildren()) do
+				table.insert(tChildren,wnd)
+			end
 			
 			for k , wnd in ipairs(tChildren) do
 				wnd:FindChild("ShadowOverlayItem"):Show(false)
@@ -762,6 +806,9 @@ function ML:Search( wndHandler, wndControl, strText )
 				table.insert(tChildren,wnd)
 			end			
 			for k ,wnd in ipairs(self.wndRandomList:GetChildren()) do
+				table.insert(tChildren,wnd)
+			end			
+			for k ,wnd in ipairs(self.wndMasterLoot:FindChild("ItemPoolList"):FindChild("List"):GetChildren()) do
 				table.insert(tChildren,wnd)
 			end
 			if self.wndMasterLoot:FindChild("ActionSlot"):FindChild("BubbleItemTile") then
@@ -796,7 +843,7 @@ end
 
 
 local tPrevOffsets = {}
-function ML:ArrangeTiles(wndList,bForce)
+function ML:ArrangeTiles(wndList,bForce,sortFunc)
 	if tPrevOffsets[wndList] and not bForce then
 		if tPrevOffsets[wndList] == wndList:GetWidth() + wndList:GetHeight() then return end
 		tPrevOffsets[wndList] = wndList:GetWidth() + wndList:GetHeight()
@@ -811,7 +858,11 @@ function ML:ArrangeTiles(wndList,bForce)
 		child:SetAnchorOffsets(knRecipientHorzSpacing,0,child:GetWidth()+knRecipientHorzSpacing,child:GetHeight())
 	end
 	local counter = 0
-	for k,child in ipairs(wndList:GetChildren()) do
+	local children = wndList:GetChildren()
+	if sortFunc then
+		table.sort(children,sortFunc)
+	end
+	for k,child in ipairs(children) do
 		if child:IsShown() and not self.settings.bKeepPositions or self.settings.bKeepPositions then 
 			counter = counter + 1
 			if counter > 1 then
@@ -875,7 +926,7 @@ function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData
 			end
 		end
 	end
-	if wndHandler:GetName() == "RandomPool" then
+	if wndHandler:GetName() == "RandomPool" or wndHandler:GetName() == "ItemPoolList" then
 		tCachedItems[tData.nLootId].destination = 2
 	elseif wndHandler:GetName() == "ItemPool" then
 		tCachedItems[tData.nLootId].destination = 1
@@ -898,7 +949,7 @@ function ML:OnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData
 		wnd:Show(true)
 	end
 	if self.settings.bHideInapp then self:ArrangeTiles(self.wndLooterList,true) end
-	self:DrawItems()
+	self:DrawItems(true)
 	self:EnableActionSlotButtons()
 	self:Search(nil,nil,self.wndMasterLoot:FindChild("Search"):GetText())
 end
@@ -989,7 +1040,11 @@ function ML:EnableActionSlotButtons()
 	if #self.wndMasterLoot:FindChild("ActionSlot"):GetChildren() > 1 then
 		self.wndMasterLoot:FindChild("CB"):Enable(true)
 		self.wndMasterLoot:FindChild("NB"):Enable(true)
+		self.wndMasterLoot:FindChild("BiddingGlow"):Show(true)
+		self.wndMasterLoot:FindChild("BiddingGlow1"):Show(true)
 	else		
+		self.wndMasterLoot:FindChild("BiddingGlow1"):Show(false)
+		self.wndMasterLoot:FindChild("BiddingGlow"):Show(false)
 		self.wndMasterLoot:FindChild("CB"):Enable(false)
 		self.wndMasterLoot:FindChild("NB"):Enable(false)
 	end
@@ -1009,7 +1064,7 @@ function ML:IsRecipientApplicable(wndTarget,wndSource)
 		if wndTarget:GetData().strName == playerUnit then bInRange = false break end
 	end
 	
-	--if wndTarget:GetData().strName == "Cpt Bicard" then return true end
+	if wndTarget:GetData().strName == "Cpt Bicard" then return true end
 	--bInRange = true
 	--bCanLoot = true
 	if bInRange and bCanLoot then 
@@ -1420,7 +1475,7 @@ end
 
 function ML:SummaryEntryAssign(wndHandler,wndControl)
 	GameLib.AssignMasterLoot(wndControl:GetParent():GetData().nLootId,wndControl:GetParent():GetData().unit)
-	self:RemoveLootFromRecipient(child:GetParent():GetData().nLootId,child:GetParent():GetData().tRecipient)
+	self:RemoveLootFromRecipient(wndControl:GetParent():GetData().nLootId,wndControl:GetParent():GetData().tRecipient)
 	self:SummaryOpen()
 end
 
@@ -1493,6 +1548,7 @@ function ML:SettingsInit()
 	self.wndSet:FindChild("HideInapp"):SetCheck(self.settings.bHideInapp)
 	self.wndSet:FindChild("ClassFilter"):SetCheck(self.settings.bClassFilter)
 	self.wndSet:FindChild("KeepPosition"):SetCheck(self.settings.bKeepPositions)
+	self.wndSet:FindChild("ArrangeList"):SetCheck(self.settings.bArrList)
 
 	--Class Weight
 	self:SetBuildClassWeightTable()
@@ -1528,7 +1584,7 @@ end
 
 function ML:SetLPExpandEnable()
 	self.settings.bLPExpand = true
-	if not self.wndMasterLoot:FindChild("ItemPool"):GetData().bExpanded then self:ExpandLootPool() end
+	if self.wndMasterLoot:FindChild("ItemPool"):GetData() and not self.wndMasterLoot:FindChild("ItemPool"):GetData().bExpanded then self:ExpandLootPool() end
 	self.wndMasterLoot:FindChild("ItemPool"):FindChild("Expand"):Show(false)
 end
 
@@ -1608,6 +1664,28 @@ end
 
 function ML:SetKeppRecipientsPostionsDisable()
 	self.settings.bKeepPositions = false
+end
+
+function ML:SetArrListEnable()
+	self.settings.bArrList = true
+	self:ChangeItemArrangeType()
+end
+
+function ML:SetArrListDisable()
+	self.settings.bArrList = false
+	self:ChangeItemArrangeType()
+end
+
+function ML:ChangeItemArrangeType()
+	if self.settings.bArrList == true then
+		self.wndMasterLoot:FindChild("Pools"):Show(false)
+		self.wndMasterLoot:FindChild("ItemPoolList"):Show(true)
+	else
+		self.wndMasterLoot:FindChild("Pools"):Show(true)
+		self.wndMasterLoot:FindChild("ItemPoolList"):Show(false)
+	end
+	self:DrawItems(true)
+	self:FigureSizing()
 end
 -----------------------------------------------------------------------------------------------
 -- Drag&Drop - Settings Class Order
