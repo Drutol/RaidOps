@@ -585,15 +585,19 @@ function DKP:RSShowLoot(wndHandler,wndControl)
 	self:LLOpenRaid(tData.finishTime-tData.length,tData.finishTime,tData.name)
 end
 
-function DKP:RSIsRaidZone(id)
-	if id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 --DS
+function DKP:RSIsRaidZone(tMap)
+	if tMap.strFolder and string.find(tMap.strFolder,"Datascape") then return true end
+	local id = tMap.id
+	if id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 or id == 108--DS
 	or id == 148 or id == 149 -- GA
 	or id == 475 -- Y-83
 	then return true else return false end
 end
 
 function DKP:AttGetRaidType()
-	local id = GameLib.GetCurrentZoneMap().id
+	local tMap = GameLib.GetCurrentZoneMap()
+	if tMap.strFolder and string.find(tMap.strFolder,"Datascape") then return true end
+	local id = tMap.id
 	if id == 148 or id == 149 then return RAID_GA
 	elseif id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 then return RAID_DS
 	elseif id == 475 then return RAID_Y
@@ -653,8 +657,19 @@ function DKP:AttZoneChanged()
 end
 
 function DKP:AttCheckZone()	
+	if self.tItems["settings"].bEnableGroupSwitch then
+		local nRaidType = self:AttGetRaidType()
+		for k , group in ipairs(self.tItems["settings"].Groups) do
+			if group.nRaidType == nRaidType then
+				self:ActiveGroupSwitch({id = k})
+				break
+			end
+		end
+
+	end
+
 	local tMap = GameLib.GetCurrentZoneMap()
-	if tMap and self:RSIsRaidZone(tMap.id) then
+	if tMap and self:RSIsRaidZone(tMap) then
 		
 		nRaidType = self:AttGetRaidType()
 
@@ -883,7 +898,7 @@ function DKP:AttPopUpClose()
 end
 
 function DKP:AttStart()
-	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap().id) then
+	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap()) then
 		local players = self:Bid2GetTargetsTable()
 		if self.tItems["settings"].bAttRaidQueue then
 			for k , player in ipairs(self.tItems.tQueuedPlayers or {}) do
@@ -1028,7 +1043,7 @@ function DKP:AttRestore(pkg)
 		player.nSecs = player.nSecs + timeDiff
 		nRaidTime = nRaidTime + timeDiff
 	end
-	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap().id) then
+	if self:RSIsRaidZone(GameLib.GetCurrentZoneMap()) then
 		self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
 		self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
 	elseif nRaidSessionStatus == SESSION_RUN then
@@ -1081,6 +1096,7 @@ end
 local ktDefaultGroup =
 {
 	strName = "EPGP - GA",
+	nRaidType = nil,
 	tIDs = {},
 	bExpand = true
 }
@@ -1100,6 +1116,7 @@ function DKP:GroupInit()
 	self.wndGroupGUI:FindChild("Enable"):SetCheck(self.tItems["settings"].bEnableGroups)
 	self.wndGroupGUI:FindChild("Drag"):SetCheck(self.tItems["settings"].bEnableGroupsDrag)
 	self.wndGroupGUI:FindChild("DispUng"):SetCheck(self.tItems["settings"].bGroupDisplayUngroupped)
+	self.wndGroupGUI:FindChild("ChangeActive"):SetCheck(self.tItems["settings"].bEnableGroupSwitch)
 	self:GroupGUIPopulate()
 end
 
@@ -1132,6 +1149,14 @@ function DKP:GroupDragDisable()
 	self.tItems["settings"].bEnableGroupsDrag = false
 end
 
+function DKP:GroupChangeActiveEnable()
+	self.tItems["settings"].bEnableGroupSwitch = true
+end
+
+function DKP:GroupChangeActiveDisable()
+	self.tItems["settings"].bEnableGroupSwitch = false
+end
+
 function DKP:GroupDispUngEnable()
 	self.tItems["settings"].bGroupDisplayUngroupped = true
 	self:RefreshMainItemList()
@@ -1154,20 +1179,45 @@ end
 
 function DKP:GroupGUIPopulate()
 	self.wndGroupGUI:FindChild("List"):DestroyChildren()
+	local nGroupsTypes = 0
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		if group.nRaidType then
+			nGroupsTypes = nGroupsTypes + 1
+		end
+	end
 	for k , group in ipairs( self.tItems["settings"].Groups) do
 		local wnd = Apollo.LoadForm(self.xmlDoc3,"GroupEntry",self.wndGroupGUI:FindChild("List"),self)
 		wnd:FindChild("Name"):SetText(group.strName)
 		wnd:FindChild("Name"):Enable(false)
+
+
+		if group.nRaidType then
+			if group.nRaidType == RAID_GA then 
+				wnd:FindChild("Type"):SetText("GA")
+				wnd:FindChild("Type"):SetTextColor("xkcdLightishPurple")
+			elseif group.nRaidType == RAID_DS then 
+				wnd:FindChild("Type"):SetText("DS")
+				wnd:FindChild("Type"):SetTextColor("ChannelAdvice")
+			elseif group.nRaidType == RAID_Y then 
+				wnd:FindChild("Type"):SetText("Y-83")
+				wnd:FindChild("Type"):SetTextColor("xkcdLighterPurple")
+			end
+		elseif nGroupsTypes == 3 then
+			wnd:FindChild("Type"):Show(false)
+		end
+
 		wnd:SetData(k)
 	end
 	local wnd = Apollo.LoadForm(self.xmlDoc3,"GroupEntry",self.wndGroupGUI:FindChild("List"),self)
 	wnd:FindChild("Name"):SetText("Input new group name")
 	wnd:FindChild("Rem"):Show(false)
+	wnd:FindChild("Type"):Show(false)
 
 	self:GroupArrangeGroups()
 end
 
 function DKP:GroupAdd(wndHandler,wndControl,strText)
+	if self:GetGroupIDByName(strText) then wndControl:SetText("") return end
 	table.insert(self.tItems["settings"].Groups,{strName = strText,tIDs = {},bExpand = true})
 	self:GroupGUIPopulate()
 	self:DataSetsInit()
@@ -1176,10 +1226,50 @@ end
 
 function DKP:GroupRem(wndHandler,wndControl)
 	table.remove(self.tItems["settings"].Groups,wndControl:GetParent():GetData())
-	self.tDataSets[wndControl:GetParent():FindChild("Name"):GetText()] = nil
 	if self.tItems["settings"].strActiveGroup == wndControl:GetParent():FindChild("Name"):GetText() then self.tItems["settings"].strActiveGroup = "Def" end
+	self.tItems.tDataSets[wndControl:GetParent():FindChild("Name"):GetText()] = nil
 	self:GroupGUIPopulate()
 	self:RefreshMainItemList()
+end
+
+local function GetNextRaidType(currRaidType,tAva)
+	if not currRaidType then 
+		if tAva[RAID_GA] then return RAID_GA
+		elseif tAva[RAID_DS] then return RAID_DS
+		elseif tAva[RAID_Y] then return RAID_Y
+		end
+	elseif currRaidType == RAID_GA then  
+		if tAva[RAID_DS] then return RAID_DS 
+		elseif tAva[RAID_Y] then return RAID_Y
+		elseif tAva[RAID_GA] then return RAID_GA
+		end
+	elseif currRaidType == RAID_DS then  		
+		if tAva[RAID_Y] then return RAID_Y 
+		elseif tAva[RAID_GA] then return RAID_GA
+		elseif tAva[RAID_DS] then return RAID_DS
+		end
+	else return end
+end
+
+function DKP:GroupEntryChangeRaid(wndHandler,wndControl)
+	local tAvailableRaids = {}
+	tAvailableRaids[RAID_DS] = true
+	tAvailableRaids[RAID_GA] = true
+	tAvailableRaids[RAID_Y] = true
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		if group.nRaidType then
+			tAvailableRaids[group.nRaidType] = false
+		end
+	end
+
+	self.tItems["settings"].Groups[wndControl:GetParent():GetData()].nRaidType = GetNextRaidType(self.tItems["settings"].Groups[wndControl:GetParent():GetData()].nRaidType,tAvailableRaids)
+	self:GroupGUIPopulate()
+end
+
+function DKP:GetGroupIDByName(strGroup)
+	for k , group in ipairs(self.tItems["settings"].Groups) do
+		if string.lower(group.strName) == string.lower(strGroup) then return k end
+	end
 end
 
 local prevWord
@@ -1312,6 +1402,7 @@ function DKP:GroupDialogSwitchGroup(wndHandler,wndControl)
 		table.insert(self.tItems["settings"].Groups[wndControl:GetData()].tIDs,self.wndGroupDialog:GetData())
 	end
 	self:GroupDialogPopulate(self.wndGroupDialog:GetData())
+	self:RefreshMainItemList()
 end
 
 -- Group Drag&Drop
@@ -1324,7 +1415,9 @@ function DKP:GroupQueryDragDrop(wndHandler, wndControl, nX, nY, wndSource, strTy
 end
 
 function DKP:GroupOnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData) --iData is an origin
-	if iData > #self.tItems["settings"].Groups and self.tItems["settings"].Groups[iData] then --remove if to ungroupped
+	if wndControl:GetData() == iData then return end -- from ungrouped to ungrouped
+
+	if wndControl:GetData() > #self.tItems["settings"].Groups then --remove if to ungroupped
 		for k , id in ipairs(self.tItems["settings"].Groups[iData].tIDs) do
 			if id == wndSource:GetData().id then table.remove(self.tItems["settings"].Groups[iData].tIDs,k) break end
 		end
@@ -1342,14 +1435,14 @@ end
 
 function DKP:GroupStartDragDrop(wndHandler,wndControl,eMouseButton)
 	if eMouseButton ~= GameLib.CodeEnumInputMouse.Left then return end
-	if not self.tItems["settings"].bEnableGroupsDrag or not self.tItems["settings"].bEnableGroups then return end
+	if not self.tItems["settings"].bEnableGroupsDrag or not self.tItems["settings"].bEnableGroups or #self.tItems["settings"].Groups == 0  then return end
+
 	if wndControl:GetName() ~= "ListItem" then 
 		wndControl = wndControl:GetParent()
 		if not wndControl or wndControl:GetName() ~= "ListItem" then return end
 	end
-	if true then
-		Apollo.BeginDragDrop(wndControl, "RaidOpsGroupTransfer", wndControl:FindChild("ClassIconBigger"):GetSprite(), wndControl:GetData().nGroupId)
-	end
+
+	Apollo.BeginDragDrop(wndControl, "RaidOpsGroupTransfer", wndControl:FindChild("ClassIconBigger"):GetSprite(), wndControl:GetData().nGroupId)
 end
 
 
@@ -1412,11 +1505,16 @@ end
 
 function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 	--swap active data and saved data
-	local nGroupId = wndControl:GetParent():GetData() -- new
-	local strGroupName = self.tItems["settings"].Groups[nGroupId].strName --new
-
-	local strOldGroupName  -- origin
-	local nOldGroupId -- origin
+	local nGroupId
+	local strGroupName
+	local strOldGroupName
+	local nOldGroupId
+	if type(wndHandler) == "table" then
+		nGroupId = wndHandler.id
+	else
+		nGroupId = wndControl:GetParent():GetData() -- new
+		strGroupName = self.tItems["settings"].Groups[nGroupId].strName --new
+	end
 
 	for k , group in ipairs(self.tItems["settings"].Groups) do
 		if group.strName == self.tItems["settings"].strActiveGroup then
@@ -1448,6 +1546,7 @@ function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 		strGroup = "Def"
 	end
 	self.tItems["settings"].strActiveGroup = strGroup
+	self:MassEditDeselect()
 	self:RefreshMainItemList()
 end
 

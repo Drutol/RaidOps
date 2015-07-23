@@ -120,6 +120,18 @@ function DKP:EPGPSetPowerThreshold(wndHandler,wndControl,strText)
 		self.tItems["EPGP"].nItemPowerThresholdValue = 0
 		wndControl:SetText("--")
 	end
+
+	if self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
+		self.wndEPGPSettings:FindChild("ItemCostAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("OrangeQualAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(0.5)
+	else
+		self.wndEPGPSettings:FindChild("ItemCostAbove"):SetOpacity(1)
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetOpacity(1)
+		self.wndEPGPSettings:FindChild("OrangeQualAbove"):SetOpacity(1)
+		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(1)
+	end
 end
 
 function DKP:OnLootedItem(item,bSuspend)
@@ -177,6 +189,12 @@ function DKP:EPGPFillInSettings()
 	if self.tItems["EPGP"].Tooltips == 1 then
 		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
 		self:EPGPHookToETooltip()
+	end
+	if self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
+		self.wndEPGPSettings:FindChild("ItemCostAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("OrangeQualAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(0.5)
 	end
 	self.wndEPGPSettings:FindChild("PowerLevelThreshold"):SetText(self.tItems["EPGP"].nItemPowerThresholdValue == 0 and "--" or self.tItems["EPGP"].nItemPowerThresholdValue)
 end

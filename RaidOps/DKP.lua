@@ -202,6 +202,8 @@ Added sorting to Master Loot loot window.
 Added button to assign multiple items at random each to different person.
 Fixed LUA error concerning chat bidding (roll).
 Fixed Bug that prevented to undo guild import.
+
+FULL CHANGELOG ON GITHUB.
 ---RaidOps version 2.26---
 {17/07/2015}
 Fixed Guild Bank pop-up issue.
@@ -1013,12 +1015,14 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 end
 
 function DKP:OnTimer()
+	if not self.uGuild then return end
+	local strGuild = self.uGuild:GetName()
 	if self.tItems["settings"].collect_new == 1 then
 		for k=1,GroupLib.GetMemberCount(),1 do
 			if self.tItems["settings"].CheckAffiliation == 1 then
 				local member = GroupLib.GetUnitForGroupMember(k)
 					if member ~= nil and member:GetGuildName() ~= nil  then
-						if self:GetPlayerByIDByName(member:GetName()) == -1 and member:GetGuildName() ~= nil and self.tItems["settings"].guildname ~= nil   and string.lower(member:GetGuildName()) == string.lower(self.tItems["settings"].guildname)  then
+						if self:GetPlayerByIDByName(member:GetName()) == -1 and self:IsPlayerOnline(self:GetOnlinePlayers(),member:GetName())  then
 							self:OnUnitCreated(member)
 							self:RegisterPlayerClass(self:GetPlayerByIDByName(member:GetName()),member:GetClassId())
 						end				
@@ -1197,7 +1201,7 @@ end
 
 function DKP:OnListItemSelected(wndHandler, wndControl)
 	if wndHandler ~= wndControl then return end
-	if self.tItems["settings"].bEnableGroups then
+	if self.tItems["settings"].bEnableGroups and #self.tItems["settings"].Groups > 0 then
 		if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
 	end
 	self.wndSelectedListItem = wndControl
@@ -2385,7 +2389,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 end
 function DKP:MassEditItemSelected( wndHandler, wndControl, eMouseButton )
 	if wndHandler ~= wndControl then return end
-	if self.tItems["settings"].bEnableGroups then
+	if self.tItems["settings"].bEnableGroups and #self.tItems["settings"].Groups > 0 then
 		if not self.tItems["settings"].Groups[wndControl:GetData().nGroupId] or self.tItems["settings"].strActiveGroup ~= self.tItems["settings"].Groups[wndControl:GetData().nGroupId].strName then wndControl:SetCheck(false) return end
 	end
 	table.insert(selectedMembers,wndControl)
@@ -4978,7 +4982,13 @@ function DKP:ConStandbyDisable()
 end
 
 function DKP:ConRemove(wndHandler,wndControl)
-	if not wndControl:FindChild("Confirm"):IsShown() then wndControl:FindChild("Confirm"):Show(true,false) else wndControl:FindChild("Confirm"):Show(false,false) end
+	if not wndControl:FindChild("Confirm"):IsShown() then 
+		wndControl:FindChild("Confirm"):Show(true,false) 
+		wndControl:FindChild("Danger"):Show(true,false) 
+	else 
+		wndControl:FindChild("Danger"):Show(false,false) 
+		wndControl:FindChild("Confirm"):Show(false,false) 
+	end
 end
 
 function DKP:ConRemoveFinal(wndHandler,wndControl)
