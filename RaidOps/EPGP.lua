@@ -808,7 +808,7 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     end
     if wndTooltip and string.find(item:GetName(),"Imprint") then
     	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
-    	wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. self:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    	wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
     end   
 
 

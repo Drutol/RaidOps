@@ -1017,12 +1017,13 @@ end
 function DKP:OnTimer()
 	if not self.uGuild then return end
 	local strGuild = self.uGuild:GetName()
+	local tOnlineMembers = self:GetOnlinePlayers()
 	if self.tItems["settings"].collect_new == 1 then
 		for k=1,GroupLib.GetMemberCount(),1 do
 			if self.tItems["settings"].CheckAffiliation == 1 then
 				local member = GroupLib.GetUnitForGroupMember(k)
 					if member ~= nil and member:GetGuildName() ~= nil  then
-						if self:GetPlayerByIDByName(member:GetName()) == -1 and self:IsPlayerOnline(self:GetOnlinePlayers(),member:GetName())  then
+						if self:GetPlayerByIDByName(member:GetName()) == -1 and self:IsPlayerOnline(tOnlineMembers,member:GetName())  then
 							self:OnUnitCreated(member)
 							self:RegisterPlayerClass(self:GetPlayerByIDByName(member:GetName()),member:GetClassId())
 						end				
@@ -6224,7 +6225,7 @@ end
 function DKP:LLAddLog(strPlayer,strItem)
 	if not self.tItems["settings"].bLootLogs then return end
 	local ID = self:GetPlayerByIDByName(strPlayer)
-	if ID ~= -1 and self.ItemDatabase[strItem] then
+	if ID ~= -1 and self.ItemDatabase and self.ItemDatabase[strItem] then
 		local item = self.ItemDatabase[strItem].ID
 		if item then
 			if self.tItems[ID].tLLogs == nil then self.tItems[ID].tLLogs = {} end
