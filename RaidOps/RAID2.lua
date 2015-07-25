@@ -1118,6 +1118,7 @@ function DKP:GroupInit()
 	self.wndGroupGUI:FindChild("DispUng"):SetCheck(self.tItems["settings"].bGroupDisplayUngroupped)
 	self.wndGroupGUI:FindChild("ChangeActive"):SetCheck(self.tItems["settings"].bEnableGroupSwitch)
 	self:GroupGUIPopulate()
+
 end
 
 function DKP:GroupGUIShow()
@@ -1395,6 +1396,7 @@ function DKP:GroupDialogSwitchGroup(wndHandler,wndControl)
 		for k , id in ipairs(self.tItems["settings"].Groups[wndControl:GetData()].tIDs) do
 			if id == self.wndGroupDialog:GetData() then
 				table.remove(self.tItems["settings"].Groups[wndControl:GetData()].tIDs,k)
+				self.tItems.tDataSets[self.tItems["settings"].Groups[wndControl:GetData()].strName][self.tItems[id].strName] = nil
 				break
 			end
 		end
@@ -1419,7 +1421,11 @@ function DKP:GroupOnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType,
 
 	if wndControl:GetData() > #self.tItems["settings"].Groups then --remove if to ungroupped
 		for k , id in ipairs(self.tItems["settings"].Groups[iData].tIDs) do
-			if id == wndSource:GetData().id then table.remove(self.tItems["settings"].Groups[iData].tIDs,k) break end
+			if id == wndSource:GetData().id then 
+				table.remove(self.tItems["settings"].Groups[iData].tIDs,k) 
+				self.tItems.tDataSets[self.tItems["settings"].Groups[iData].strName][self.tItems[id].strName] = nil
+				break 
+			end
 		end
 	end
 	

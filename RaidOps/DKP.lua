@@ -4141,6 +4141,7 @@ function DKP:ExportExport()
 		exportTables.tEPGP = self.tItems["EPGP"]
 		exportTables.tStandby = self.tItems["Standby"]
 		exportTables.tCE = self.tItems["CE"]
+		exportTables.tDataSets = self.tItems.tDataSets
 		
 
 		self:ExportSetOutputText(serpent.dump(exportTables))
@@ -4162,8 +4163,14 @@ function DKP:ExportExport()
 				for k,raid in ipairs(self.tItems.tRaids or {}) do
 					if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
 				end
+				self.tItems.tDataSets = {}
 				for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
 					table.insert(self.tItems,player)
+					for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
+						if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
+						self.tItems.tDataSets[set.strGroup][player.strName] = set.tData
+					end
+					self.tItems[#self.tItems].tDataSets = nil
 				end
 				if not self.tItems.tRaids then self.tItems.tRaids = {} end
 				for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
@@ -4201,6 +4208,7 @@ function DKP:ExportExport()
 				self.tItems["EPGP"] = tImportedTables.tEPGP
 				self.tItems["Standby"] = tImportedTables.tStandby
 				self.tItems["CE"] = tImportedTables.tCE
+				self.tItems.tDataSets = tImportedTables.tDataSets
 				self.tItems.tRaids = tImportedTables.tRaids
 				self:AltsBuildDictionary()
 				for alt , owner in ipairs(self.tItems["alts"]) do
@@ -4242,6 +4250,16 @@ function DKP:ExportExport()
 			tCopy.tLLogs = player.tLLogs
 			tCopy.tAtt = player.tAtt
 			tCopy.tLLogs = {}
+			tCopy.tDataSets = {}
+			for j , group in ipairs(self.tItems["settings"].Groups) do 
+				for i , id in ipairs(group.tIDs) do
+					if id == k then
+						table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)})
+						break
+					end
+				end
+			end
+			if #tCopy.tDataSets == 0 then tCopy.tDataSets = nil end
 			table.insert(tTestTable['tMembers'],tCopy)
 			for k , entry in ipairs(player.tLLogs) do
 				if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
