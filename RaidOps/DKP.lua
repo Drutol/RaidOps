@@ -187,6 +187,8 @@ local RAID_GA = 0
 local RAID_DS = 1
 local RAID_Y = 2
 
+local nSortedGroup = nil
+
 -- Changelog
 local strChangelog = 
 [===[
@@ -2553,7 +2555,11 @@ function DKP:RefreshMainItemList()
 			-- if it's not a group then we won't do anything here and sort afterwards in more optimised way , else we sort it now
 			
 			if  self.SortedLabel then
-				if type(tIDs) == "table" then table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd) else
+				if type(tIDs) == "table" then 
+					nSortedGroup = i
+					table.sort(tIDs,easyDKPSortPlayerbyLabelNotWnd)
+					nSortedGroup = nil
+				else
 					bSortAfter = true
 				end
 			end
@@ -3171,14 +3177,25 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if type(a) ~= "table" then a = DKPInstance.tItems[a] end
 	if type(b) ~= "table" then b = DKPInstance.tItems[b] end
+
+	local tSetA
+	local tSetB
+
+	if nSortedGroup and DKPInstance.tItems["settings"].Groups[nSortedGroup] and DKPInstance:GetActiveGroupID() ~= nSortedGroup then
+		tSetA = DKPInstance:GetDataSetForGroupPlayer(DKPInstance.tItems["settings"].Groups[nSortedGroup].strName,a.strName)
+		tSetB = DKPInstance:GetDataSetForGroupPlayer(DKPInstance.tItems["settings"].Groups[nSortedGroup].strName,b.strName)
+	else
+		tSetA = {EP = a.EP,GP = a.GP,net = a.net,tot = a.tot}
+		tSetB = {EP = b.EP,GP = b.GP,net = b.net,tot = b.tot}
+	end
 	if DKPInstance.SortedLabel then
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
 		local label = "Stat"..DKPInstance.SortedLabel
 		if DKPInstance.tItems["settings"].LabelSortOrder == "asc" then
 			if sortBy == "Name" then return a.strName > b.strName 
-			elseif sortBy == "Net" then return tonumber(a.net) > tonumber(b.net)
-			elseif sortBy == "Tot" then return tonumber(a.tot) > tonumber(b.tot) 
-			elseif sortBy == "Spent" then return tonumber(a.tot) - tonumber(a.net) > tonumber(b.tot) - tonumber(b.net)
+			elseif sortBy == "Net" then return tonumber(tSetA.net) > tonumber(tSetB.net)
+			elseif sortBy == "Tot" then return tonumber(tSetA.tot) > tonumber(tSetB.tot) 
+			elseif sortBy == "Spent" then return tonumber(tSetA.tot) - tonumber(tSetA.net) > tonumber(tSetB.tot) - tonumber(tSetB.net)
 			elseif sortBy == "Hrs" then 
 			 	local nSecsA = 0
 				for k ,tAtt in ipairs(a.tAtt or {}) do
@@ -3191,14 +3208,14 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 				end
 				return nSecsA > nSecsB
 			elseif sortBy == "Priority" then 
-				if tonumber(a.tot)-tonumber(a.net) == 0 then return b end
-				if tonumber(b.tot)-tonumber(b.net) == 0 then return a end
-				local pra = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(a.tot)/(tonumber(a.tot)-tonumber(a.net))))
-				local prb = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(b.tot)/(tonumber(b.tot)-tonumber(b.net))))
+				if tonumber(tSetA.tot)-tonumber(tSetA.net) == 0 then return b end
+				if tonumber(tSetB.tot)-tonumber(tSetB.net) == 0 then return a end
+				local pra = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(tSetA.tot)/(tonumber(tSetA.tot)-tonumber(tSetA.net))))
+				local prb = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(tSetB.tot)/(tonumber(tSetB.tot)-tonumber(tSetB.net))))
 				return pra > prb
 			elseif sortBy == "EP" then return a.EP > b.EP
 			elseif sortBy == "GP" then return a.GP > b.GP
-			elseif sortBy == "PR" then return  tonumber(DKPInstance:EPGPGetPRByName(a.strName)) > tonumber(DKPInstance:EPGPGetPRByName(b.strName))
+			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.GP) > DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.GP)
 			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
 			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
 			elseif sortBy == "%Y" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_Y) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_Y)
@@ -3206,9 +3223,9 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 			end
 		else
 			if sortBy == "Name" then return a.strName < b.strName 
-			elseif sortBy == "Net" then return tonumber(a.net) < tonumber(b.net)
-			elseif sortBy == "Tot" then return tonumber(a.tot) < tonumber(b.tot) 
-			elseif sortBy == "Spent" then return tonumber(a.tot) - tonumber(a.net) < tonumber(b.tot) - tonumber(b.net)
+			elseif sortBy == "Net" then return tonumber(tSetA.net) < tonumber(tSetB.net)
+			elseif sortBy == "Tot" then return tonumber(tSetA.tot) < tonumber(tSetB.tot) 
+			elseif sortBy == "Spent" then return tonumber(tSetA.tot) - tonumber(tSetA.net) < tonumber(tSetB.tot) - tonumber(tSetB.net)
 			elseif sortBy == "Hrs" then  
 				local nSecsA = 0
 				for k ,tAtt in ipairs(a.tAtt or {}) do
@@ -3221,14 +3238,14 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 				end
 				return nSecsA < nSecsB
 			elseif sortBy == "Priority" then 
-				if tonumber(a.tot)-tonumber(a.net) == 0 then return b end
-				if tonumber(b.tot)-tonumber(b.net) == 0 then return a end
-				local pra = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(a.tot)/(tonumber(a.tot)-tonumber(a.net))))
-				local prb = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(b.tot)/(tonumber(b.tot)-tonumber(b.net))))
+				if tonumber(tSetA.tot)-tonumber(tSetA.net) == 0 then return b end
+				if tonumber(tSetB.tot)-tonumber(tSetB.net) == 0 then return a end
+				local pra = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(tSetA.tot)/(tonumber(tSetA.tot)-tonumber(tSetA.net))))
+				local prb = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(tSetB.tot)/(tonumber(tSetB.tot)-tonumber(tSetB.net))))
 				return pra < prb
-			elseif sortBy == "EP" then return a.EP < b.EP
-			elseif sortBy == "GP" then return a.GP < b.GP
-			elseif sortBy == "PR" then return  tonumber(DKPInstance:EPGPGetPRByName(a.strName)) < tonumber(DKPInstance:EPGPGetPRByName(b.strName))
+			elseif sortBy == "EP" then return tSetA.EP < tSetB.EP
+			elseif sortBy == "GP" then return tSetA.GP < tSetB.GP
+			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.GP) < DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.GP)
 			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
 			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
 			elseif sortBy == "%Y" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_Y) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_Y)
@@ -3364,7 +3381,9 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
 			
 			for j,tab in ipairs(tables) do
+				nSortedGroup = i
 				table.sort(tab,easyDKPSortPlayerbyLabelNotWnd)
+				nSortedGroup = nil
 				local added = false
 				local nCounter = 1
 				for k,player in ipairs(tab) do

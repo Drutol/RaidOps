@@ -681,6 +681,14 @@ function DKP:EPGPGetPRByName(strName)
 	else return "0" end
 end
 
+function DKP:EPGPGetPRByValues(nEP,nGP)
+	if nGP ~= 0 then
+		return tonumber(string.format("%."..tostring(self.tItems["settings"].Precision).."f", nEP/nGP))
+	else
+		return 0
+	end
+end
+
 function DKP:EPGPGetPRByID(ID)
 	if not self.tItems[ID] then return 0 end
 	if ID ~= -1 then
