@@ -465,6 +465,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bPopUpRandomSkip == nil then self.tItems["settings"].bPopUpRandomSkip = false end
 		if self.tItems["settings"].bHideStandby == nil then self.tItems["settings"].bHideStandby = false end
 		if self.tItems["settings"].nMinIlvl == nil then self.tItems["settings"].nMinIlvl = 1 end
+		if self.tItems["settings"].bAutoLog == nil then self.tItems["settings"].bAutoLog = true end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
 		self.wndTimeAward = self.wndMain:FindChild("TimeAward")
@@ -512,6 +513,7 @@ function DKP:OnDocLoaded()
 		self:GroupDialogInit()
 		self:MoreBottomOptionsInit()
 		self:DataSetsInit()
+		self:ArmoryInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -570,10 +572,8 @@ end
 -- Debug
 -----
 function DKP:DebugFetch()
-	local wnd = Apollo.LoadForm(self.xmlDoc3,"DbgOutput",nil,self)
-	local str = self:dbggetlogs()
-	wnd:FindChild("Output"):SetText(#str > 29999 and "Reached limit of 30k" or str)
-	self:RequestRoster()
+	local unit = GameLib.GetPlayerUnit()
+	self.tItems.tArmory["Drutol Windchaser"] = self:GetArmoryEntries(unit)
 end
 
 function DKP:dbglog(strMsg)
@@ -785,6 +785,7 @@ function DKP:Undo()
 end
 
 function DKP:UndoPopulate()
+	if not self.wndActivity then return end
 	local grid = self.wndActivity:FindChild("Grid")
 	
 	grid:DeleteAll()
@@ -1279,6 +1280,7 @@ function DKP:OnSave(eLevel)
 			tSave["CE"] = self.tItems["CE"]
 			tSave.tDataSets = self.tItems.tDataSets
 			tSave.tRaids = self.tItems.tRaids
+			tSave.tArmory = self.tItems.tArmory
 			if self.tItems["settings"].bSaveUndo then tSave["ALogs"] = tUndoActions end
 			tSave.wndMainLoc = self.wndMain:GetLocation():ToTable()
 			tSave.wndPopUpLoc = self.wndPopUp:GetLocation():ToTable()
@@ -4270,6 +4272,7 @@ function DKP:ExportExport()
 			tCopy.tAtt = player.tAtt
 			tCopy.tLLogs = {}
 			tCopy.tDataSets = {}
+			if self.tItems["settings"].bArmoryAppend then tCopy.tArmoryEntry = self.tItems.tArmory[tCopy.strName] end
 			for j , group in ipairs(self.tItems["settings"].Groups) do 
 				for i , id in ipairs(group.tIDs) do
 					if id == k then
@@ -4286,10 +4289,13 @@ function DKP:ExportExport()
 				end 
 			end
 		end
+		
 		self:ExportSetOutputText(JSON.encode(tTestTable))
 	    
 	end
 end
+
+
 
 function DKP:ExportEnableLootFiltering()
 	self.tItems["settings"].bUseFilterForWebsiteExport = true

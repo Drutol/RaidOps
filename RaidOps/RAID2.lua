@@ -953,8 +953,13 @@ function DKP:AttResume()
 	self.raidTimer = ApolloTimer.Create(30, true, "AttAddTime", self)
 	self.raidPreciseTimer = ApolloTimer.Create(1, true, "AttCheckTime", self)
 end
-
+local nCheckCount = 0
 function DKP:AttAddTime()
+	nCheckCount = nCheckCount + 1
+	if nCheckCount == 20 and self.tItems["settings"].bArmoryGather then
+		self:ArmoryBuild()
+		nCheckCount = 0
+	end
 	self:AttUpdatePlayers(30)
 	nRaidTime = nRaidTime + 30
 	nTimeFromLastUpdate = 0
@@ -1555,7 +1560,96 @@ function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 	self:MassEditDeselect()
 	self:RefreshMainItemList()
 end
+--------------------------------------------------------------------------
+-- Armory
+--------------------------------------------------------------------------
+function DKP:ArmoryInit()
+	self.wndArmory = Apollo.LoadForm(self.xmlDoc,"Armory",nil,self)
+	self.wndArmory:Show(false)
 
+	if not self.tItems.tArmory then self.tItems.tArmory = {} end
+	if self.tItems["settings"].bArmoryGather == nil then self.tItems["settings"].bArmoryGather = true end
+	if self.tItems["settings"].bArmoryAppend == nil then self.tItems["settings"].bArmoryAppend = true end
+
+	self.wndArmory:FindChild("Gather"):SetCheck(self.tItems["settings"].bArmoryGather)
+	self.wndArmory:FindChild("Append"):SetCheck(self.tItems["settings"].bArmoryAppend)
+end
+
+function DKP:ArmoryShow()
+	if not self.wndArmory:IsShown() then 
+		local tCursor = Apollo.GetMouse()
+		self.wndArmory:Move(tCursor.x - 100, tCursor.y - 100, self.wndArmory:GetWidth(), self.wndArmory:GetHeight())
+	end
+
+	self.wndArmory:Show(true,false)
+	self.wndArmory:ToFront()
+end
+
+function DKP:ArmoryClose()
+	self.wndArmory:Show(false,false)
+end
+
+function DKP:ArmoryGatherEnable()
+	self.tItems["settings"].bArmoryGather = true
+end
+
+function DKP:ArmoryGatherDisable()
+	self.tItems["settings"].bArmoryGather = false
+end
+
+function DKP:ArmoryAppendEnable()
+	self.tItems["settings"].bArmoryAppend = true
+end
+
+function DKP:ArmoryAppendDisable()
+	self.tItems["settings"].bArmoryAppend = false
+end
+
+function DKP:ArmoryBuild()
+	for i=1,GroupLib.GetMemberCount() do
+		local member = GroupLib.GetUnitForGroupMember(i)
+		if member and self:GetPlayerByIDByName(member:GetName()) ~= -1 then
+			self.tItems.tArmory[member:GetName()] = self:GetArmoryEntries(member)
+		end
+	end
+	if GroupLib.GetMemberCount() == 0 then
+		local unit = GameLib.GetPlayerUnit()
+		if unit then
+			self.tItems.tArmory[unit:GetName()] = self:GetArmoryEntries(unit)
+		end
+	end
+end
+
+function DKP:GetArmoryEntries(unit)
+	if not unit then return end
+	local tItems = {}
+	for k , item in ipairs(unit:GetEquippedItems()) do
+		local slot =  item:GetSlot()
+		if slot ~= 9 and slot ~= 17  then
+			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
+			tItems[item:GetSlot()]["runes"] = {}
+			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+			end
+		end
+	end
+	local tStats = unit:GetUnitProperties()
+	tItems['tStats'] = {}
+	tItems['tStats']['Mox'] = math.floor(tStats['Magic'].fValue)
+	tItems['tStats']['Bru'] = math.floor(tStats['Strength'].fValue)
+	tItems['tStats']['Tech'] = math.floor(tStats['Technology'].fValue)
+	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
+	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
+	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
+	return tItems
+end
+
+function DKP:ArmoryGetOwn()
+	local unit = GameLib.GetPlayerUnit()
+	if unit then
+		self:ExportShowPreloadedText(Apollo.GetPackage("Lib:dkJSON-2.5").tPackage.encode(self:GetArmoryEntries(unit)))
+	end
+end
 
 
 --------------------------------------------------------------------------
