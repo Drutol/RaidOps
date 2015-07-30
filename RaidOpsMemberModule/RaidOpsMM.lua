@@ -6,7 +6,7 @@
 require "Window"
 require "ICComm"
 
-local Major, Minor, Patch, Suffix = 1, 16, 0, 0
+local Major, Minor, Patch, Suffix = 1, 17, 0, 0
  
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMM Module Definition
@@ -162,6 +162,11 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.bDisplayApplicable == nil then self.settings.bDisplayApplicable = false end
 		if self.settings.bOthers == nil then self.settings.bOthers = true end
 		if self.settings.bCloseAssign == nil then self.settings.bCloseAssign = true end
+
+		if self.QualityValuesAbove == nil then self.QualityValuesAbove = defaultQualityValues end
+		if self.SlotValuesAbove == nil then self.SlotValuesAbove = defaultSlotValues end
+		if self.FormulaModifierAbove == nil then self.FormulaModifierAbove = 0.5 end
+		if self.nItemPowerThresholdValue == nil then self.nItemPowerThresholdValue = 0 end
 		
 		if self.settings.bCloseAssign then 	Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self) end
 		
@@ -170,7 +175,7 @@ function RaidOpsMM:OnDocLoaded()
 		if self.settings.enable then 
 			self:JoinGuildChannel()
 		end
-		self:FillInCostFormula()
+		self:EPGPFillInSettings()
 		self:RestoreSettings()
 		local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
 		if self.ResizedWndBottom then self.wndLootList:SetAnchorOffsets(l,t,r,self.ResizedWndBottom) end
@@ -203,7 +208,10 @@ function RaidOpsMM:OnDocLoaded()
 		if self.group then self.wndStandings:FindChild("Controls"):FindChild("Group"):SetCheck(self.group) end
 		
 		--self:LogsFetched("ZG8gbG9jYWwgXz17e3N0ck1vZGlmaWVyPS0xMjAsc3RyQ29tbWVudD0idGVzdDYiLHN0clR5cGU9IntFUH0iLHN0clRpbWVzdGFtcD0iMi85LzIwMTUgIDEwOjA3OjE4IEFNIn0se3N0ck1vZGlmaWVyPS0xMDAsc3RyQ29tbWVudD0idGVzdDYiLHN0clR5cGU9IntHUH0iLHN0clRpbWVzdGFtcD0iMi85LzIwMTUgIDEwOjA3OjA4IEFNIn0se3N0ck1vZGlmaWVyPTEwMCxzdHJDb21tZW50PSJ0ZXN0NiIsc3RyVHlwZT0ie0dQfSIsc3RyVGltZXN0YW1wPSIyLzkvMjAxNSAgMTA6MDY6NTggQU0ifSx7c3RyTW9kaWZpZXI9MTAwLHN0ckNvbW1lbnQ9InRlc3QyIixzdHJUeXBlPSJ7R1B9IixzdHJUaW1lc3RhbXA9IjIvOS8yMDE1ICAxMDowNjo1NSBBTSJ9LHtzdHJNb2RpZmllcj0xMDAsc3RyQ29tbWVudD0idGVzdDEiLHN0clR5cGU9IntFUH0iLHN0clRpbWVzdGFtcD0iMi85LzIwMTUgIDEwOjA2OjUxIEFNIn19O3JldHVybiBfO2VuZA==")
-		
+				
+		self.GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+		self.Locale = self.GeminiLocale:GetLocale("RaidOpsMM", true)
+		self.GeminiLocale:TranslateWindow(self.Locale, self.wndCost)
 		--
 		if self.tLogs == nil then self.tLogs = {} end
 	end
@@ -391,7 +399,11 @@ function RaidOpsMM:OnSave(eLevel)
 	tSave.loc = self.wndAnchor:GetLocation():ToTable()
 	tSave.SlotValues = self.SlotValues
 	tSave.QualityValues = self.QualityValues
-	tSave.CustomModifier = self.CustomModifier
+	tSave.CustomModifier = self.CustomModifier	
+	tSave.SlotValuesAbove = self.SlotValuesAbove
+	tSave.QualityValuesAbove = self.QualityValuesAbove
+	tSave.FormulaModifierAbove = self.FormulaModifierAbove
+	tSave.nItemPowerThresholdValue = self.nItemPowerThresholdValue
 	tSave.MyChoices = self.MyChoices
 	tSave.Group = self.wndStandings:FindChild("Controls"):FindChild("Group"):IsChecked()
 	tSave.tLogs = self.tLogs
@@ -406,7 +418,11 @@ function RaidOpsMM:OnRestore(eLevel, tData)
 	self.settings = tData.settings
 	self.SlotValues = tData.SlotValues
 	self.QualityValues = tData.QualityValues
-	self.CustomModifier = tData.CustomModifier
+	self.CustomModifier = tData.CustomModifier	
+	self.SlotValuesAbove = tData.SlotValuesAbove
+	self.QualityValuesAbove= tData.QualityValuesAbove
+	self.FormulaModifierAbove = tData.FormulaModifierAbove
+	self.nItemPowerThresholdValue = tData.nItemPowerThresholdValue
 	self.wndAnchorloc  = WindowLocation.new(tData.loc)
 	self.ResizedWndBottom = tData.ResizedWndBottom
 	self.MyChoices = tData.MyChoices
@@ -908,23 +924,78 @@ function RaidOpsMM:FetchItemCost(wndHandler,wndControl)
 	end
 end
 
-function RaidOpsMM:FillInCostFormula()
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue"):FindChild("Field"):SetText(self.SlotValues["Weapon"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.SlotValues["Shield"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.SlotValues["Head"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.SlotValues["Shoulders"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.SlotValues["Chest"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.SlotValues["Hands"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.SlotValues["Legs"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.SlotValues["Feet"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.SlotValues["Attachment"])
-	self.wndCost:FindChild("ItemCost"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.SlotValues["Support"])
-          self.wndCost:FindChild("ItemCost"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.SlotValues["Gadget"])
-          self.wndCost:FindChild("ItemCost"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.SlotValues["Implant"])
+function RaidOpsMM:EPGPFillInSettings()
+	self:EPGPFillInSettingsBelow()
+	self:EPGPFillInSettingsAbove()
+	if self.nItemPowerThresholdValue == 0 then
+		self.wndCost:FindChild("ItemCostAbove"):SetOpacity(0.5)
+		self.wndCost:FindChild("FormulaLabelAbove"):SetOpacity(0.5)
+		self.wndCost:FindChild("OrangeQualAbove"):SetOpacity(0.5)
+		self.wndCost:FindChild("PurpleQualAbove"):SetOpacity(0.5)
+	end
+	self.wndCost:FindChild("PowerLevelThreshold"):SetText(self.nItemPowerThresholdValue == 0 and "--" or self.nItemPowerThresholdValue)
+end
+
+function RaidOpsMM:EPGPFillInSettingsBelow()
+	--Slots
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue"):FindChild("Field"):SetText(self.SlotValues["Weapon"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.SlotValues["Shield"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.SlotValues["Head"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.SlotValues["Shoulders"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.SlotValues["Chest"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.SlotValues["Hands"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.SlotValues["Legs"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.SlotValues["Feet"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.SlotValues["Attachment"])
+	self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.SlotValues["Support"])
+          self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.SlotValues["Gadget"])
+          self.wndCost:FindChild("ItemCostBelow"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.SlotValues["Implant"])
 	--Rest
-	self.wndCost:FindChild("FormulaLabel"):FindChild("CustomModifier"):SetText(self.CustomModifier)
-	self.wndCost:FindChild("PurpleQual"):FindChild("Field"):SetText(self.QualityValues["Purple"])
-	self.wndCost:FindChild("OrangeQual"):FindChild("Field"):SetText(self.QualityValues["Orange"])
+	self.wndCost:FindChild("FormulaLabelBelow"):FindChild("CustomModifier"):SetText(self.CustomModifier)
+	self.wndCost:FindChild("PurpleQualBelow"):FindChild("Field"):SetText(self.QualityValues["Purple"])
+	self.wndCost:FindChild("OrangeQualBelow"):FindChild("Field"):SetText(self.QualityValues["Orange"])
+end
+
+function RaidOpsMM:EPGPFillInSettingsAbove()
+	--Slots
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue"):FindChild("Field"):SetText(self.SlotValuesAbove["Weapon"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue1"):FindChild("Field"):SetText(self.SlotValuesAbove["Shield"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue2"):FindChild("Field"):SetText(self.SlotValuesAbove["Head"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue3"):FindChild("Field"):SetText(self.SlotValuesAbove["Shoulders"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue4"):FindChild("Field"):SetText(self.SlotValuesAbove["Chest"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue5"):FindChild("Field"):SetText(self.SlotValuesAbove["Hands"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue6"):FindChild("Field"):SetText(self.SlotValuesAbove["Legs"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue7"):FindChild("Field"):SetText(self.SlotValuesAbove["Feet"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue8"):FindChild("Field"):SetText(self.SlotValuesAbove["Attachment"])
+	self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue9"):FindChild("Field"):SetText(self.SlotValuesAbove["Support"])
+          self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue10"):FindChild("Field"):SetText(self.SlotValuesAbove["Gadget"])
+          self.wndCost:FindChild("ItemCostAbove"):FindChild("SlotValue11"):FindChild("Field"):SetText(self.SlotValuesAbove["Implant"])
+	--Rest
+	self.wndCost:FindChild("FormulaLabelAbove"):FindChild("CustomModifier"):SetText(self.FormulaModifierAbove)
+	self.wndCost:FindChild("PurpleQualAbove"):FindChild("Field"):SetText(self.QualityValuesAbove["Purple"])
+	self.wndCost:FindChild("OrangeQualAbove"):FindChild("Field"):SetText(self.QualityValuesAbove["Orange"])
+end
+
+function RaidOpsMM:EPGPSetPowerThreshold(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val > 0 then
+		self.nItemPowerThresholdValue = val
+	else
+		self.nItemPowerThresholdValue = 0
+		wndControl:SetText("--")
+	end
+
+	if self.nItemPowerThresholdValue == 0 then
+		self.wndCost:FindChild("ItemCostAbove"):SetOpacity(0.5)
+		self.wndCost:FindChild("FormulaLabelAbove"):SetOpacity(0.5)
+		self.wndCost:FindChild("OrangeQualAbove"):SetOpacity(0.5)
+		self.wndCost:FindChild("PurpleQualAbove"):SetOpacity(0.5)
+	else
+		self.wndCost:FindChild("ItemCostAbove"):SetOpacity(1)
+		self.wndCost:FindChild("FormulaLabelAbove"):SetOpacity(1)
+		self.wndCost:FindChild("OrangeQualAbove"):SetOpacity(1)
+		self.wndCost:FindChild("PurpleQualAbove"):SetOpacity(1)
+	end
 end
 
 function RaidOpsMM:ShowItemCost()
@@ -936,26 +1007,65 @@ function RaidOpsMM:ItemCostClose( wndHandler, wndControl, eMouseButton )
 	self.wndCost:Show(false,false)
 end
 
-function RaidOpsMM:EPGPItemSlotValueChanged( wndHandler, wndControl, strText )
+function RaidOpsMM:EPGPSetCustomModifier( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		self.SlotValues[wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
+		if wndControl:GetParent():GetName() == "FormulaLabelBelow" then
+			self.CustomModifier = tonumber(strText)
+		else
+			self.FormulaModifierAbove = tonumber(strText)
+		end
 	else
-		wndControl:SetText(self.SlotValues[wndControl:GetParent():FindChild("Name"):GetText()])
+		if wndControl:GetParent():GetName() == "FormulaLabelBelow" then
+			wndControl:SetText(self.CustomModifier)
+		else
+			wndControl:SetText(self.FormulaModifierAbove)
+		end
 	end
 end
 
-function RaidOpsMM:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
+function RaidOpsMM:EPGPItemSlotValueChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
-			self.QualityValues["Purple"] = tonumber(strText)
+		if wndControl:GetParent():GetParent():GetName() == "ItemCostAbove" then
+			self.SlotValuesAbove[wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
 		else
-			self.QualityValues["Orange"] = tonumber(strText)
+			self.SlotValues[wndControl:GetParent():FindChild("Name"):GetText()] = tonumber(strText)
 		end
 	else
-		if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
-			wndControl:SetText(self.QualityValues["Purple"])
+		if wndControl:GetParent():GetParent():GetName() == "ItemCostAbove" then
+			wndControl:SetText(self.SlotValuesAbove[wndControl:GetParent():FindChild("Name"):GetText()])
 		else
-			wndControl:SetText(self.QualityValues["Orange"])		
+			wndControl:SetText(self.SlotValues[wndControl:GetParent():FindChild("Name"):GetText()])
+		end
+	end
+end
+function RaidOpsMM:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
+	if tonumber(strText) ~= nil then
+		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				self.QualityValues["Purple"] = tonumber(strText)
+			else
+				self.QualityValues["Orange"] = tonumber(strText)
+			end
+		else
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				self.QualityValuesAbove["Purple"] = tonumber(strText)
+			else
+				self.QualityValuesAbove["Orange"] = tonumber(strText)
+			end
+		end
+	else
+		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				wndControl:SetText(self.QualityValues["Purple"])
+			else
+				wndControl:SetText(self.QualityValues["Orange"])		
+			end
+		else
+			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
+				wndControl:SetText(self.QualityValuesAbove["Purple"])
+			else
+				wndControl:SetText(self.QualityValuesAbove["Orange"])		
+			end
 		end
 	end
 end
@@ -989,8 +1099,12 @@ function RaidOpsMM:EPGPGetQualityStringByID(ID)
 	end
 end
 
-function RaidOpsMM:EPGPGetItemCostByID(itemID)
+function RaidOpsMM:EPGPGetItemCostByID(itemID,bCut)
+	if not bCut then bCut = false end
 	local item = Item.GetDataFromId(itemID)
+	if string.find(item:GetName(),"Imprint") then
+		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
+	end
 	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then
 		local slot 
 		if item:GetSlotName() ~= "" then
@@ -999,9 +1113,19 @@ function RaidOpsMM:EPGPGetItemCostByID(itemID)
 			slot = item:GetSlot()
 		end
 		if self.SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
-		return "                                GP: " .. math.ceil(item:GetItemPower()/self.QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.CustomModifier * self.SlotValues[self:EPGPGetSlotStringByID(slot)])
+		
+		if item:GetDetailedInfo().tPrimary.nEffectiveLevel <= self.nItemPowerThresholdValue or self.nItemPowerThresholdValue == 0 then
+			if not bCut then 
+				return "                                GP: " .. math.ceil(item:GetItemPower()/self.QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.CustomModifier * self.SlotValues[self:EPGPGetSlotStringByID(slot)])
+			else return math.ceil(item:GetItemPower()/self.QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.CustomModifier * self.SlotValues[self:EPGPGetSlotStringByID(slot)]) end
+		else
+			if not bCut then 
+			return "                                GP: " .. math.ceil(item:GetItemPower()/self.QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.FormulaModifierAbove * self.SlotValues[self:EPGPGetSlotStringByID(slot)])
+			else return math.ceil(item:GetItemPower()/self.QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.FormulaModifierAbove * self.SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
+		end
 	else return "" end
 end
+
 
 
 local originalTootltipFunction
@@ -1496,6 +1620,37 @@ function RaidOpsMM:HighlightRow()
 		if self.SortedLabel then child:FindChild("Stat"..self.SortedLabel):SetTextColor("ChannelAdvice") end
 	end
 
+end
+
+function RaidOpsMM:GetArmoryCode()
+	local unit = GameLib.GetPlayerUnit()
+	if unit then
+		self.wndSettings:FindChild("ArmoryCode"):SetText(Apollo.GetPackage("Lib:dkJSON-2.5").tPackage.encode(self:GetArmoryEntries(unit)))
+	end
+end
+
+function RaidOpsMM:GetArmoryEntries(unit)
+	if not unit then return end
+	local tItems = {}
+	for k , item in ipairs(unit:GetEquippedItems()) do
+		local slot =  item:GetSlot()
+		if slot ~= 9 and slot ~= 17  then
+			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
+			tItems[item:GetSlot()]["runes"] = {}
+			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+			end
+		end
+	end
+	local tStats = unit:GetUnitProperties()
+	tItems['tStats'] = {}
+	tItems['tStats']['Mox'] = math.floor(tStats['Magic'].fValue)
+	tItems['tStats']['Bru'] = math.floor(tStats['Strength'].fValue)
+	tItems['tStats']['Tech'] = math.floor(tStats['Technology'].fValue)
+	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
+	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
+	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
+	return tItems
 end
 
 ---------------------------------------------------------------------------------------------------

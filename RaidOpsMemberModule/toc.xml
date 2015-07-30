@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Addon Author="Drutol@Jabbit" APIVersion="10" Name="RaidOpsMM" Description="RaidOps Member Module." Version="">
     <Script Name="libs/GeminiHook-1.0.lua"/>
+    <Script Name="libs/LibJSON-2.5.lua"/>
+    <Script Name="libs/GeminiLocale.lua"/>
+    <Script Name="locale/enUS.lua"/>
+    <Script Name="locale/deDE.lua"/>
     <Script Name="libs/Base64.lua"/>
     <Script Name="libs/Serpent.lua"/>
     <Script Name="RaidOpsMM.lua"/>
