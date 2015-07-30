@@ -1568,12 +1568,13 @@ function DKP:ArmoryInit()
 	self.wndArmory:Show(false)
 
 	if not self.tItems.tArmory then self.tItems.tArmory = {} end
-	if self.tItems["settings"].bArmoryGather == nil then self.tItems["settings"].bArmoryGather = true end
 	if self.tItems["settings"].bArmoryAppend == nil then self.tItems["settings"].bArmoryAppend = true end
 
-	self.wndArmory:FindChild("Gather"):SetCheck(self.tItems["settings"].bArmoryGather)
 	self.wndArmory:FindChild("Append"):SetCheck(self.tItems["settings"].bArmoryAppend)
+
+	Apollo.RegisterEventHandler("Inspect","ArmoryOnInspect",self)
 end
+local nDelay = 1
 
 function DKP:ArmoryShow()
 	if not self.wndArmory:IsShown() then 
@@ -1604,12 +1605,21 @@ end
 function DKP:ArmoryAppendDisable()
 	self.tItems["settings"].bArmoryAppend = false
 end
-
+local nUnitsToScan
+local nUnitsScanned = 0 
 function DKP:ArmoryBuild()
+	self.wndArmory:FindChild("ScanProgress"):SetProgress(0,100)
+	unitsToInspect = {}
+	local nSkipped = 0
 	for i=1,GroupLib.GetMemberCount() do
 		local member = GroupLib.GetUnitForGroupMember(i)
 		if member and self:GetPlayerByIDByName(member:GetName()) ~= -1 then
-			self.tItems.tArmory[member:GetName()] = self:GetArmoryEntries(member)
+			Print(member:GetId())
+			self:delay(i - nSkipped,function(tContext,args) if GameLib.GetUnitById(args.unit) then GameLib.GetUnitById(args.unit):Inspect() end tContext:ArmoryUpdateScan() end,{unit = member:GetId()})
+			self:delay(i - nSkipped,function(tContext,args) if GameLib.GetUnitById(args.unit) then GameLib.GetUnitById(args.unit):Inspect() end end,{unit = member:GetId()})
+			self:delay(i - nSkipped,function(tContext,args) if GameLib.GetUnitById(args.unit) then GameLib.GetUnitById(args.unit):Inspect() end end,{unit = member:GetId()})
+		else
+			nSkipped = nSkipped + 1
 		end
 	end
 	if GroupLib.GetMemberCount() == 0 then
@@ -1618,18 +1628,35 @@ function DKP:ArmoryBuild()
 			self.tItems.tArmory[unit:GetName()] = self:GetArmoryEntries(unit)
 		end
 	end
+	nUnitsToScan = GroupLib.GetMemberCount() - nSkipped
+	nUnitsScanned = 0
+	self.wndArmory:FindChild("ScanProgress"):SetMax(GroupLib.GetMemberCount() - nSkipped)
+	self.wndArmory:FindChild("ScanProgress"):SetProgress(0,100)
+	self.wndArmory:FindChild("ScanProgressTitle"):SetText(string.format("Scan progress: (%d/%d)",0,nUnitsToScan))
 end
 
-function DKP:GetArmoryEntries(unit)
-	if not unit then return end
+
+function DKP:ArmoryUpdateScan()
+	nUnitsScanned = nUnitsScanned + 1
+	self.wndArmory:FindChild("ScanProgressTitle"):SetText(string.format("Scan progress: (%d/%d)",nUnitsScanned,nUnitsToScan))
+	self.wndArmory:FindChild("ScanProgress"):SetProgress(nUnitsScanned,1)
+end
+
+
+function DKP:ArmoryOnInspect(unit,items)
+	if not unit or self:GetPlayerByIDByName(unit:GetName()) == -1 then return end
 	local tItems = {}
-	for k , item in ipairs(unit:GetEquippedItems()) do
+	tItems['tSets'] = {}
+	for k , item in ipairs(items) do
 		local slot =  item:GetSlot()
 		if slot ~= 9 and slot ~= 17  then
 			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
 			tItems[item:GetSlot()]["runes"] = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
 				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+				if rune.tSet then
+					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
+				end
 			end
 		end
 	end
@@ -1641,6 +1668,39 @@ function DKP:GetArmoryEntries(unit)
 	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
 	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
 	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
+	tItems['tStats']['AP'] = math.floor(tStats['AssaultPower'].fValue)
+	tItems['tStats']['SP'] = math.floor(tStats['SupportPower'].fValue)
+	--Print(unit:GetName())
+	self.tItems.tArmory[unit:GetName()] = tItems
+end
+
+function DKP:GetArmoryEntries(unit)
+	if not unit then return end
+	local tItems = {}
+	tItems['tSets'] = {}
+	for k , item in ipairs(unit:GetEquippedItems()) do
+		local slot =  item:GetSlot()
+		if slot ~= 9 and slot ~= 17  then
+			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
+			tItems[item:GetSlot()]["runes"] = {}
+			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+				if rune.tSet then
+					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
+				end
+			end
+		end
+	end
+	local tStats = unit:GetUnitProperties()
+	tItems['tStats'] = {}
+	tItems['tStats']['Mox'] = math.floor(tStats['Magic'].fValue)
+	tItems['tStats']['Bru'] = math.floor(tStats['Strength'].fValue)
+	tItems['tStats']['Tech'] = math.floor(tStats['Technology'].fValue)
+	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
+	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
+	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
+	tItems['tStats']['AP'] = math.floor(tStats['AssaultPower'].fValue)
+	tItems['tStats']['SP'] = math.floor(tStats['SupportPower'].fValue)
 	return tItems
 end
 

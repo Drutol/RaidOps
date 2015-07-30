@@ -1798,6 +1798,7 @@ function DKP:Bid2UpdateProgress()
 	end
 end
 
+
 function DKP:Bid2BroadcastMySuperiority()
 	local msg = {}
 	msg.type = "IamML"

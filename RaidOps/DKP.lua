@@ -204,8 +204,8 @@ Added sorting to Master Loot loot window.
 Added button to assign multiple items at random each to different person.
 Fixed LUA error concerning chat bidding (roll).
 Fixed Bug that prevented to undo guild import.
-
-FULL CHANGELOG ON GITHUB.
+Added Armory module.
+Added 2nd GP formula profile dependent on item's level. 
 ---RaidOps version 2.26---
 {17/07/2015}
 Fixed Guild Bank pop-up issue.
@@ -624,7 +624,7 @@ function DKP:DelayTimer()
 	for k , event in ipairs(tDelayActions) do
 		event.delay = event.delay - 1
 		if event.delay == 0 then
-			event.func(self)
+			event.func(self,event.args)
 			table.remove(tDelayActions,k)
 		end
 	end

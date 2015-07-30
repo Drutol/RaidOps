@@ -1632,6 +1632,7 @@ end
 function RaidOpsMM:GetArmoryEntries(unit)
 	if not unit then return end
 	local tItems = {}
+	tItems['tSets'] = {}
 	for k , item in ipairs(unit:GetEquippedItems()) do
 		local slot =  item:GetSlot()
 		if slot ~= 9 and slot ~= 17  then
@@ -1639,6 +1640,9 @@ function RaidOpsMM:GetArmoryEntries(unit)
 			tItems[item:GetSlot()]["runes"] = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
 				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+				if rune.tSet then
+					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
+				end
 			end
 		end
 	end
@@ -1650,6 +1654,8 @@ function RaidOpsMM:GetArmoryEntries(unit)
 	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
 	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
 	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
+	tItems['tStats']['AP'] = math.floor(tStats['AssaultPower'].fValue)
+	tItems['tStats']['SP'] = math.floor(tStats['SupportPower'].fValue)
 	return tItems
 end
 

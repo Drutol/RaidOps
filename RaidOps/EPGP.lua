@@ -662,7 +662,7 @@ function DKP:EPGPGetItemCostByID(itemID,bCut)
 			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
 		else
 			if not bCut then 
-			return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+			return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
 			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
 		end
 	else return "" end
