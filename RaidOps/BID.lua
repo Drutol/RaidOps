@@ -325,7 +325,7 @@ function DKP:BidCompleteInit()
 		self:EPGPHookToETooltip()
 	end
 	--Hook.wndMasterLoot:Show(true,false)
-
+	Hook:OnMasterLootUpdate(true)
 	--RaidOps LootHex
   	Apollo.RegisterEventHandler("RaidOpsChatBidding","StartChatBiddingFromOtherSource", self)
   	Apollo.RegisterEventHandler("RaidOpsNetworkBidding","StartNetworkBiddingFromOtherSource", self)

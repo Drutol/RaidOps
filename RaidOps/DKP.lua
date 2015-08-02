@@ -192,8 +192,8 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.27 Beta---
-{17/07/2015}
+---RaidOps version 2.27 ---
+{30/07/2015}
 Added grouping mechanism.
 Added different data sets for each group.
 Added restriction to modify only certain data set.
@@ -571,9 +571,19 @@ end
 -----
 -- Debug
 -----
+local strDB = ""
 function DKP:DebugFetch()
-	local unit = GameLib.GetPlayerUnit()
-	self.tItems.tArmory["Drutol Windchaser"] = self:GetArmoryEntries(unit)
+	self:GetNewItem(1)
+	Print('lol')
+end
+
+function DKP:GetNewItem(id)
+	Print(id)
+	if id > 74000 then self:ExportShowPreloadedText(strDB) return end
+	if Item.GetDataFromId(id) then
+		strDB = strDB .. string.format("ItemDB.create(:item_id => %d,:sprite => '%s',:quality => %s)\n",id,Item.GetDataFromId(id):GetIcon(),Item.GetDataFromId(id):GetItemQuality())
+	end
+	self:delay(1,function (tContext,args) tContext:GetNewItem(args.id) end,{id = id+1})
 end
 
 function DKP:dbglog(strMsg)
@@ -656,7 +666,7 @@ function DKP:UndoAddActivity(strType,strMod,tMembers,bRemoval,strForceComment,bA
 	local tMembersNames = {}
 	local strComment = ""
 	if bRemoval == true or bRemoval == false then strComment = "--" 
-	elseif self:string_starts(strType,"Award for") then  strComment = "--" 
+	elseif self:string_starts(strType,"{Award for") then  strComment = "--" 
 	elseif strType == ktUndoActions["addmp"] then  strComment = "--" 
 	elseif strType == ktUndoActions["remp"] then  strComment = "--" 
 	elseif strType == ktUndoActions["mremp"] then  strComment = "--" 
@@ -2143,9 +2153,9 @@ function DKP:MassEditInvite()
 			bInviteSuspend = true
 			break			
 		end
-		if wnd:GetData() and self.tItems[wnd:GetData()] then
-			GroupLib.Invite(self.tItems[wnd:GetData()].strName,strRealm,strMessage)
-			table.insert(invitedIDs,wnd:GetData())
+		if wnd:GetData().id and self.tItems[wnd:GetData().id] then
+			GroupLib.Invite(self.tItems[wnd:GetData().id].strName,strRealm,strMessage)
+			table.insert(invitedIDs,wnd:GetData().id)
 		end
 	end
 	self:InviteOpen(invitedIDs)
@@ -2172,7 +2182,7 @@ function DKP:MassEditCreditAtt()
 			for j , att in ipairs(player.tAtt or {}) do
 				if att.nTime == nTime then 
 					table.remove(player.tAtt,j) 
-					for i , id in ipairs(self.tOverrideFilter) do if id == wnd:GetData() then table.remove(self.tOverrideFilter,i) break end end
+					for i , id in ipairs(self.tOverrideFilter) do if id == wnd:GetData().id then table.remove(self.tOverrideFilter,i) break end end
 				end
 			end
 		end
@@ -2709,7 +2719,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	-- if data is invalid for this group
 	local tDataSet
 	local nGroup = playerItem.wnd:GetData().nGroupId
-	if self:GetActiveGroupID() ~= nGroup and self.tItems["settings"].Groups[nGroup] then
+	if self.tItems["settings"].bEnableGroups and self:GetActiveGroupID() ~= nGroup and self.tItems["settings"].Groups[nGroup] then
 		tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].Groups[nGroup].strName,playerItem.strName)
 		if tDataSet.GP ~= 0 then
 			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/tDataSet.GP)
@@ -5290,12 +5300,12 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 		end
 	
 		local after
-		if strType == "{EP}" then after = self.tItems[ID].EP
-		elseif strType == "{GP}" then after = self.tItems[ID].GP
-		elseif strType == "{DKP}" then after = self.tItems[ID].net
-		elseif strType == "{Decay}" and string.find(strComment,"GP") then after = self.tItems[ID].GP
-		elseif strType == "{Decay}" and string.find(strComment,"EP") then after = self.tItems[ID].EP
-		elseif strType == "{Decay}" and string.find(strComment,"DKP") then after = self.tItems[ID].net
+		if strType == "{EP}" then after = math.floor(self.tItems[ID].EP)
+		elseif strType == "{GP}" then after = math.floor(self.tItems[ID].GP)
+		elseif strType == "{DKP}" then after = math.floor(self.tItems[ID].net)
+		elseif strType == "{Decay}" and string.find(strComment,"GP") then after = math.floor(self.tItems[ID].GP)
+		elseif strType == "{Decay}" and string.find(strComment,"EP") then after = math.floor(self.tItems[ID].EP)
+		elseif strType == "{Decay}" and string.find(strComment,"DKP") then after = math.floor(self.tItems[ID].net)
 		end
 
 		if strType == "{Decay}" and self.tItems[ID].strName == "Guild Bank" then return end
