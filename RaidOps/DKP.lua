@@ -574,11 +574,11 @@ end
 local strDB = ""
 function DKP:DebugFetch()
 	self:GetNewItem(1)
-	Print('lol')
+
 end
 
 function DKP:GetNewItem(id)
-	Print(id)
+
 	if id > 74000 then self:ExportShowPreloadedText(strDB) return end
 	if Item.GetDataFromId(id) then
 		strDB = strDB .. string.format("ItemDB.create(:item_id => %d,:sprite => '%s',:quality => %s)\n",id,Item.GetDataFromId(id):GetIcon(),Item.GetDataFromId(id):GetItemQuality())
@@ -5420,18 +5420,33 @@ end
 -----------------------------------------------------------------------------------------------
 -- CustomEvents
 -----------------------------------------------------------------------------------------------
+local ktFirstMultipliers =
+{
+	["Experiment X-89"] = {bKilled = false,nMultiplier =1},
+	["Kuralak the Defiler"] = {bKilled = false,nMultiplier =1},
+	["Phage Maw"] = {bKilled = false,nMultiplier =1},
+	["Phageborn Convergence"] = {bKilled = false,nMultiplier =1},
+	["Phagetech Prototypes"] = {bKilled = false,nMultiplier =1},
+	["Dreadphage Ohmna"] = {bKilled = false,nMultiplier =1},
+
+	["System Daemons"] = {bKilled = false,nMultiplier =1},
+	["Gloomclaw"] = {bKilled = false,nMultiplier =1},
+	["Maelstorm Authority"] = {bKilled = false,nMultiplier =1},
+	["Avatus"] = {bKilled = false,nMultiplier =1},
+}
 
 local tCreatedEvent = {}
 
 function DKP:CEInit()
 	self.wndCE = Apollo.LoadForm(self.xmlDoc,"CustomEvents",nil,self)
-	
+	self.wndFirstKills = Apollo.LoadForm(self.xmlDoc,"FirstKills",nil,self)
 	--self.wndCE:SetSizingMaximum(692,700)
 	--self.wndCE:SetSizingMinimum(692,414)
 	
 	self.wndCEL = Apollo.LoadForm(self.xmlDoc,"HandledEventsList",nil,self)
 	self.wndCEL:Show(false,true)
 	self.wndCE:Show(false,true)
+	self.wndFirstKills:Show(false,true)
 	self.wndCE:FindChild("IfBoss"):Show(false,true)
 	self.wndCE:FindChild("IfUnit"):Show(false,true)
 	
@@ -5440,6 +5455,7 @@ function DKP:CEInit()
 	if self.tItems["settings"].CENotifyChat == nil then self.tItems["settings"].CENotifyChat = false end
 	if self.tItems["settings"].CENotifyScreen == nil then self.tItems["settings"].CENotifyScreen = true end
 	if self.tItems["settings"].CENotifyScreenTime == nil then self.tItems["settings"].CENotifyScreenTime = 5 end
+	if self.tItems["settings"].tCEFirstMultipliers == nil then self.tItems["settings"].tCEFirstMultipliers = ktFirstMultipliers end
 	
 	self.wndCE:FindChild("Enable"):SetCheck(self.tItems["settings"].CEEnable)
 	self.wndCE:FindChild("RaidOnly"):SetCheck(self.tItems["settings"].CERaidOnly)
@@ -5452,6 +5468,11 @@ function DKP:CEInit()
 	self.wndCE:FindChild("ArrowArt"):SetRotation(270)
 	
 	if self.tItems["CE"] == nil then self.tItems["CE"] = {} end
+
+	for k , v in pairs(self.tItems["settings"].tCEFirstMultipliers) do
+		self.wndFirstKills:FindChild(k):SetCheck(v.bKilled)
+		self.wndFirstKills:FindChild(k.."M"):SetText(v.nMultiplier)
+	end
 end
 
 function DKP:CEHideSuccess()
@@ -5471,6 +5492,32 @@ end
 
 function DKP:CEHide(tContext)
 	self.wndCE:Show(false,false)
+end
+
+function DKP:CEShowFirstKills()
+	self.wndFirstKills:Show(true,false)
+	self.wndFirstKills:ToFront()
+end
+
+function DKP:CEHideFirstKills()
+	self.wndFirstKills:Show(false,false)
+end
+
+function DKP:CESubmitBossKill(wndHandler,wndControl)
+	self.tItems["settings"].tCEFirstMultipliers[wndControl:GetText()].bKilled = true
+end
+
+function DKP:CESubmitBossUnKill(wndHandler,wndControl) -- that's a word!
+	self.tItems["settings"].tCEFirstMultipliers[wndControl:GetText()].bKilled = false
+end
+
+function DKP:CEChangeKillMultiplier(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val and val >= 1 then
+		self.tItems["settings"].tCEFirstMultipliers[string.sub(wndControl:GetName(),1,-2)].nMultiplier = val
+	else
+		wndControl:SetText(self.tItems["settings"].tCEFirstMultipliers[string.sub(wndControl:GetName(),1,-2)].nMultiplier)
+	end
 end
 
 function DKP:CEEnable()
@@ -5558,6 +5605,8 @@ end
 function DKP:CETriggerEvent(eID)
 	local event = self.tItems["CE"][eID]
 	if event then
+		local bFirst = false
+		local nMultiplier = 1
 		local raid = self:Bid2GetTargetsTable()
 		table.insert(raid,GameLib.GetPlayerUnit():GetName())
 		if event.uType == "Unit" then strMob = event.strUnit else strMob = event.bType end
@@ -5570,6 +5619,13 @@ function DKP:CETriggerEvent(eID)
 				end
 			end
 		end
+		
+		if self.tItems["settings"].tCEFirstMultipliers[strMob] and not self.tItems["settings"].tCEFirstMultipliers[strMob].bKilled then
+			self.tItems["settings"].tCEFirstMultipliers[strMob].bKilled = true
+			bFirst = true
+			nMultiplier = self.tItems["settings"].tCEFirstMultipliers[strMob].nMultiplier
+		end
+
 		local tMembers = {}
 		if self.tItems["settings"].bTrackUndo then
 			for k,player in ipairs(raid) do
@@ -5578,17 +5634,19 @@ function DKP:CETriggerEvent(eID)
 					table.insert(tMembers,self.tItems[ID])
 				end
 			end
-			self:UndoAddActivity(string.format(ktUndoActions["cetrig"],strMob,eID),event.EP or event.GP or event.DKP,tMembers)
+			local strUndoEvent = string.format(ktUndoActions["cetrig"],strMob,eID)
+			if bFirst then strUndoEvent = strUndoEvent .. " 1st Kill" end
+			self:UndoAddActivity(strUndoEvent,event.EP*nMultiplier or event.GP*nMultiplier or event.DKP*nMultiplier,tMembers)
 		end
 			local strAwards = ""
 			if event.EP then
-				strAwards = strAwards .. event.EP .. "EP  "
+				strAwards = strAwards .. tostring(event.EP*nMultiplier) .. "EP  "
 			end			
 			if event.GP then
-				strAwards = strAwards .. event.GP .. "GP  "
+				strAwards = strAwards .. tostring(event.GP*nMultiplier) .. "GP  "
 			end			
 			if event.DKP then
-				strAwards = strAwards .. event.DKP .. "DKP "
+				strAwards = strAwards .. tostring(event.DKP*nMultiplier) .. "DKP "
 			end
 			
 		if self.tItems["settings"].CENotifyScreen then
@@ -5599,21 +5657,24 @@ function DKP:CETriggerEvent(eID)
 			ChatSystemLib.Command("/party " .. string.format("Award for %s , %s",strMob,strAwards))
 		end
 		
+		local strFirstKill
+		if bFirst then strFirstKill = "1st Kill" else strFirstKill = "" end
+
 		for k,member in ipairs(raid) do
 			local pID = self:GetPlayerByIDByName(member)
 			if pID ~= -1 then
 				if event.EP then
-					self.tItems[pID].EP = self.tItems[pID].EP + event.EP
-					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")","{EP}",event.EP,pID)
+					self.tItems[pID].EP = self.tItems[pID].EP + (event.EP * nMultiplier)
+					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{EP}",event.EP*nMultiplier,pID)
 				end
 				if event.GP then
-					self.tItems[pID].GP = self.tItems[pID].GP + event.GP
-					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")","{GP}",event.GP,pID)
+					self.tItems[pID].GP = self.tItems[pID].GP + (event.GP * nMultiplier)
+					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{GP}",event.GP*nMultiplier,pID)
 				end
 				if event.DKP then
-					self.tItems[pID].net = self.tItems[pID].net + event.DKP
-					self.tItems[pID].tot = self.tItems[pID].tot + event.DKP
-					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")","{DKP}",event.DKP,pID)
+					self.tItems[pID].net = self.tItems[pID].net + (event.DKP * nMultiplier)
+					self.tItems[pID].tot = self.tItems[pID].tot + (event.DKP * nMultiplier)
+					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{DKP}",event.DKP*nMultiplier,pID)
 				end
 			end
 		end
