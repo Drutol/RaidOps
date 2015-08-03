@@ -657,7 +657,7 @@ function DKP:AttZoneChanged()
 end
 
 function DKP:AttCheckZone()	
-	if self.tItems["settings"].bEnableGroupSwitch then
+	--[[if self.tItems["settings"].bEnableGroupSwitch then
 		local nRaidType = self:AttGetRaidType()
 		for k , group in ipairs(self.tItems["settings"].Groups) do
 			if group.nRaidType == nRaidType then
@@ -665,8 +665,7 @@ function DKP:AttCheckZone()
 				break
 			end
 		end
-
-	end
+	end]]
 
 	local tMap = GameLib.GetCurrentZoneMap()
 	if tMap and self:RSIsRaidZone(tMap) then
@@ -1540,10 +1539,12 @@ function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 
 	for k , id in ipairs(self.tItems["settings"].Groups[nGroupId].tIDs) do
 		local newDataSet = self:GetDataSetForGroupPlayer(strGroupName,self.tItems[id].strName)
-		self.tItems[id].EP = newDataSet.EP
-		self.tItems[id].GP = newDataSet.GP
-		self.tItems[id].net = newDataSet.net
-		self.tItems[id].tot = newDataSet.tot
+		if newDataSet then
+			self.tItems[id].EP = newDataSet.EP
+			self.tItems[id].GP = newDataSet.GP
+			self.tItems[id].net = newDataSet.net
+			self.tItems[id].tot = newDataSet.tot
+		end
 	end
 
 
@@ -1657,6 +1658,7 @@ function DKP:ArmoryOnInspect(unit,items)
 			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
 			tItems[item:GetSlot()]["runes"] = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
 				if rune.tSet then
 					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
 				end
@@ -1687,7 +1689,7 @@ function DKP:GetArmoryEntries(unit)
 			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
 			tItems[item:GetSlot()]["runes"] = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
-				--if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
 				if rune.tSet then
 					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
 				end

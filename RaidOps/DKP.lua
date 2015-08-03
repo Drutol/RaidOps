@@ -401,6 +401,7 @@ function DKP:OnDocLoaded()
 		Apollo.RegisterSlashCommand("ropsml", "MLSettingShow", self)
 		Apollo.RegisterSlashCommand("nb", "Bid2ShowNetworkBidding", self)
 		Apollo.RegisterSlashCommand("dbgf", "DebugFetch", self)
+		Apollo.RegisterSlashCommand("rops", "OnRaidOpsCmd", self)
 		Apollo.RegisterTimerHandler(10, "OnTimer", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
 		Apollo.RegisterEventHandler("Group_Invite_Result","InviteOnResult", self)
@@ -574,14 +575,13 @@ end
 local strDB = ""
 function DKP:DebugFetch()
 	self:GetNewItem(1)
-
 end
 
 function DKP:GetNewItem(id)
-
+	Print(id)
 	if id > 74000 then self:ExportShowPreloadedText(strDB) return end
-	if Item.GetDataFromId(id) then
-		strDB = strDB .. string.format("ItemDB.create(:item_id => %d,:sprite => '%s',:quality => %s)\n",id,Item.GetDataFromId(id):GetIcon(),Item.GetDataFromId(id):GetItemQuality())
+	if GameLib.GetSpell(id) and GameLib.GetSpell(id):GetClass() == 40 and GameLib.GetSpell(id):GetName() then
+		strDB = strDB .. string.format("SpellDb.create(:spell_id => %d,:name => '%s')\n",id,GameLib.GetSpell(id):GetName())
 	end
 	self:delay(1,function (tContext,args) tContext:GetNewItem(args.id) end,{id = id+1})
 end
@@ -7756,6 +7756,15 @@ function DKP:MoreBottomOptionsShow()
 
 	self.wndBtmOpt:Show(true)
 	self.wndBtmOpt:ToFront()
+end
+-----------------------------------------------------------------------------------------------
+-- CMDs
+-----------------------------------------------------------------------------------------------
+
+function DKP:OnRaidOpsCmd(cmd , args)
+
+	Print(args)
+
 end
 
 -----------------------------------------------------------------------------------------------
