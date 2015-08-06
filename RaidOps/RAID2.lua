@@ -1421,7 +1421,7 @@ end
 function DKP:GroupOnDragDrop(wndHandler, wndControl, nX, nY, wndSource, strType, iData) --iData is an origin
 	if wndControl:GetData() == iData then return end -- from ungrouped to ungrouped
 
-	if wndControl:GetData() > #self.tItems["settings"].Groups then --remove if to ungroupped
+	if wndControl:GetData() > table.maxn(self.tItems["settings"].Groups) then --remove if to ungroupped
 		for k , id in ipairs(self.tItems["settings"].Groups[iData].tIDs) do
 			if id == wndSource:GetData().id then 
 				table.remove(self.tItems["settings"].Groups[iData].tIDs,k) 
@@ -1485,7 +1485,7 @@ end
 
 function DKP:GetDataSetForGroupPlayer(strGroup,strPlayer)
 	if strGroup == "Ungrouped" then strGroup = "Def" end
-	if self.tItems.tDataSets[strGroup] then 
+	if self.tItems.tDataSets and self.tItems.tDataSets[strGroup] then 
 		if not self.tItems.tDataSets[strGroup][strPlayer] then --if no data set then create one
 			local id = self:GetPlayerByIDByName(strPlayer)
 			self.tItems.tDataSets[strGroup][self.tItems[id].strName] = {EP = self.tItems[id].EP,GP = self.tItems[id].GP,net = self.tItems[id].net,tot = self.tItems[id].tot}

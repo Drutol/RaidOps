@@ -12,6 +12,7 @@
     <Script Name="TUT.lua"/>
     <Script Name="BID.lua"/>
     <Script Name="EPGP.lua"/>
+    <Script Name="IMPORT_STRING_HERE.lua"/>
     <Form Name="DKP.xml"/>
     <Form Name="DKP2.xml"/>
     <Form Name="DKP3.xml"/>

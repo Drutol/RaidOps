@@ -358,6 +358,8 @@ function DKP:EPGPReset()
 end
 
 function DKP:EPGPAdd(strName,EP,GP)
+	EP = tonumber(EP) or 0
+	GP = tonumber(GP) or 0
 	local ID = self:GetPlayerByIDByName(strName)
 	if ID ~= -1 then
 		if EP ~= nil then
@@ -376,6 +378,8 @@ function DKP:EPGPAdd(strName,EP,GP)
 end
 
 function DKP:EPGPSubtract(strName,EP,GP)
+	EP = tonumber(EP) or 0
+	GP = tonumber(GP) or 0
 	local ID = self:GetPlayerByIDByName(strName)
 	if ID ~= -1 then
 		if EP ~= nil then

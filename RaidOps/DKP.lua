@@ -192,6 +192,18 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.28 ---
+{05/08/2015}
+Added first kills menu to Custom events.
+Added option to import from file , instructions in the export/import window.
+Added following commands:
+	/rops add|sub|set ep|gp|dkp value strComment rm|rmq|strName
+	/rops timeaward start|stop
+	/rops undo
+	/rops armoryscan
+	/rops help
+	/rops raidsession start|stop|pause
+Fixed bug concnerning drag&fropping between groups.
 ---RaidOps version 2.27 ---
 {30/07/2015}
 Added grouping mechanism.
@@ -242,17 +254,6 @@ Fixed Gp values not showing on certain item types - for standalone tooltips.
 Added option to start and stop 'Timed Award' on raid session start/end.
 Fixed small Attendace + Raid Queue UI bug.
 Time award timer is now saved between sessions.
----RaidOps version 2.22---
-{05/07/2015}
-Added Raid Queue option to Timed Award.
-Added On-screen notification for Timed Award.
-Added option to grant award on timer's start for Timed Award.
-After value in logs will be now present for '{Decay}' log.
-Data for Hrs label is now pulled from Raid Sessions.
-Dropped Base64 Encoding for import/export.
-Added 4 new tutorials.
-Item tooltip no longer requires EToolTip addon , compatibilty remains.
-Added some condition checks to players' attendances.
  ]===]
 
 -- Localization stuff
@@ -574,14 +575,14 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	self:GetNewItem(1)
+	self:GetNewItem(70000)
 end
 
 function DKP:GetNewItem(id)
 	Print(id)
-	if id > 74000 then self:ExportShowPreloadedText(strDB) return end
-	if GameLib.GetSpell(id) and GameLib.GetSpell(id):GetClass() == 40 and GameLib.GetSpell(id):GetName() then
-		strDB = strDB .. string.format("SpellDb.create(:spell_id => %d,:name => '%s')\n",id,GameLib.GetSpell(id):GetName())
+	if id > 80000 then self:ExportShowPreloadedText(strDB) return end
+	if Item.GetDataFromId(id) then
+		strDB = strDB .. string.format("ItemDB.create(:item_id => %d,:sprite => '%s',:quality => %d)\n",id,Item.GetDataFromId(id):GetIcon(),Item.GetDataFromId(id):GetItemQuality())
 	end
 	self:delay(1,function (tContext,args) tContext:GetNewItem(args.id) end,{id = id+1})
 end
@@ -1084,7 +1085,7 @@ function DKP:OnCancel()
 end
 
 
-function DKP:SetDKP(cycling)
+function DKP:SetDKP(cycling,value,comment)
 	if self.MassEdit == true and cycling ~= true then
 		self:MassEditModify("Set")
 		return
@@ -1093,8 +1094,12 @@ function DKP:SetDKP(cycling)
 	if self.wndSelectedListItem ~= nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
-			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
+			if type(comment) ~= "string" then
+				comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			end	
+			if type(value) == "userdata" then
+				value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
+			end
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
 				if self.tItems["EPGP"].Enable == 1 then
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
@@ -1349,7 +1354,7 @@ function DKP:ForceRefresh()
 	self:RefreshMainItemList()
 end
 
-function DKP:AddDKP(cycling) -- Mass Edit check
+function DKP:AddDKP(cycling,value,comment) -- Mass Edit check
 	if self.MassEdit == true and cycling ~= true then
 		self:MassEditModify("Add")
 		return
@@ -1358,8 +1363,13 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 	if self.wndSelectedListItem ~=nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
-			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
-			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			
+			if type(comment) ~= "string" then
+				comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			end
+			if type(value) == "userdata" then
+				value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
+			end
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
 				if self.tItems["EPGP"].Enable == 1 then
 					if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
@@ -1439,7 +1449,7 @@ function DKP:AddDKP(cycling) -- Mass Edit check
 
 end
 
-function DKP:SubtractDKP(cycling)
+function DKP:SubtractDKP(cycling,value,comment)
 	if self.MassEdit == true and cycling ~= true then
 		self:MassEditModify("Sub")
 		return
@@ -1448,8 +1458,12 @@ function DKP:SubtractDKP(cycling)
 	if self.wndSelectedListItem ~=nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
-			local value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
-			local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			if type(comment) == "userdata" then
+				comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+			end		
+			if type(value) == "userdata" then
+				value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
+			end
 			local ID = self:GetPlayerByIDByName(strName)
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
 				if self.tItems["EPGP"].Enable == 1 then
@@ -2129,7 +2143,7 @@ function DKP:MassEditSelectRaid( wndHandler, wndControl, eMouseButton )
 	selectedMembers = {}
 	local children = self:MainItemListGetChildren()
 	for k,child in ipairs(children) do
-		if self:IsPlayerInRaid(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()) then
+		if self:IsPlayerInRaid(child:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()) or self:IsPlayerInQueue(nil,child:GetData().id) and wndHandler == true then
 			if self.tItems["settings"].bEnableGroups then
 				if self.tItems["settings"].Groups[child:GetData().nGroupId] and self.tItems["settings"].strActiveGroup == self.tItems["settings"].Groups[child:GetData().nGroupId].strName then
 					table.insert(selectedMembers,child)
@@ -2308,7 +2322,7 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 	self:RefreshMainItemList()
 end
 
-function DKP:MassEditModify(what) -- "Add" "Sub" "Set" 
+function DKP:MassEditModify(what,comment,val) -- :what => "Add"|"Sub"|"Set" 
 	--we're gonna just change self.wndSelectedListItem and call the specific function
 	local tMembers = {}
 	local strType
@@ -2316,7 +2330,7 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 		local player = self.tItems[wnd:GetData().id]
 		table.insert(tMembers,player)
 	end
-		local comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
+		if not comment then comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText() end
 		if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
 			if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
 				if what == "Add" then
@@ -2356,13 +2370,11 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 				strType = ktUndoActions["maddep"]
 			end
 		end
-
-		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
+		if tMembers then self:UndoAddActivity(strType,not val and self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText() or val,tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			self.wndSelectedListItem = wnd
-			self:AddDKP(true) -- information to function not to cause stack overflow
+			self:AddDKP(true,val,comment) -- information to function not to cause stack overflow
 		end	
 	elseif what == "Sub" then
 		if self.tItems["EPGP"].Enable == 0 then
@@ -2375,12 +2387,12 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
+		if tMembers then self:UndoAddActivity(strType,not val and self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText() or val,tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData().id then table.insert(tMembers,self.tItems[wnd:GetData().id]) end
 			self.wndSelectedListItem = wnd
-			self:SubtractDKP(true) 
+			self:SubtractDKP(true,val,comment) 
 		end
 	elseif what == "Set" then
 		if self.tItems["EPGP"].Enable == 0 then
@@ -2393,12 +2405,12 @@ function DKP:MassEditModify(what) -- "Add" "Sub" "Set"
 			end
 		end		
 		
-		if tMembers then self:UndoAddActivity(strType,self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText(),tMembers,nil,comment) end 
+		if tMembers then self:UndoAddActivity(strType,not val and self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText() or val,tMembers,nil,comment) end 
 		
 		for i,wnd in ipairs(selectedMembers) do
 			if self.tItems["settings"].bTrackUndo and wnd:GetData().id then table.insert(tMembers,self.tItems[wnd:GetData().id]) end
 			self.wndSelectedListItem = wnd
-			self:SetDKP(true) 
+			self:SetDKP(true,val,comment) 
 		end
 	end
 end
@@ -3810,7 +3822,8 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("SlashCommands"):SetTooltip(" /epgp - For main roster window \n" ..
 									 " /ropsml - For Master Looter Settings window \n" ..
 									 " /nb - For Network Bidding window \n" ..
-									 " /chatbid - For Chat Bidding window \n")
+									 " /chatbid - For Chat Bidding window \n" ..
+									 " /rops help - for all action commands \n")
 									 
 end
 
@@ -4274,7 +4287,11 @@ function DKP:ExportExport()
 			tCopy.EP = player.EP
 			tCopy.GP = player.GP
 			tCopy.class = player.class
-			tCopy.alts = player.alts
+			
+			tCopy.alts = {}
+			for k , alt in ipairs(player.alts) do
+				table.insert(tCopy.alts,{name = alt , tArmoryEntry = self.tItems["settings"].bArmoryApp and self.tItems.tArmory[alt] or nil})
+			end
 			tCopy.logs = player.logs
 			tCopy.role = player.role
 			tCopy.offrole = player.offrole
@@ -4305,6 +4322,12 @@ function DKP:ExportExport()
 	end
 end
 
+function DKP:ExportLoadFromFile()
+	if self.GetExportStringFromFile then
+		strConcatedString = self:GetExportStringFromFile()
+		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
+	end
+end
 
 
 function DKP:ExportEnableLootFiltering()
@@ -4314,6 +4337,7 @@ end
 function DKP:ExportDisableLootFiltering()
 	self.tItems["settings"].bUseFilterForWebsiteExport = false
 end
+
 
 function DKP:ExportAddStringPart()
 	self.wndExport:FindChild("ClearString"):Show(true)
@@ -6925,7 +6949,6 @@ end
 function DKP:DFOnSyncMessage(channel, strMessage, idMessage)
 
 	local tMsg = serpent.load(strMessage)
-	Print(tMsg.type)
 	if tMsg.type  then
 		if tMsg.type == "SendMeData" then
 			self.sChannel:SendPrivateMessage(tMsg.strSender,self:GetEncodedData(tMsg.strSender))
@@ -7762,8 +7785,110 @@ end
 -----------------------------------------------------------------------------------------------
 
 function DKP:OnRaidOpsCmd(cmd , args)
+	local words = {}
+	for word in string.gmatch(args,"%S+") do
+		table.insert(words,word)
+	end
+	if #words < 1 then Print("Use '/rops help' for help") end
+	-- /rops add|sub|set ep|gp|dkp nMod strComment rm|rmq|strName
+	if words[1] == "add" or words[1] == "sub" or words[1] == "set" then
+		local mEdit = self.MassEdit
+		self.MassEdit = true
+		local nMod = tonumber(words[3])
+		local strComment = words[4]
+		if strComment == "auto" then strComment = "Comment - Auto" end
+		local selectedMembersSave = {}
+		for k , child in ipairs(selectedMembers) do table.insert(selectedMembersSave,child:GetData().id) end
+		selectedMembers = {}
+		if words[5] == "rm" then
+			self:MassEditSelectRaid()
+		elseif words[5] == "rmq" then
+			self:MassEditSelectRaid(true)
+		else
+			if words[6] then
+				words[5] = words[5] .. " " .. words[6]
+			end
+			local id = self:GetPlayerByIDByName(words[5])
+			if id ~= -1 then
+				for k , child in ipairs(self:MainItemListGetChildren()) do
+					if child:GetData().id == id then
+						table.insert(selectedMembers,child)
+						break
+					end
+				end
+			end
+		end
+		if words[2] == "ep" then
+			self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):SetCheck(false) -- cause I'm lazy
+			self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):SetCheck(true)
+			self.tItems["EPGP"].Enable = 1
+			self:EPGPChangeUI()
+		elseif words[2] == "gp" then
+			self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):SetCheck(true)
+			self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):SetCheck(false)
+						self.tItems["EPGP"].Enable = 1
+			self:EPGPChangeUI()
+		elseif words[2] == "dkp" then
+			self.tItems["EPGP"].Enable = 0
+			self:EPGPChangeUI()
+		end
+		if words[1] == "add" then
+			self:MassEditModify("Add",strComment,nMod)
+		elseif words[1] == "sub" then
+			self:MassEditModify("Sub",strComment,nMod)
+		elseif words[1] == "set" then
+			self:MassEditModify("Set",strComment,nMod)
+		end
 
-	Print(args)
+		self.MassEdit = mEdit
+		
+		for k , child in ipairs(self:MainItemListGetChildren()) do child:SetCheck(false) end
+		if self.MassEdit then
+			for k , child in ipairs(self:MainItemListGetChildren()) do
+				for  j , member in ipairs(selectedMembersSave) do
+					if child:GetData().id == member then table.insert(selectedMembers,child) child:SetCheck(true) break end
+				end
+			end
+		end
+	end
+
+	if words[1] == 'timeaward' then
+		if words[2] == 'stop' then
+			self:TimeAwardStop()
+		elseif words[2] == 'start' then
+			self:TimeAwardStart()
+		end
+	end
+
+	if words[1] == 'undo' then
+		self:Undo()
+	end	
+
+	if words[1] == 'raidsession' then
+		if words[2] == 'start' then
+			self:AttStart()
+		elseif words[2] == 'stop' then
+			self:AttEndSession()
+		elseif words[2] == 'pause' then
+			self:AttPause()
+		end
+	end
+
+	if words[1] == 'armoryscan' then
+		self:AttStartScan()
+	end
+
+	if words[1] == 'help' then
+		Print("===RaidOps - CMDs===")
+		Print("Symbol '|' means that you have to choose one from all possible.")
+		Print("Perform modifications on entries , do not add spaces anywhere except for strName. Use comment 'auto' for auto comment. 'rm' = raid members , 'rmq' = raid members + raid queue")
+		Print("/rops add|sub|set ep|gp|dkp value strComment rm|rmq|strName")
+		Print("== Self explanatory commands ==")
+		Print("/rops timeaward start|stop")
+		Print("/rops undo")
+		Print("/rops armoryscan")
+		Print("/rops raidsession start|stop|pause")
+	end
 
 end
 
