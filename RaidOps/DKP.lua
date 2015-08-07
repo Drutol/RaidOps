@@ -1096,8 +1096,8 @@ function DKP:SetDKP(cycling,value,comment)
 			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
 			if type(comment) ~= "string" then
 				comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-			end	
-			if type(value) == "userdata" then
+			end
+			if type(value) ~= "number" then
 				value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			end
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
@@ -1367,7 +1367,7 @@ function DKP:AddDKP(cycling,value,comment) -- Mass Edit check
 			if type(comment) ~= "string" then
 				comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
 			end
-			if type(value) == "userdata" then
+			if type(value) ~= "number" then
 				value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			end
 			if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
@@ -1458,10 +1458,10 @@ function DKP:SubtractDKP(cycling,value,comment)
 	if self.wndSelectedListItem ~=nil then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..tostring(self:LabelGetColumnNumberForValue("Name"))):GetText()
-			if type(comment) == "userdata" then
+			if type(comment) ~= "string" then
 				comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText()
-			end		
-			if type(value) == "userdata" then
+			end
+			if type(value) ~= "number" then
 				value = tonumber(self.wndMain:FindChild("Controls"):FindChild("EditBox1"):GetText())
 			end
 			local ID = self:GetPlayerByIDByName(strName)
