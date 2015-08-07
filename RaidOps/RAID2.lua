@@ -586,6 +586,7 @@ function DKP:RSShowLoot(wndHandler,wndControl)
 end
 
 function DKP:RSIsRaidZone(tMap)
+	if type(tMap) ~= "table" then return false end
 	if tMap.strFolder and string.find(tMap.strFolder,"Datascape") then return true end
 	local id = tMap.id
 	if id == 105 or id == 104 or id == 110 or id == 109 or id == 111 or id == 117 or id == 119 or id == 118 or id == 115 or id == 120 or id == 116 or id == 108--DS
