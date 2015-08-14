@@ -4299,6 +4299,7 @@ function DKP:ExportExport()
 			tCopy.tAtt = player.tAtt
 			tCopy.tLLogs = {}
 			tCopy.tDataSets = {}
+			tCopy.tLLogs = {}
 			if self.tItems["settings"].bArmoryAppend then tCopy.tArmoryEntry = self.tItems.tArmory[tCopy.strName] end
 			for j , group in ipairs(self.tItems["settings"].Groups) do 
 				for i , id in ipairs(group.tIDs) do
@@ -4310,7 +4311,7 @@ function DKP:ExportExport()
 			end
 			if #tCopy.tDataSets == 0 then tCopy.tDataSets = nil end
 			table.insert(tTestTable['tMembers'],tCopy)
-			for k , entry in ipairs(player.tLLogs) do
+			for k , entry in ipairs(player.tLLogs or {}) do
 				if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
 					table.insert(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs,entry)
 				end 
