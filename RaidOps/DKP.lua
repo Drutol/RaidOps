@@ -5206,6 +5206,7 @@ function DKP:AltsBuildDictionary()
 	self.tItems["alts"] = {}
 	for k , player in ipairs(self.tItems) do
 		for j , alt in ipairs(player.alts) do
+			if type(alt) == "table" and alt.name then self.tItems[k].alts[j] = alt.name end
 			self.tItems["alts"][string.lower(alt)] =  k
 		end
 	end
@@ -5245,6 +5246,7 @@ function DKP:AltsInit()
 	self.wndAlts:Show(false,true)
 	self.wndAltsDict:Show(false,true)
 	self.wndAlts:FindChild("Art"):SetOpacity(.5)
+	self:AltsBuildDictionary()
 end
 
 function DKP:AltsClose()
