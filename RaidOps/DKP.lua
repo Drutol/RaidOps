@@ -5206,7 +5206,10 @@ function DKP:AltsBuildDictionary()
 	self.tItems["alts"] = {}
 	for k , player in ipairs(self.tItems) do
 		for j , alt in ipairs(player.alts) do
-			if type(alt) == "table" and alt.name then self.tItems[k].alts[j] = alt.name end
+			if type(alt) == "table" and alt.name then 
+				self.tItems[k].alts[j] = alt.name 
+				alt = alt.name
+			end
 			self.tItems["alts"][string.lower(alt)] =  k
 		end
 	end
