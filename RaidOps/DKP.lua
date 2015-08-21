@@ -5210,7 +5210,9 @@ function DKP:AltsBuildDictionary()
 				self.tItems[k].alts[j] = alt.name 
 				alt = alt.name
 			end
-			self.tItems["alts"][string.lower(alt)] =  k
+			if type(alt) == "string" then
+				self.tItems["alts"][string.lower(alt)] =  k
+			end
 		end
 	end
 end
