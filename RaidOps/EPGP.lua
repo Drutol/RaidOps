@@ -596,7 +596,7 @@ end
 
 function DKP:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+		if string.find(wndControl:GetParent():GetName(),"Below") then	
 			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
 				self.tItems["EPGP"].QualityValues["Purple"] = tonumber(strText)
 			else
@@ -610,7 +610,7 @@ function DKP:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
 			end
 		end
 	else
-		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+		if string.find(wndControl:GetParent():GetName(),"Below") then	
 			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
 				wndControl:SetText(self.tItems["EPGP"].QualityValues["Purple"])
 			else

@@ -1615,12 +1615,11 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					if self.tItems["settings"].strLootFiltering == "WL" then
 						if string.lower(fWord) == string.lower(word) then bFound = true break end
 					elseif self.tItems["settings"].strLootFiltering == "BL" then
-						if string.lower(fWord) == string.lower(word) then self:dbglog(">Query Fail > Reason: 'Blacklisted'") return end
+						if string.lower(fWord) == string.lower(word) then return end
 					end
 				end
 				if bFound then break end
 			end
-			self:dbglog(">Query passed > blacklist")
 
 			if self.ItemDatabase and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
@@ -1658,7 +1657,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				strItem = strItem .. " " .. words[k]
 			 end
 			 
-			for word in string.gmatch(string.sub(itemStr,2),"%S+") do
+			for word in string.gmatch(string.sub(strItem,2),"%S+") do
 				for fWord in string.gmatch(self.tItems["settings"].strFilteredKeywords, '([^;]+)') do
 					if self.tItems["settings"].strLootFiltering == "WL" then
 						if string.lower(fWord) == string.lower(word) then bFound = true break end
@@ -1669,8 +1668,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if bFound then break end
 			end
 			
-			if self.ItemDatabase[string.sub(itemStr,2)] then
-				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
+			if self.ItemDatabase[string.sub(strItem,2)] then
+				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(strItem,2)].ID)
 				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
 				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
 				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then return end
@@ -4131,195 +4130,220 @@ end
 local strConcatedString
 
 function DKP:ExportExport()
-
-	if not self.wndExport:FindChild("List"):IsChecked() then
-		if self.wndExport:FindChild("EPGP"):IsChecked() then
-			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+	if not self.wndExport:FindChild("ModeDisplay"):IsChecked() then
+		if self.wndExport:FindChild("ModeEPGP"):IsChecked() then
+			if self.wndExport:FindChild("TypeCSV"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsCSVEPGP())
-			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTML"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsHTMLEPGP())
-			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTMLF"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsFormattedHTMLEPGP())
 			end
-		elseif self.wndExport:FindChild("DKP"):IsChecked() then
-			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+		elseif self.wndExport:FindChild("ModeDKP"):IsChecked() then
+			if self.wndExport:FindChild("TypeCSV"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsCSVDKP())
-			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTML"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsHTMLDKP())
-			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTMLF"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsFormattedHTMLDKP())
 			end
 		end
 	else
-		if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+		if self.wndExport:FindChild("TypeCSV"):IsChecked() then
 			self:ExportSetOutputText(self:ExportAsCSVList())
-		elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+		elseif  self.wndExport:FindChild("TypeHTML"):IsChecked() then
 			self:ExportSetOutputText(self:ExportAsHTMLList())
-		elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+		elseif  self.wndExport:FindChild("TypeHTMLF"):IsChecked() then
 			self:ExportSetOutputText(self:ExportAsFormattedHTMLList())
 		end
 	end
+end
+
+function DKP:ExportDatabase()
+	local exportTables = {}
+	exportTables.tPlayers = {}
+	for k , player in ipairs(self.tItems) do
+		local tPlayer = {}
+		tPlayer.strName = player.strName
+		tPlayer.net = player.net
+		tPlayer.tot = player.tot
+		tPlayer.Hrs = player.Hrs
+		tPlayer.logs = player.logs
+		tPlayer.EP = player.EP
+		tPlayer.GP = player.GP
+		tPlayer.class = player.class
+		tPlayer.alts = player.alts
+		tPlayer.role = player.role
+		tPlayer.offrole = player.offrole
+		tPlayer.tLLogs = player.tLLogs
+		tPlayer.tAtt = player.tAtt
+		table.insert(exportTables.tPlayers,tPlayer)
+	end
+	exportTables.tRaids = self.tItems.tRaids
+	exportTables.tSettings = self.tItems["settings"]
+	exportTables.tEPGP = self.tItems["EPGP"]
+	exportTables.tStandby = self.tItems["Standby"]
+	exportTables.tCE = self.tItems["CE"]
+	exportTables.tDataSets = self.tItems.tDataSets
 	
-	if self.wndExport:FindChild("ButtonExportSerialize"):IsChecked() then
-		local exportTables = {}
-		exportTables.tPlayers = {}
-		for k , player in ipairs(self.tItems) do
-			local tPlayer = {}
-			tPlayer.strName = player.strName
-			tPlayer.net = player.net
-			tPlayer.tot = player.tot
-			tPlayer.Hrs = player.Hrs
-			tPlayer.logs = player.logs
-			tPlayer.EP = player.EP
-			tPlayer.GP = player.GP
-			tPlayer.class = player.class
-			tPlayer.alts = player.alts
-			tPlayer.role = player.role
-			tPlayer.offrole = player.offrole
-			tPlayer.tLLogs = player.tLLogs
-			tPlayer.tAtt = player.tAtt
-			table.insert(exportTables.tPlayers,tPlayer)
-		end
-		exportTables.tRaids = self.tItems.tRaids
-		exportTables.tSettings = self.tItems["settings"]
-		exportTables.tEPGP = self.tItems["EPGP"]
-		exportTables.tStandby = self.tItems["Standby"]
-		exportTables.tCE = self.tItems["CE"]
-		exportTables.tDataSets = self.tItems.tDataSets
+
+	self:ExportSetOutputText(serpent.dump(exportTables))
+
+end
+
+function DKP:ExportWebsite()
+	local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+	local tTestTable = {}
+	tTestTable['tMembers'] = {}
+	tTestTable['tRaids'] = self.tItems.tRaids
+	for k , player in ipairs(self.tItems) do
+		local tCopy = {}
+		tCopy.strName = player.strName
+		tCopy.net = player.net
+		tCopy.tot = player.tot
+		tCopy.EP = player.EP
+		tCopy.GP = player.GP
+		tCopy.class = player.class
 		
-
-		self:ExportSetOutputText(serpent.dump(exportTables))
-
-	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
-		self.wndExport:FindChild("ClearString"):Show(false)
-		self.wndExport:FindChild("StoredLength"):SetText("0")
-		local strImportString = strConcatedString
-		strConcatedString = nil
-		if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
-		if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{' then
-			local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
-			local tImportedPlayers = JSON.decode(strImportString)
-			if tImportedPlayers then
-
-				for k,player in ipairs(self.tItems) do
-					self.tItems[k] = nil
+		tCopy.alts = {}
+		for k , alt in ipairs(player.alts) do
+			table.insert(tCopy.alts,{name = alt , tArmoryEntry = self.tItems["settings"].bArmoryApp and self.tItems.tArmory[alt] or nil})
+		end
+		tCopy.logs = player.logs
+		tCopy.role = player.role
+		tCopy.offrole = player.offrole
+		tCopy.tLLogs = player.tLLogs
+		tCopy.tAtt = player.tAtt
+		tCopy.tLLogs = {}
+		tCopy.tDataSets = {}
+		tCopy.tLLogs = {}
+		if self.tItems["settings"].bArmoryAppend then tCopy.tArmoryEntry = self.tItems.tArmory[tCopy.strName] end
+		for j , group in ipairs(self.tItems["settings"].Groups) do 
+			for i , id in ipairs(group.tIDs) do
+				if id == k then
+					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)})
+					break
 				end
-				for k,raid in ipairs(self.tItems.tRaids or {}) do
-					if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
-				end
-				self.tItems.tDataSets = {}
-				for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
-					table.insert(self.tItems,player)
-					for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
-						if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
-						self.tItems.tDataSets[set.strGroup][player.strName] = set.tData
-					end
-					self.tItems[#self.tItems].tDataSets = nil
-				end
-				if not self.tItems.tRaids then self.tItems.tRaids = {} end
-				for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
-					table.insert(self.tItems.tRaids,raid)
-				end
- 				self:AltsBuildDictionary()
-				for alt , owner in ipairs(self.tItems["alts"]) do
-					for k , player in ipairs(self.tItems) do
-						if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
-						break
-					end
-				end
-				self:AltsBuildDictionary()
 			end
-			ChatSystemLib.Command("/reloadui")
-		else
-			local tImportedTables
-			if string.sub(strImportString, 1, 2) == 'do' then
-				tImportedTables = serpent.load(strImportString)
-			else
-				tImportedTables = serpent.load(Base64.Decode(strImportString))
-			end
-
-			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
-				for k,player in ipairs(self.tItems) do
-					self.tItems[k] = nil
-				end
-				for k,player in ipairs(tImportedTables.tPlayers) do
-					table.insert(self.tItems,player)
-				end
-				for k,player in ipairs(self.tItems) do
-					if not self.tItems[k].logs then self.tItems[k].logs = {} end
-				end
-				self.tItems["settings"] = tImportedTables.tSettings
-				self.tItems["EPGP"] = tImportedTables.tEPGP
-				self.tItems["Standby"] = tImportedTables.tStandby
-				self.tItems["CE"] = tImportedTables.tCE
-				self.tItems.tDataSets = tImportedTables.tDataSets
-				self.tItems.tRaids = tImportedTables.tRaids
-				self:AltsBuildDictionary()
-				for alt , owner in ipairs(self.tItems["alts"]) do
-					for k , player in ipairs(self.tItems) do
-						if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
-						break
-					end
-				end
-				self:AltsBuildDictionary()
-				ChatSystemLib.Command("/reloadui")
-			elseif tImportedTables["settings"] and tImportedTables["EPGP"] then
-				self.tItems["settings"] = tImportedTables["settings"]
-				self.tItems["EPGP"] = tImportedTables["EPGP"]
-				self.tItems["CE"] = tImportedTables["CE"]
-				ChatSystemLib.Command("/reloadui")
-			else
-				Print("Error processing database")
-			end
+		end
+		if #tCopy.tDataSets == 0 then tCopy.tDataSets = nil end
+		table.insert(tTestTable['tMembers'],tCopy)
+		for k , entry in ipairs(player.tLLogs or {}) do
+			if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
+				table.insert(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs,entry)
+			end 
 		end
 	end
+	
+	self:ExportSetOutputText(JSON.encode(tTestTable))
+end
 
-	if self.wndExport:FindChild("WebExport"):IsChecked() then
+function DKP:ExportCheckImport()
+	local strImportString = strConcatedString
+	if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
+	local bResult = false
+	local strType = "----"
+	if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{'  then
+		bResult = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage.decode(strImportString) and true or false
+		strType = "Website"
+	elseif string.sub(strImportString, 1, 2) == 'do' then
+		bResult = string.sub(strImportString,-5) == "_;end" and true or false
+		strType = "Database"
+	else
+		strType = "Invalid"
+	end
+	if bResult then
+		self.wndExport:FindChild("ImportStatusOK"):Show(true)
+		self.wndExport:FindChild("ImportStatusNope"):Show(false)
+	else
+		self.wndExport:FindChild("ImportStatusOK"):Show(false)
+		self.wndExport:FindChild("ImportStatusNope"):Show(true)
+	end
+	self.wndExport:FindChild("ImportTypeLabel"):SetText(strType)
+	self.wndExport:FindChild("Import"):Enable(bResult)
+end
+
+function DKP:ExportImport()
+	self.wndExport:FindChild("ClearString"):Show(false)
+	self.wndExport:FindChild("StoredLength"):SetText("0")
+	local strImportString = strConcatedString
+	strConcatedString = nil
+	if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
+	if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{' then
 		local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
-		local tTestTable = {}
-		tTestTable['tMembers'] = {}
-		tTestTable['tRaids'] = self.tItems.tRaids
-		for k , player in ipairs(self.tItems) do
-			local tCopy = {}
-			tCopy.strName = player.strName
-			tCopy.net = player.net
-			tCopy.tot = player.tot
-			tCopy.EP = player.EP
-			tCopy.GP = player.GP
-			tCopy.class = player.class
-			
-			tCopy.alts = {}
-			for k , alt in ipairs(player.alts) do
-				table.insert(tCopy.alts,{name = alt , tArmoryEntry = self.tItems["settings"].bArmoryApp and self.tItems.tArmory[alt] or nil})
+		local tImportedPlayers = JSON.decode(strImportString)
+		if tImportedPlayers then
+
+			for k,player in ipairs(self.tItems) do
+				self.tItems[k] = nil
 			end
-			tCopy.logs = player.logs
-			tCopy.role = player.role
-			tCopy.offrole = player.offrole
-			tCopy.tLLogs = player.tLLogs
-			tCopy.tAtt = player.tAtt
-			tCopy.tLLogs = {}
-			tCopy.tDataSets = {}
-			tCopy.tLLogs = {}
-			if self.tItems["settings"].bArmoryAppend then tCopy.tArmoryEntry = self.tItems.tArmory[tCopy.strName] end
-			for j , group in ipairs(self.tItems["settings"].Groups) do 
-				for i , id in ipairs(group.tIDs) do
-					if id == k then
-						table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)})
-						break
-					end
+			for k,raid in ipairs(self.tItems.tRaids or {}) do
+				if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
+			end
+			self.tItems.tDataSets = {}
+			for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
+				table.insert(self.tItems,player)
+				for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
+					if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
+					self.tItems.tDataSets[set.strGroup][player.strName] = set.tData
+				end
+				self.tItems[#self.tItems].tDataSets = nil
+			end
+			if not self.tItems.tRaids then self.tItems.tRaids = {} end
+			for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
+				table.insert(self.tItems.tRaids,raid)
+			end
+				self:AltsBuildDictionary()
+			for alt , owner in ipairs(self.tItems["alts"]) do
+				for k , player in ipairs(self.tItems) do
+					if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
+					break
 				end
 			end
-			if #tCopy.tDataSets == 0 then tCopy.tDataSets = nil end
-			table.insert(tTestTable['tMembers'],tCopy)
-			for k , entry in ipairs(player.tLLogs or {}) do
-				if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
-					table.insert(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs,entry)
-				end 
-			end
+			self:AltsBuildDictionary()
 		end
-		
-		self:ExportSetOutputText(JSON.encode(tTestTable))
-	    
+		ChatSystemLib.Command("/reloadui")
+	else
+		local tImportedTables
+		if string.sub(strImportString, 1, 2) == 'do' then
+			tImportedTables = serpent.load(strImportString)
+		else
+			tImportedTables = serpent.load(Base64.Decode(strImportString))
+		end
+
+		if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
+			for k,player in ipairs(self.tItems) do
+				self.tItems[k] = nil
+			end
+			for k,player in ipairs(tImportedTables.tPlayers) do
+				table.insert(self.tItems,player)
+			end
+			for k,player in ipairs(self.tItems) do
+				if not self.tItems[k].logs then self.tItems[k].logs = {} end
+			end
+			self.tItems["settings"] = tImportedTables.tSettings
+			self.tItems["EPGP"] = tImportedTables.tEPGP
+			self.tItems["Standby"] = tImportedTables.tStandby
+			self.tItems["CE"] = tImportedTables.tCE
+			self.tItems.tDataSets = tImportedTables.tDataSets
+			self.tItems.tRaids = tImportedTables.tRaids
+			self:AltsBuildDictionary()
+			for alt , owner in ipairs(self.tItems["alts"]) do
+				for k , player in ipairs(self.tItems) do
+					if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
+					break
+				end
+			end
+			self:AltsBuildDictionary()
+			ChatSystemLib.Command("/reloadui")
+		elseif tImportedTables["settings"] and tImportedTables["EPGP"] then
+			self.tItems["settings"] = tImportedTables["settings"]
+			self.tItems["EPGP"] = tImportedTables["EPGP"]
+			self.tItems["CE"] = tImportedTables["CE"]
+			ChatSystemLib.Command("/reloadui")
+		else
+			Print("Error processing database")
+		end
 	end
 end
 
@@ -4327,9 +4351,9 @@ function DKP:ExportLoadFromFile()
 	if self.GetExportStringFromFile then
 		strConcatedString = self:GetExportStringFromFile()
 		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
+		if string.len(strConcatedString) ~= 0 then self.wndExport:FindChild("ClearString"):Show(true) end
 	end
 end
-
 
 function DKP:ExportEnableLootFiltering()
 	self.tItems["settings"].bUseFilterForWebsiteExport = true
@@ -4350,6 +4374,7 @@ function DKP:ExportAddStringPart()
 		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	end
 	self.wndExport:FindChild("ExportBox"):SetText("")
+	self:ExportCheckImport()
 end
 
 function DKP:ExportResetString()
@@ -4361,6 +4386,7 @@ end
 function DKP:ExportSetOutputText(strText)
 	if string.len(strText) < 30000 then self.wndExport:FindChild("ExportBox"):SetText(strText) else self.wndExport:FindChild("ExportBox"):SetText("String is too long , use copy to clipboard button.") end
 	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, strText)
+	self:ExportCheckImport()
 end
 
 function DKP:ExportCloseWindow( wndHandler, wndControl, eMouseButton )
@@ -4370,8 +4396,9 @@ end
 
 function DKP:ExportShowWindow( wndHandler, wndControl, eMouseButton )
 	self.wndExport:Show(true,false)
-	self.wndExport:FindChild("ButtonExportCSV"):SetCheck(true)
 	self.wndExport:ToFront()
+	self.wndExport:FindChild("Import"):Enable(false)
+
 end
 
 function DKP:ExportShowPreloadedText(exportString)
@@ -4503,7 +4530,7 @@ function DKP:ExportAsFormattedHTMLDKP()
 			if self.tItems[i].logs ~= nil then
 				formatedTable[self.tItems[i].strName]["Logs"] = {}
 				for k,logs in ipairs(self.tItems[i].logs) do
-					if string.find(logs.comment,"EP") == nil and string.find(logs.comment,"GP") == nil then 
+					if string.find(logs.strComment,"EP") == nil and string.find(logs.strComment,"GP") == nil then 
 						table.insert(formatedTable[self.tItems[i].strName]["Logs"],logs)
 					end
 				end
