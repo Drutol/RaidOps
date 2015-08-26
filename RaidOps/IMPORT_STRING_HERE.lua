@@ -8,9 +8,9 @@ How this file looks by default:
 local DKP = Apollo.GetAddon("RaidOps")
 
 function DKP:GetExportStringFromFile()
-	return [===[ EXPORT_STRING_HERE_JUST_REPLACE_THIS_PLACEHOLDER ]===]
+	return [===[EXPORT_STRING_HERE_JUST_REPLACE_THIS_PLACEHOLDER]===]
 end
 ]]
 function DKP:GetExportStringFromFile()
-	return [===[ EXPORT_STRING_HERE_JUST_REPLACE_THIS_PLACEHOLDER ]===]
+	return [===[EXPORT_STRING_HERE_JUST_REPLACE_THIS_PLACEHOLDER]===]
 end

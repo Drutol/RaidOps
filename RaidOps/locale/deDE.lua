@@ -221,3 +221,26 @@ L["#wndSettings:SkipBidWinner"] = "Verberge das Pop-up Fenster, wenn durch eine 
 L["#wndBid:Modes:AutoStart"] = "Starte Auktion automatisch."
 --v2.05
 L["#wndSettings:RaidInvites"] = "Raid Einladungen."
+--v2.15
+L["#LabelTooltips:%GA"] = "Prozentuale Teilnahme an GA Raids."
+L["#LabelTooltips:%DS"] = "Prozentuale Teilnahme an DS Raids."
+L["#LabelTooltips:%Y"] = "Prozentuale Teilnahme an Y-83 Raids."
+L["#LabelTooltips:%Total"] = "Prozentuale Teilnahme an allen Raidss."
+L["#LabelTooltips:GA"] = "Verhältnis der teilgenommenen GA Raids zu allen GA Raids."
+L["#LabelTooltips:DS"] = "Verhältnis der teilgenommenen DS Raids zu allen DS Raids."
+L["#LabelTooltips:Y"] = "Verhältnis der teilgenommenen Y-83 Raids zu allen Y-83 Raids."
+L["#LabelTooltips:Total"] = "Prozentualle Teilnahme an allen Raids."
+--v2.20
+L["#wndEPGPSettings:GPThres"] = "GP kann nicht unter die Grund GP Fallen."
+--v2.22
+L["#wndMain:TimedAward:NotifyScreen"] = "Benachrichtung auf dem Monitor ?"
+--v2.23 and a half
+L["#wndSettings:ItemLabelFilter"] = "Filter Item Bezeichnung mit Loot Logs Filterung."
+--v2.25
+L["#wndMain:DKPDecay:Title"] = "DKP Verfall"
+L["#wndMain:DKPDecay:MinNet"] = "Minimaler Net Betrag:"
+L["#wndMain:DKPDecay:HelpNegative"] = "Negativer DKP Zuwachs."
+L["#wndSettings:DKPPrec"] = "Setzte DKP Präzision."
+L["#wndEPGPSettings:Enable"] = "Aktiviere EPGP"
+--v2.26
+L["#wndBid:AssignRandom"] = "Zufällige Verteilung"

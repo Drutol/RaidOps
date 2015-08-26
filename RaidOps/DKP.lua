@@ -192,6 +192,17 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.30 ---
+{26/08/2015}
+Redesigned alts window.
+Redesigned logs window.
+Fixed sorting in logs window.
+Fixed visual bug when exporting importable database.
+Fixed harmless error when exporting settings.
+---RaidOps version 2.29 ---
+{24/08/2015}
+Redesigned export window.
+Fixed some GP formula bugs.
 ---RaidOps version 2.28 ---
 {05/08/2015}
 Added first kills menu to Custom events.
@@ -237,23 +248,6 @@ DKP decay is registered in Recent Activity.
 Added Option to credit player with attendance manually. 
 Added Option to remove player's attendance manually. 
 When switching to Mass Edit currently selected player will transition to this mode.
----RaidOps version 2.24---
-{12/07/2015}
-Fixed GP values on tokens' tooltips - standalone.
-Added option to import/export settings only.
-Fixed LUA error on attemting to clear raids based on day difference.
-Small UI fixes and enhancements.
-Another iteration of Custom events UI maybe the final one.
-From versions 2.23 b and c :
-Added option to filter out trash items in website export.
-Added option to filter Item label with Loot Logs filtering.
----RaidOps version 2.23---
-{08/07/2015}
-Added Decay reminder.
-Fixed Gp values not showing on certain item types - for standalone tooltips.
-Added option to start and stop 'Timed Award' on raid session start/end.
-Fixed small Attendace + Raid Queue UI bug.
-Time award timer is now saved between sessions.
  ]===]
 
 -- Localization stuff
@@ -1360,7 +1354,7 @@ function DKP:AddDKP(cycling,value,comment) -- Mass Edit check
 		return
 	end
 	Event_FireGenericEvent("ModifiedSomething")
-	if self.wndSelectedListItem ~=nil then
+	if self.wndSelectedListItem then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 			
@@ -4368,11 +4362,10 @@ function DKP:ExportAddStringPart()
 	self.wndExport:FindChild("ClearString"):Show(true)
 	if not strConcatedString then
 		strConcatedString = self.wndExport:FindChild("ExportBox"):GetText()
-		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	else
 		strConcatedString = strConcatedString .. self.wndExport:FindChild("ExportBox"):GetText()
-		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	end
+	self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	self.wndExport:FindChild("ExportBox"):SetText("")
 	self:ExportCheckImport()
 end
@@ -4386,6 +4379,8 @@ end
 function DKP:ExportSetOutputText(strText)
 	if string.len(strText) < 30000 then self.wndExport:FindChild("ExportBox"):SetText(strText) else self.wndExport:FindChild("ExportBox"):SetText("String is too long , use copy to clipboard button.") end
 	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, strText)
+	strConcatedString = strText
+	self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	self:ExportCheckImport()
 end
 
@@ -4406,8 +4401,6 @@ function DKP:ExportShowPreloadedText(exportString)
 	self.wndExport:FindChild("ExportBox"):SetText(exportString)
 	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, exportString)
 	self.wndExport:ToFront()
-	self.wndExport:FindChild("ButtonExportHTML"):SetCheck(false)
-	self.wndExport:FindChild("ButtonExportCSV"):SetCheck(false)
 end
 
 function DKP:ExportAsCSVEPGP()
@@ -5144,6 +5137,7 @@ function DKP:AltsShow()
 	
 	self.wndAlts:FindChild("Player"):SetText(self.tItems[self.wndAlts:GetData()].strName)
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	self:AltsPopulate()
 end
 
@@ -5167,6 +5161,7 @@ function DKP:AltsAdd()
 	local strAlt = self.wndAlts:FindChild("NewAltBox"):GetText()
 	if string.lower(strAlt) == string.lower(self.tItems[self.wndAlts:GetData()].strName) then return end
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	local ID 
 	for k,player in ipairs(self.tItems) do if string.lower(player.strName) == string.lower(strAlt) then ID = k break end end
 	if ID == nil then -- just add
@@ -5181,6 +5176,7 @@ function DKP:AltsAdd()
 		end
 	elseif self.tItems["alts"][strAlt] == nil then -- further input required
 		self.wndAlts:FindChild("FoundBox"):Show(true,false)
+		self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(31,285,245,407)
 	else
 		Print("Alt already registred") 
 	end
@@ -5213,6 +5209,7 @@ function DKP:AltsAddMerge()
 	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	self:AltsPopulate()
 end
 
@@ -5269,6 +5266,7 @@ function DKP:AltsAddConvert()
 	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	self:AltsPopulate()
 end
 
@@ -5277,7 +5275,6 @@ function DKP:AltsInit()
 	self.wndAltsDict = Apollo.LoadForm(self.xmlDoc2,"AltsDictionary",nil,self)
 	self.wndAlts:Show(false,true)
 	self.wndAltsDict:Show(false,true)
-	self.wndAlts:FindChild("Art"):SetOpacity(.5)
 	self:AltsBuildDictionary()
 end
 
@@ -5329,6 +5326,38 @@ function DKP:LogsShow(nOverride)
 	
 end
 
+local function convertStringNumberToChars(nNum)
+	local val = tonumber(nNum)
+	local strSortText = ""
+	if val and val >= 0 then
+		for k=1,#nNum do
+			if nNum[k] == "1" then strSortText = strSortText .. "i" 
+			elseif nNum[k] == "2" then strSortText = strSortText .. "h" 
+			elseif nNum[k] == "3" then strSortText = strSortText .. "g" 
+			elseif nNum[k] == "4" then strSortText = strSortText .. "f" 
+			elseif nNum[k] == "5" then strSortText = strSortText .. "e" 
+			elseif nNum[k] == "6" then strSortText = strSortText .. "d" 
+			elseif nNum[k] == "7" then strSortText = strSortText .. "c" 
+			elseif nNum[k] == "8" then strSortText = strSortText .. "b" 
+			elseif nNum[k] == "9" then strSortText = strSortText .. "a" end
+		end
+	elseif val and val < 0 then
+		strSortText = "z"
+		for k=1,#nNum do
+			if nNum[k] == "1" then strSortText = strSortText .. "a" 
+			elseif nNum[k] == "2" then strSortText = strSortText .. "b" 
+			elseif nNum[k] == "3" then strSortText = strSortText .. "c" 
+			elseif nNum[k] == "4" then strSortText = strSortText .. "d" 
+			elseif nNum[k] == "5" then strSortText = strSortText .. "e" 
+			elseif nNum[k] == "6" then strSortText = strSortText .. "f" 
+			elseif nNum[k] == "7" then strSortText = strSortText .. "g" 
+			elseif nNum[k] == "8" then strSortText = strSortText .. "h" 
+			elseif nNum[k] == "9" then strSortText = strSortText .. "i" end
+		end
+	end
+	return strSortText
+end
+
 function DKP:LogsPopulate()
 	local grid = self.wndLogs:FindChild("Grid")
 	grid:DeleteAll()
@@ -5338,14 +5367,17 @@ function DKP:LogsPopulate()
 		grid:SetCellData(k,4,entry.strType)
 		if entry.strModifier then
 			grid:SetCellData(k,2,entry.strModifier)
+			grid:SetCellSortText(k,2,convertStringNumberToChars(entry.strModifier))
 		end
 		if entry.strTimestamp then
 			grid:SetCellData(k,5,entry.strTimestamp)
 		elseif entry.nDate then
 			grid:SetCellData(k,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
+			grid:SetCellSortText(k, 5, string.format("%09.3f", entry.nDate))
 		end
 		if entry.nAfter then
 			grid:SetCellData(k,3,entry.nAfter)
+			grid:SetCellSortText(k,3,string.format("%09.3f",(tonumber(entry.nAfter) >= 0 and tonumber(entry.nAfter) or (tonumber(entry.nAfter)*-1)/100000)))
 		end
 	end
 end
