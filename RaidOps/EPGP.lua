@@ -152,21 +152,21 @@ function DKP:OnLootedItem(item,bSuspend)
 end
 
 function DKP:EPGPGetTokenItemID(strToken)
-	if string.find(strToken,"Calculated") or string.find(strToken,"Algebraic") or string.find(strToken,"Logarithmic") then --DS
-		if string.find(strToken,"Chestplate") then return DataScapeTokenIds["Chest"] 
-		elseif string.find(strToken,"Greaves") then return DataScapeTokenIds["Legs"] 
-		elseif string.find(strToken,"Helm") then return DataScapeTokenIds["Head"] 
-		elseif string.find(strToken,"Pauldron") then return DataScapeTokenIds["Shoulders"] 
-		elseif string.find(strToken,"Glove") then return DataScapeTokenIds["Hands"] 
-		elseif string.find(strToken,"Boot") then return DataScapeTokenIds["Feet"] 
+	if string.find(strToken,self.Locale["#Calculated"]) or string.find(strToken,self.Locale["#Algebraic"]) or string.find(strToken,self.Locale["#Logarithmic"]) then --DS
+		if string.find(strToken,self.Locale["#Chestplate"]) then return DataScapeTokenIds["Chest"] 
+		elseif string.find(strToken,self.Locale["#Greaves"]) then return DataScapeTokenIds["Legs"] 
+		elseif string.find(strToken,self.Locale["#Helm"]) then return DataScapeTokenIds["Head"] 
+		elseif string.find(strToken,self.Locale["#Pauldron"]) then return DataScapeTokenIds["Shoulders"] 
+		elseif string.find(strToken,self.Locale["#Glove"]) then return DataScapeTokenIds["Hands"] 
+		elseif string.find(strToken,self.Locale["#Boot"]) then return DataScapeTokenIds["Feet"] 
 		end
-	elseif string.find(strToken,"Xenological") or string.find(strToken,"Xenobiotic") or string.find(strToken,"Xenogenetic") then --GA
-		if string.find(strToken,"Chestplate") then return GeneticTokenIds["Chest"] 
-		elseif string.find(strToken,"Greaves") then return GeneticTokenIds["Legs"] 
-		elseif string.find(strToken,"Helm") then return GeneticTokenIds["Head"] 
-		elseif string.find(strToken,"Pauldron") then return GeneticTokenIds["Shoulders"] 
-		elseif string.find(strToken,"Glove") then return GeneticTokenIds["Hands"] 
-		elseif string.find(strToken,"Boot") then return GeneticTokenIds["Feet"] 
+	elseif string.find(strToken,self.Locale["#Xenological"]) or string.find(strToken,self.Locale["#Xenobiotic"]) or string.find(strToken,self.Locale["#Xenogenetic"]) then --GA
+		if string.find(strToken,self.Locale["#Chestplate"]) then return GeneticTokenIds["Chest"] 
+		elseif string.find(strToken,self.Locale["#Greaves"]) then return GeneticTokenIds["Legs"] 
+		elseif string.find(strToken,self.Locale["#Helm"]) then return GeneticTokenIds["Head"] 
+		elseif string.find(strToken,self.Locale["#Pauldron"]) then return GeneticTokenIds["Shoulders"] 
+		elseif string.find(strToken,self.Locale["#Glove"]) then return GeneticTokenIds["Hands"] 
+		elseif string.find(strToken,self.Locale["#Boot"]) then return GeneticTokenIds["Feet"] 
 		end
 	end
 end
@@ -248,17 +248,17 @@ function DKP:EPGPGetSlotValueByString(strSlot)
 end
 
 function DKP:EPGPGetSlotStringByID(ID)
-	if ID == "Primary Weapon" then return "Weapon"
+	if ID == 16 then return "Weapon"
 	elseif ID == 7 then return "Attachment"
-	elseif ID == "Shoulder" then return "Shoulders"
-	elseif ID == "Chest" then return "Chest"
-	elseif ID == "Feet" then return "Feet"
-	elseif ID == "Gadget" then return "Gadget"
-	elseif ID == "Hands" then return "Hands"
-	elseif ID == "Head" then return "Head"
-	elseif ID == "Augment" then return "Implant"
-	elseif ID == "Legs" then return "Legs"
-	elseif ID == "Shields" then return "Shield"
+	elseif ID == 3 then return "Shoulders"
+	elseif ID == 0 then return "Chest"
+	elseif ID == 4 then return "Feet"
+	elseif ID == 11 then return "Gadget"
+	elseif ID == 5 then return "Hands"
+	elseif ID == 2 then return "Head"
+	elseif ID == 10 then return "Implant"
+	elseif ID == 1 then return "Legs"
+	elseif ID == 15 then return "Shield"
 	elseif ID == 8  then return "Support"
 	end
 end
@@ -648,16 +648,12 @@ end
 function DKP:EPGPGetItemCostByID(itemID,bCut)
 	if not bCut then bCut = false end
 	local item = Item.GetDataFromId(itemID)
-	if string.find(item:GetName(),"Imprint") then
+	if string.find(item:GetName(),self.Locale["#Imprint"]) then
 		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
 	end
 	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then
 		local slot 
-		if item:GetSlotName() ~= "" then
-			slot = item:GetSlotName()
-		else
-			slot = item:GetSlot()
-		end
+		slot = item:GetSlot()
 		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
 		
 		if item:GetDetailedInfo().tPrimary.nEffectiveLevel <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
@@ -818,8 +814,9 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
     	end
     end
-    if wndTooltip and string.find(item:GetName(),"Imprint") then
+    if wndTooltip and string.find(item:GetName(),this.Locale["#Imprint"]) then
     	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
+    	--89Print(wndTooltip:FindChild("ItemBasicStatsLine"):GetText())
     	if wndBox then
     		wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
     	end

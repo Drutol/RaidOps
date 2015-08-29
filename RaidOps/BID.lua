@@ -452,9 +452,18 @@ end
 function DKP:BidDistributeAllAtRandom()
 	for k , item in ipairs(self.tSelectedItems) do
 		local luckylooter = self:ChooseRandomLooter(item)
+		self:BidAddPlayerToRandomSkip(luckylooter:GetName())
 		GameLib.AssignMasterLoot(item.nLootId,luckylooter)
-		table.insert(self.tRandomWinners,luckylooter:GetName())
 	end
+end
+
+function DKP:BidAddPlayerToRandomSkip(strName)
+	for random in ipairs(self.tRandomWinners) do -- in theory there should be no duplicates , but let's check just in case
+		if string.lower(strName) == string.lower(random) then return end
+	end
+
+	table.insert(self.tRandomWinners,strName)
+	
 end
 
 function DKP:ChooseRandomLooter(entry)
@@ -2420,13 +2429,13 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		luaCaller.tMasterLootSelectedItem = nil
 		if #DKPInstance.tSelectedItems > 1 then
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
-				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then table.insert(self.tRandomWinners,prevLuckyChild) end
+				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild) end
 				GameLib.AssignMasterLoot(item.nLootId,SelectedLooter)
 				DKPInstance:MLRegisterItemWinner()
 			end
 			DKPInstance.tSelectedItems = {}
 		else
-			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then table.insert(self.tRandomWinners,prevLuckyChild) end
+			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild) end
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
 	end

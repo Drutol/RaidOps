@@ -193,12 +193,15 @@ local nSortedGroup = nil
 local strChangelog = 
 [===[
 ---RaidOps version 2.30 ---
-{26/08/2015}
+{28/08/2015}
 Redesigned alts window.
 Redesigned logs window.
 Fixed sorting in logs window.
 Fixed visual bug when exporting importable database.
 Fixed harmless error when exporting settings.
+Fixed various issues with German localisation.
+Added 1st kill multipliers to custom events for units.
+Fixed Alts merge bug.
 ---RaidOps version 2.29 ---
 {24/08/2015}
 Redesigned export window.
@@ -761,16 +764,6 @@ function DKP:Undo()
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then -- modifications 
 							self.tItems[k] = revertee
-							--[[if string.find(tUndoActions[1].strType,"Reassigned") then
-								local item = Item.GetDataFromId(tUndoActions[1].item)
-								if item then
-									if k == 1 then -- Giver -> Add
-										self
-									elseif k == 2 then -- Recipient -> Rem
-
-									end
-								end
-							end]]
 							break
 						end
 					end
@@ -5184,19 +5177,19 @@ end
 
 function DKP:AltsAddMerge()
 	local mergedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
+	if self.tItems["settings"].bTrackUndo then
+		self:UndoAddActivity(string.format(ktUndoActions["amrg"],mergedPlayer.strName,recipent),"--",{[1] = mergedPlayer},true,nil,true)
+	end
 	local save = self:RaidQueueSaveRestoreAndClear()
 	self:GroupSaveMembers()
 	self.tItems[self.wndAlts:GetData()].net =  self.tItems[self.wndAlts:GetData()].net + mergedPlayer.net
 	self.tItems[self.wndAlts:GetData()].tot =  self.tItems[self.wndAlts:GetData()].tot + mergedPlayer.tot
 	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
 	self.tItems[self.wndAlts:GetData()].GP =  self.tItems[self.wndAlts:GetData()].GP + mergedPlayer.GP
-	self.tItems[self.wndAlts:GetData()].Hrs =  self.tItems[self.wndAlts:GetData()].Hrs + mergedPlayer.Hrs
 	
 	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	
-	if self.tItems["settings"].bTrackUndo then
-		self:UndoAddActivity(string.format(ktUndoActions["amrg"],mergedPlayer.strName,recipent),"--",{[1] = mergedPlayer},true,nil,true)
-	end
+
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
 	
 	for k,player in ipairs(self.tItems) do if player.strName == recipent then self.wndAlts:SetData(k) end end
@@ -5326,34 +5319,42 @@ function DKP:LogsShow(nOverride)
 	
 end
 
-local function convertStringNumberToChars(nNum)
-	local val = tonumber(nNum)
+local function convertStringNumberToChars(strNum) -- because grid sorts only by text -.-
+	local val = strNum
+	strNum = tostring(strNum)
 	local strSortText = ""
-	if val and val >= 0 then
-		for k=1,#nNum do
-			if nNum[k] == "1" then strSortText = strSortText .. "i" 
-			elseif nNum[k] == "2" then strSortText = strSortText .. "h" 
-			elseif nNum[k] == "3" then strSortText = strSortText .. "g" 
-			elseif nNum[k] == "4" then strSortText = strSortText .. "f" 
-			elseif nNum[k] == "5" then strSortText = strSortText .. "e" 
-			elseif nNum[k] == "6" then strSortText = strSortText .. "d" 
-			elseif nNum[k] == "7" then strSortText = strSortText .. "c" 
-			elseif nNum[k] == "8" then strSortText = strSortText .. "b" 
-			elseif nNum[k] == "9" then strSortText = strSortText .. "a" end
+	if val and val > 0 then
+		for i = 1, #strNum do
+    		local c = strNum:sub(i,i)
+			if c == "1" then strSortText = strSortText .. "i" 
+			elseif c == "2" then strSortText = strSortText .. "h" 
+			elseif c == "3" then strSortText = strSortText .. "g" 
+			elseif c == "4" then strSortText = strSortText .. "f" 
+			elseif c == "5" then strSortText = strSortText .. "e" 
+			elseif c == "6" then strSortText = strSortText .. "d" 
+			elseif c == "7" then strSortText = strSortText .. "c" 
+			elseif c == "8" then strSortText = strSortText .. "b" 
+			elseif c == "0" then strSortText = strSortText .. "x" 
+			elseif c == "9" then strSortText = strSortText .. "a" end
 		end
 	elseif val and val < 0 then
 		strSortText = "z"
-		for k=1,#nNum do
-			if nNum[k] == "1" then strSortText = strSortText .. "a" 
-			elseif nNum[k] == "2" then strSortText = strSortText .. "b" 
-			elseif nNum[k] == "3" then strSortText = strSortText .. "c" 
-			elseif nNum[k] == "4" then strSortText = strSortText .. "d" 
-			elseif nNum[k] == "5" then strSortText = strSortText .. "e" 
-			elseif nNum[k] == "6" then strSortText = strSortText .. "f" 
-			elseif nNum[k] == "7" then strSortText = strSortText .. "g" 
-			elseif nNum[k] == "8" then strSortText = strSortText .. "h" 
-			elseif nNum[k] == "9" then strSortText = strSortText .. "i" end
+		for i = 1, #strNum do
+    		local c = strNum:sub(i,i)
+			if c == "1" then strSortText = strSortText .. "a" 
+			elseif c == "2" then strSortText = strSortText .. "b" 
+			elseif c == "3" then strSortText = strSortText .. "c" 
+			elseif c == "4" then strSortText = strSortText .. "d" 
+			elseif c == "5" then strSortText = strSortText .. "e" 
+			elseif c == "6" then strSortText = strSortText .. "f" 
+			elseif c == "7" then strSortText = strSortText .. "g" 
+			elseif c == "8" then strSortText = strSortText .. "h" 
+			elseif c == "0" then strSortText = strSortText .. "x" 
+			elseif c == "9" then strSortText = strSortText .. "i" end
 		end
+	end
+	for k=#strSortText,11 do
+		strSortText = "y" .. strSortText
 	end
 	return strSortText
 end
@@ -5373,11 +5374,11 @@ function DKP:LogsPopulate()
 			grid:SetCellData(k,5,entry.strTimestamp)
 		elseif entry.nDate then
 			grid:SetCellData(k,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
-			grid:SetCellSortText(k, 5, string.format("%09.3f", entry.nDate))
+			grid:SetCellSortText(k,5,convertStringNumberToChars(entry.nDate))
 		end
 		if entry.nAfter then
 			grid:SetCellData(k,3,entry.nAfter)
-			grid:SetCellSortText(k,3,string.format("%09.3f",(tonumber(entry.nAfter) >= 0 and tonumber(entry.nAfter) or (tonumber(entry.nAfter)*-1)/100000)))
+			grid:SetCellSortText(k,3,convertStringNumberToChars(entry.nAfter))
 		end
 	end
 end
@@ -5531,6 +5532,9 @@ local tCreatedEvent = {}
 function DKP:CEInit()
 	self.wndCE = Apollo.LoadForm(self.xmlDoc,"CustomEvents",nil,self)
 	self.wndFirstKills = Apollo.LoadForm(self.xmlDoc,"FirstKills",nil,self)
+
+	self.GeminiLocale:TranslateWindow(self.Locale, self.wndCE)
+
 	--self.wndCE:SetSizingMaximum(692,700)
 	--self.wndCE:SetSizingMinimum(692,414)
 	
@@ -5564,6 +5568,9 @@ function DKP:CEInit()
 		self.wndFirstKills:FindChild(k):SetCheck(v.bKilled)
 		self.wndFirstKills:FindChild(k.."M"):SetText(v.nMultiplier)
 	end
+
+	self.GeminiLocale:TranslateWindow(self.Locale, self.wndCE)
+
 end
 
 function DKP:CEHideSuccess()
@@ -5693,6 +5700,20 @@ function DKP:BossItemSelected(wndHandler,wndControl)
 	self:CECollapseBosses()
 end
 
+local function normalizeBossName(strName) -- aka translate
+	if strName == "Kuralak die Schänderin" then strName = "Kuralak the Defiler"
+	elseif strName == "Phagenschlund" then strName = "Phage Maw"
+	elseif strName == "Konvergenz der Phagengeborenen" then strName = "Phageborn Convergence"
+	elseif strName == "Phagentech Prototypen" then strName = "Phagetech Prototypes"
+	elseif strName == "Schreckensphage Ohmna" then strName = "Dreadphage Ohmna"
+	elseif strName == "System-Dämonen" then strName = "System Daemons"
+	elseif strName == "Düsterklaue" then strName = "Gloomclaw"
+	elseif strName == "Mahlstromgewalt" then strName = "Maelstorm Authority"
+	end
+
+	return strName
+end
+
 function DKP:CETriggerEvent(eID)
 	local event = self.tItems["CE"][eID]
 	if event then
@@ -5710,12 +5731,21 @@ function DKP:CETriggerEvent(eID)
 				end
 			end
 		end
-		
-		if self.tItems["settings"].tCEFirstMultipliers[strMob] and not self.tItems["settings"].tCEFirstMultipliers[strMob].bKilled then
-			self.tItems["settings"].tCEFirstMultipliers[strMob].bKilled = true
+		local strMobTrans = strMob
+
+		if self.tItems["settings"].tCEFirstMultipliers[strMobTrans] and not self.tItems["settings"].tCEFirstMultipliers[strMobTrans].bKilled then
+			self.tItems["settings"].tCEFirstMultipliers[strMobTrans].bKilled = true
 			bFirst = true
-			nMultiplier = self.tItems["settings"].tCEFirstMultipliers[strMob].nMultiplier
+			nMultiplier = self.tItems["settings"].tCEFirstMultipliers[strMobTrans].nMultiplier
 		end
+
+		if event.nTriggerCount == 0 and event.uType == "Unit" then
+			bFirst = true
+			if not event.nMultiplier then event.nMultiplier = 1 end
+			nMultiplier = event.nMultiplier
+		end
+
+		if not nMultiplier then nMultiplier = 1 end
 
 		local tMembers = {}
 		if self.tItems["settings"].bTrackUndo then
@@ -5771,7 +5801,7 @@ function DKP:CETriggerEvent(eID)
 		end
 		event.nTriggerCount = event.nTriggerCount + 1
 		if self.tItems["settings"].tCETriggeredEvents == nil then self.tItems["settings"].tCETriggeredEvents = {} end
-		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")",strDate = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time())})
+		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")" .. strFirstKill,strDate = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time())})
 		if #self.tItems["settings"].tCETriggeredEvents > 20 then table.remove(self.tItems["settings"].tCETriggeredEvents,20) end
 		if self.wndCE:IsShown() then self:CEPopulate() end
 
@@ -5804,17 +5834,36 @@ function DKP:CECreate()
 			if self.wndCE:FindChild("DKP"):IsChecked() then
 				tCreatedEvent.DKP = tonumber(self.wndCE:FindChild("ValueDKP"):GetText())
 			end
-			
-			table.insert(self.tItems["CE"],{uType = tCreatedEvent.uType,bType = tCreatedEvent.bType,rType = tCreatedEvent.rType,EP = tCreatedEvent.EP,GP = tCreatedEvent.GP,DKP = tCreatedEvent.DKP,strUnit = tCreatedEvent.strUnit,nTriggerCount = 0})
+			if tCreatedEvent.uType == "Unit" then
+				tCreatedEvent.nMultiplier = tonumber(self.wndCE:FindChild("FirstKillMulti"):GetText())
+			end
+			table.insert(self.tItems["CE"],{uType = tCreatedEvent.uType,bType = tCreatedEvent.bType,rType = tCreatedEvent.rType,EP = tCreatedEvent.EP,GP = tCreatedEvent.GP,DKP = tCreatedEvent.DKP,strUnit = tCreatedEvent.strUnit,nTriggerCount = 0,nMultiplier = tCreatedEvent.nMultiplier})
 			
 			tCreatedEvent.EP = nil
 			tCreatedEvent.GP = nil
 			tCreatedEvent.DKP = nil
+
 			if self.wndCEL:IsShown() then self:CELPopulate() end
 			self.wndCE:FindChild("Success"):SetOpacity(1)
 			self:delay(3,self.CEHideSuccess)
 			Event_FireGenericEvent("CEEventCreated")
 		end
+	end
+end
+
+function DKP:CESetMultiplier(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if not val or val < 0 then
+		wndControl:SetText(1)
+	end
+end
+
+function DKP:CEEntryUpdateMultiplier(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if not val or val < 0 then
+		wndControl:SetText(1)
+	else
+		self.tItems["CE"][wndControl:GetParent():GetData()].nMultiplier = val
 	end
 end
 
@@ -5879,8 +5928,11 @@ function DKP:CELPopulate()
 			local wnd = Apollo.LoadForm(self.xmlDoc,"CEEntry",self.wndCEL:FindChild("List"),self)
 			if event.uType == "Unit" then 
 				wnd:FindChild("UnitName"):SetText(event.strUnit)
+				wnd:FindChild("Multi"):SetText(event.nMultiplier or 1)
 			else
 				wnd:FindChild("UnitName"):SetText(event.bType)
+				wnd:FindChild("Multi"):Show(false)
+				wnd:FindChild("MultiTitle"):Show(false)
 			end
 			wnd:FindChild("Recipents"):SetText(event.rType == "RM" and "Raid Members" or "Raid Members + Queue")
 			local strAwards = ""
@@ -5914,7 +5966,6 @@ local tKilledBossesInSession = {
 	daem1 = false,
 	daem2 = false,
 	daemTriggered = false,
-
 }
 
 function DKP:CEOnUnitDamage(tArgs)
@@ -5931,19 +5982,19 @@ function DKP:CEOnUnitDamage(tArgs)
 	local name = tArgs.unitTarget:GetName()
 
 	-- Counting Council Fights
-	if name == "Phagetech Commander" then tKilledBossesInSession.tech1 = true end
-	if name == "Phagetech Augmentor" then tKilledBossesInSession.tech2 = true end
-	if name == "Phagetech Protector" then tKilledBossesInSession.tech3 = true end
-	if name == "Phagetech Fabricator" then tKilledBossesInSession.tech4 = true end
+	if name == self.Locale["#PhagetechCommander"] then tKilledBossesInSession.tech1 = true end
+	if name == self.Locale["#PhagetechAugmentor"] then tKilledBossesInSession.tech2 = true end
+	if name == self.Locale["#PhagetechProtector"] then tKilledBossesInSession.tech3 = true end
+	if name == self.Locale["#PhagetechFabricator"] then tKilledBossesInSession.tech4 = true end
 	
-	if name == "Ersoth Curseform" then tKilledBossesInSession.born1 = true end
-	if name == "Fleshmonger Vratorg" then tKilledBossesInSession.born2 = true end
-	if name == "Terex Blightweaver" then tKilledBossesInSession.born3 = true end
-	if name == "Golgox the Lifecrusher" then tKilledBossesInSession.born4 = true  end
-	if name == "Noxmind the Insidious" then tKilledBossesInSession.born5 = true end
+	if name == self.Locale["#ErsothCurseform"] then tKilledBossesInSession.born1 = true end
+	if name == self.Locale["#FleshmongerVratorg"] then tKilledBossesInSession.born2 = true end
+	if name == self.Locale["#TerexBlightweaver"] then tKilledBossesInSession.born3 = true end
+	if name == self.Locale["#GolgoxtheLifecrusher"] then tKilledBossesInSession.born4 = true  end
+	if name == self.Locale["#NoxmindtheInsidious"] then tKilledBossesInSession.born5 = true end
 
-	if name == "Binary System Daemon" then tKilledBossesInSession.daem1 = true end
-	if name == "Null System Daemon" then tKilledBossesInSession.daem2 = true end
+	if name == self.Locale["#BinarySystemDaemon"] then tKilledBossesInSession.daem1 = true end
+	if name == self.Locale["#NullSystemDaemon"] then tKilledBossesInSession.daem2 = true end
 		
 		
 	
@@ -5964,25 +6015,25 @@ function DKP:CEOnUnitDamage(tArgs)
 	
 	if #tBosses > 0 then
 		for k,boss in ipairs(tBosses) do
-			if boss.bType ~= "Phageborn Convergence" and boss.bType ~= "Phagetech Prototypes" then
+			if boss.bType ~= self.Locale["#PhagebornConvergence"] and boss.bType ~= self.Locale["#PhagetechPrototypes"] then
 				if string.lower(boss.bType) == string.lower(name) then
 					self:CETriggerEvent(boss.ID)
 					break
 				end
 			else
-				if boss.bType == "Phageborn Convergence" and not tKilledBossesInSession.bornTriggerred then
+				if boss.bType == self.Locale["#PhagebornConvergence"] and not tKilledBossesInSession.bornTriggerred then
 					if bornCounter >= 4 then 
 						tKilledBossesInSession.bornTriggerred = true
 						self:CETriggerEvent(boss.ID)
 						break
 					end
-				elseif boss.bType == "Phagetech Prototypes" and not tKilledBossesInSession.techTriggered then
+				elseif boss.bType == self.Locale["#PhagetechPrototypes"] and not tKilledBossesInSession.techTriggered then
 					if tKilledBossesInSession.tech1 or tKilledBossesInSession.tech2 or tKilledBossesInSession.tech3 or tKilledBossesInSession.tech4 then
 						tKilledBossesInSession.techTriggered = true
 						self:CETriggerEvent(boss.ID)
 						break
 					end
-				elseif boss.bType == "System Daemons" and not tKilledBossesInSession.daemTriggered then
+				elseif boss.bType == self.Locale["#SystemDaemons"] and not tKilledBossesInSession.daemTriggered then
 					if tKilledBossesInSession.daem1 and tKilledBossesInSession.daem2 then
 						tKilledBossesInSession.daemTriggered = true
 						self:CETriggerEvent(boss.ID)

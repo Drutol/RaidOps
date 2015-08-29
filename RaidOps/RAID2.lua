@@ -1300,14 +1300,15 @@ function DKP:GroupIsPlayerInAny(ofID)
 	end
 	return false
 end
+
 local tSavedGroups = {}
 function DKP:GroupSaveMembers()
+	tSavedGroups = {}
 	for k , group in ipairs(self.tItems["settings"].Groups) do
 		tSavedGroups[group.strName] = {}
 		for  j , id in ipairs(group.tIDs) do
-			table.insert(tSavedGroups[group.strName],self.tItems[id].name)
+			table.insert(tSavedGroups[group.strName],self.tItems[id].strName)
 		end
-		group.tIDs = {}
 	end
 end
 
@@ -1315,8 +1316,10 @@ function DKP:GroupRestoreMembers()
 	if not tSavedGroups then return end
 
 	for k , group in ipairs(self.tItems["settings"].Groups) do
+		group.tIDs = {}
 		for j , strName in ipairs(tSavedGroups[group.strName]) do
-			table.insert(group.tIDs,self:GetPlayerByIDByName(strName))
+			local id = self:GetPlayerByIDByName(strName)
+			if id ~= -1 then table.insert(self.tItems["settings"].Groups[k].tIDs,id) end
 		end
 	end
 end

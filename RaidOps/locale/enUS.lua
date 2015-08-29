@@ -243,3 +243,50 @@ L["#wndSettings:DKPPrec"] = "Set DKP values precision."
 L["#wndEPGPSettings:Enable"] = "Enable EPGP"
 --v2.26
 L["#wndBid:AssignRandom"] = "Assign Randomly"
+
+
+
+L["#wndCE:NotifyDur"] = "Notification's Duration:"
+
+
+
+-- Internal strings
+L["#Imprint"] = "Imprint"
+
+L["#Chestplate"] = "Chestplate"
+L["#Greaves"] = "Greaves"
+L["#Pauldron"] = "Pauldron"
+L["#Glove"] = "Glove"
+L["#Boot"] = "Boot"
+L["#Helm"] = "Helm"
+
+L["#Calculated"] = "Calculated"
+L["#Algebraic"] = "Algebraic"
+L["#Logarithmic"] = "Logarithmic"
+
+L["#Xenological"] = "Xenological"
+L["#Xenobiotic"] = "Xenobiotic"
+L["#Xenogenetic"] = "Xenogenetic"
+
+L["#PhagetechCommander"] = "Phagetech Commander"
+L["#PhagetechAugmentor"] = "Phagetech Augmentor"
+L["#PhagetechProtector"] = "Phagetech Protector"
+L["#PhagetechFabricator"] = "Phagetech Fabricator"
+L["#ErsothCurseform"] = "Ersoth Curseform"
+L["#FleshmongerVratorg"] = "Fleshmonger Vratorg"
+L["#TerexBlightweaver"] = "Terex Blightweaver"
+L["#GolgoxtheLifecrusher"] = "Golgox the Lifecrusher"
+L["#NoxmindtheInsidious"] = "Noxmind the Insidious"
+L["#BinarySystemDaemon"] = "Binary System Daemon"
+L["#NullSystemDaemon"] = "Null System Daemon"
+
+L["#Experiment X-89"] = "Experiment X-89"
+L["#KuralaktheDefiler"] = "Kuralak the Defiler"
+L["#PhageMaw"] = "Phage Maw"
+L["#PhagebornConvergence"] = "Phageborn Convergence"
+L["#PhagetechPrototypes"] = "Phagetech Prototypes"
+L["#DreadphageOhmna"] = "Dreadphage Ohmna"
+L["#SystemDaemons"] = "System Daemons"
+L["#Gloomclaw"] = "Gloomclaw"
+L["#MaelstormAuthority"] = "Maelstorm Authority"
+L["#Avatus"] = "Avatus"
