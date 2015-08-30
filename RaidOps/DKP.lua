@@ -4699,6 +4699,8 @@ function DKP:PopUpAssign(entry,nPrice)
 	self:PopUpCheckUpdate()
 
 	if self.tItems[ID].wnd then self:UpdateItem(self.tItems[ID]) end
+
+	Event_FireGenericEvent("PopUpAccepted")
 end
 
 function DKP:PopUpGetCurrentPrice()
@@ -5061,8 +5063,8 @@ function DKP:ConLootLogs()
 end
 
 function DKP:ConManualAward()
-	Event_FireGenericEvent("ManualAssignOpen")
 	self:MAOpen(self.wndContext:GetData())
+	Event_FireGenericEvent("ManualAssignOpen")
 end
 
 function DKP:ConStandbyEnable()

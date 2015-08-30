@@ -27,7 +27,7 @@ local ktTutIndex =
 
 			1. I care about users so do not hesitate to create issues on github.You can find more info in settings window under "Support" button.
 			2. This tutorial is not foolproof so don't play against the rules.
-			3. You can progress by pressing blue arror pointing right , or taking certain actions.
+			3. You can progress by pressing blue arror pointing right ('J' is the hotkey for this button) , or taking certain actions.
 			4. You can access tutorial index via settings window.
 
 			Enjoy!
@@ -53,37 +53,39 @@ local ktTutIndex =
 			[5] = "RaidQueue",
 			[6] = "EditBox1",
 			[7] = "MassEdit",
-			[8] = "ShowDPS",
-			[9] = "Undo",
-			[10] = "ALButton",
-			[11] = "ButtonCE",
-			[12] = "ButtonLL",
-			[13] = "ToggleToolbar",
-			[14] = "ShowRS",
-			[15] = "CurrentlyListedAmount",
-			[16] = "OnlineOnly",
-			[17] = "RaidOnly",
+			[8] = "OnlineOnly",
+			[9] = "RaidOnly",
+			[10] = "ShowDPS",
+			[11] = "Undo",
+			[12] = "ALButton",
+			[13] = "ButtonLL",
+			[14] = "ButtonCE",	
+			[15] = "ToggleToolbar",
+			[16] = "ShowRS",
+			[17] = "CurrentlyListedAmount",
+
 
 		},
 		text = 
 		{
 			[1] = "\nThis is main window of the whole addon , here you will find buttons leading deeper.",
-			[2] = "\nThis button here leads to settings window. Particular controls are highlighted with white glow.",
+			[2] = "\nThis button here leads to settings window.",
 			[3] = "\nThis section allows you to set-up columns (labels) , enable sorting , change profiles and add players to Raid Queue.\n\nIn order to set label right click on it and select what you want.\nLeft click will sort roster by selected label , click again to change order.",
-			[4] = "\nThis button and button on the right change label profile - you can have 2 different sets of labels. \n\nBy default the first one is EPGP one and the sencond one shows attendance. \n\nProfiles are saved automatically as you change labels.",
-			[5] = "\nBy enabling this checkbox you will be able to add players to Raid Queue.\nEach player's bar will have this checkbox which upon checking will add this player to queue .\nRaid queue allows you to fool the addon that those players are in raid too.",
+			[4] = "\nThis button as well as button on the right change label profile - you can have 2 different sets of labels. \n\nBy default the first one is EPGP one and the sencond one shows attendance. \n\nProfiles are saved automatically as you change labels.",
+			[5] = "\nBy enabling this checkbox you will be able to add players to Raid Queue.\n\nEach player's bar will have this checkbox which upon checking will add this player to queue .\n\nRaid queue makes addon include them into current raid members tables.",
 			[6] = "\nForces display of player's whose names begin with typed phrase.",
-			[7] = "\nSwitches to 'Mass Edit' mode . You will be provided with additional set of selection tools + some actions. Any modifications will apply to all selected players.",
-			[8] = "\nThis and other two buttons on the right filter's display depending on player's set role. (DPS - HEAL - TANK)",
-			[9] = "\nThis button will revert last action , let it be item award , EPGP manipulation , player removal...",
-			[10] = "\nLeads to window that will show list of all action you can undo/redo with details.",
-			[11] = "\nOpens Custom Events window where you can specify how much EP/GP/DKP will be assigned on boss's or unit's death.",
-			[12] = "\nOpen Loot Logs where you can extensively filter and review loot - whole roster.",
-			[13] = "\nIf you wish to track attendance you have to start Raid Session , this toolbar may prove helpful.",
-			[14] = "\nShows all saved Raid Sessions with ability to display only attendees or loot awarded during this session.",
-			[15] = "\nThis counter displays count of all players currently displayed above.",
-			[16] = "\nPress this to show only online players in the roster window.",
-			[117] = "\nPress this to show people in raid + Raid Queue",
+			[7] = "\nSwitches to 'Mass Edit' mode . You will be provided with additional set of selection tools + some actions.\n\n Any modifications will apply to all selected players.",
+			[8] = "\nPress this to show only online players in the roster window.",
+			[9] = "\nPress this to show people in raid + Raid Queue",
+			[10] = "\nThis and other two buttons on the right filter's display depending on player's set role. (DPS - HEAL - TANK)",
+			[11] = "\nThis button will revert last action , let it be item award , EPGP manipulation , player removal , decay etc.",
+			[12] = "\nLeads to window that will show list of all action you can undo/redo with details.",
+			[14] = "\nOpens Custom Events window where you can specify how much EP/GP/DKP will be assigned on boss's or unit's death.",
+			[13] = "\nOpen Loot Logs where you can extensively filter and review loot - whole roster.",
+			[15] = "\nIf you wish to track attendance you have to start Raid Session , this toolbar may prove helpful.",
+			[16] = "\nShows all saved Raid Sessions with ability to display only attendees or loot awarded during this session.",
+			[17] = "\nThis counter displays count of all players currently displayed above.",
+
 		},
 		events = 
 		{
@@ -116,21 +118,21 @@ local ktTutIndex =
 		},
 		text = 
 		{
-			[1] = "\nWelcome to the settings window.Those don't represent all of the settings available , each module has it's own specific settings.\n\nGeneral settings are split into following groups:",
-			[2] = "\nPlayer creation group , you can collect players from raid and filter them by nameplate affiliation. Right now I advise to use Guild Import",
+			[1] = "\nWelcome to the settings window.\n\nThese are the most basic settings affecting addon's behaviour in general.\n\n There are also buttons leading to smaller submodules.",
+			[2] = "\nPlayer creation group , you can collect players from raid and filter them by nameplate affiliation.",
 			[3] = "\nPopUp group , whenever you assign stuff this window may appear depending on filters and can be customized with those settings.",
 			[4] = "\nDisplay group , a bit of cosmetic customization.",
 			[5] = "\nLogs group , a few settings for Undo logs , standard logs and loot logs.",
-			[6] = "\nLoot filtering, this is the main gate for loot to be registred in addon , if they do not meet those filter they are ignored.",
+			[6] = "\nLoot filtering, this is the main gate for items to be registred by addon.\n\n If item doesn't meet said requirements it's ignored by all modules.",
 			[7] = "\nMiscalleanous settings which do not fit in other categories.",
 			[8] = "\nLeads to EPGP settings where you can adjust GP formula , set decay options and specify minimum EP and base GP.\n\n If you want to use DKP the option for it is there.",
-			[9] = "\nEnables Undo tracking , if logs are not appearing this may be the issue.",
-			[10] = "\nData sharing, you can share data with players who use member module.",
+			[9] = "\nEnables Recent Activity log , which allows you to undo or redo actions.",
+			[10] = "\nData sharing, you can share data with players who use Member Module addon.",
 			[11] = "\nData sync, you can sync database with your raid assistants directly , instead of passing over import strings.",
 			[12] = "\nAttendance, a few settigns concerning attendance tracking and raid sessions.",
 			[13] = "\nGuild Import,place where you want to start . Allows to create roster based on guild's roster.",
 			[14] = "\nStandby list , list of players who will be ommited during decay.",
-			[15] = "\nExport (and Import), you have a few options to export data with two importable formats - JSON for raidops.net  and Base64 encoded string only for addon.",
+			[15] = "\nExport and Import window , allows to create importable databases in text form and import them.\n\n You can also export data into CSV and HTML formats.",
 			[16] = "\nRaid invites , this module allow you to specify command that when written in guild channel or whispered to you will invite sender to raid.",
 		},
 		events = 
@@ -150,20 +152,17 @@ local ktTutIndex =
 		anchor = 
 		{
 			[1] = "Right",
-			[2] = "Button1",
-			[3] = "Button",
+			[2] = "Button",
 		},
 		text = 
 		{
-			[1] = "\nYou need to import some players first , select ranks and specify minimum level .",
-			[2] = "\nThis button will refresh guild roster's data.",
-			[3] = "\nNow press import",
+			[1] = "\nYou need to import some players first , select ranks and specify minimum level.",
+			[2] = "\nNow press import.",
 		},
 		events =
 		{
 			[1] = "GIRankSelect",
-			[2] = nil,
-			[3] = "GIImport",
+			[2] = "GIImport",
 		},
 		highlight = true,
 		func = function(tContext)
@@ -181,7 +180,7 @@ local ktTutIndex =
 			[2] = "Controls",
 			[3] = "Controls:EditBox",
 			[4] = "GroupByClass",
-			[5] = "Mid",
+			[5] = "ListItem",
 			[6] = "Controls:EditBox1",
 			[7] = "Controls:EditBox",
 		},
@@ -190,10 +189,10 @@ local ktTutIndex =
 			[1] = "\nNow all added players are visible here.",
 			[2] = "\nThis section here allows you to manipulate EP/GP/DKP and enable grouping.",
 			[3] = "\nWhenever you want to modify something you need to input comment (if enabled) , note that you can enable 'Generate Comments Automatically' in setting window to add generic coments.",
-			[4] = "\nThis button allows you to group your players , the checkbox on this button allows to group in token groups. Enable gropuing.",
-			[5] = "\nNow players are groupped , let's add something to one of them! Click on player bar.",
-			[6] = "\nNow select EP/GP and type something in the 'Input value' box.",
-			[7] = "\nNow write a comment and press one of the buttons (Add/Sub/Set) below.",
+			[4] = "\nThis button allows you to group your players , the checkbox on this button allows to group in token groups.\n\n Enable gropuing (press it).",
+			[5] = "\nNow players are groupped , let's add something to one of them!\n\n Click on player's bar.",
+			[6] = "\nNow select EP or GP and type number in the 'Input value' box.",
+			[7] = "\nNow write a comment if you want and press one of the buttons Add , Subtract or Set.",
 		},
 		events = 
 		{
@@ -224,11 +223,11 @@ local ktTutIndex =
 		},
 		text = 
 		{
-			[1] = "\nEach of this labels represent one column by default this one is EP one.",
-			[2] = "\nThis label here while can store any data it is advised to use it for name property as it's the biggest one.",
+			[1] = "\nEach of this labels represent one column, by default this one is EP one.",
+			[2] = "\nThis label here can store any data it is advised to use it for name property as it has the biggest field.",
 			[3] = "\nLet's change this label to something else! Right click on it.",
 			[4] = "\nSelect anything from this list , (Last item may fit here well)",
-			[5] = "\nYou can left click on label in order to sort by this label, if grouping is enabled players will be sorted in groups , in order to change direction click again. Click it. ",
+			[5] = "\nYou can left click on label in order to sort by this label, if grouping is enabled players will be sorted in groups, in order to change direction click again.\n\n Click it. ",
 			[6] = "\nYou can have up to 9 labels , to show them grab the corner of the window and resize it.",
 			[7] = "\nBy clicking on this , another set of labels will be loaded. Those sets are saved whenever you change label."
 		},
@@ -307,8 +306,8 @@ local ktTutIndex =
 		text = 
 		{
 			[1] = "There's not much to this window alone , just type ID or select it from loot logs and continue.",
-			[2] = "This button will open Loot Logs window with items dropped in this session , find the one you want and just click it.",
-			[3] = "Type some random item ID and proceed. (eg. 39876)",
+			[2] = "This button will open Loot Logs window with Master Loot items that dropped during this session, you can click one of them to fill in the ID field.\n\n We don't have any items saved so it's empty now.",
+			[3] = "Type some random item ID and proceed. (eg. 60417)",
 		},
 		events = 
 		{
@@ -329,26 +328,24 @@ local ktTutIndex =
 			[4] = "Right",
 			[5] = "ButtonSkip",
 			[6] = "GPOffspec",
-			[7] = "GPOffspec",
-			[8] = "Right",
+			[7] = "Right",
 		},
 		text = 
 		{
-			[1] = "This is the window we wanted to get our hands on. As you can see you can just press 'Accept' and GP will be added to this player.",
-			[2] = "This button will instantly award curent item to 'Guild bank'. It means that the log will appear in GB logs.",
+			[1] = "This is the window we wanted to get our hands on. Don't press accept just yet.",
+			[2] = "This button will instantly award curent item to 'Guild bank'. It means that the log will appear in Guild Bank logs.",
 			[3] = "This number shows how many items are in queue waiting to be assigned.",
-			[4] = "Assign another item to different player via Manual Assign.",
-			[5] = "As you can see this button is now active. When you press it this item will be forgotten - no GP charged. Press this button.",
-			[6] = "The window has updated itself with new data. Look at this checkbox now.",
-			[7] = "When pressed it will decrease the GP/DKP value by percentage set in settings window.",
-			[8] = "When you are done simply press 'Accept'.",
+			[4] = "Assign another item to different player via Manual Assign.\n\n Repeat steps from previous tutorial.\n 1.Right click on player entry\n2.Press 'Item award button'\n3.Fill in ID field and press proceed button.",
+			[5] = "As you can see this button is now active. When you press it current item will be forgotten (no GP charged) and next item from queue loaded. Press this button.",
+			[6] = "Look at this checkbox now.\n\n When pressed it will decrease the GP/DKP value by percentage set in settings window, by default it's set to 25%.",
+			[7] = "When you are done simply press 'Accept'.\n\n Press Accept",
 
 		},
 		events = 
 		{
 			[4] = "MAProceed",
 			[5] = "PopUpSkip",
-			[8] = "PopUpAccepted",
+			[7] = "PopUpAccepted",
 		},
 		highlight = true,
 		bCantGOTO = true
@@ -445,7 +442,7 @@ local ktTutIndex =
 			[2] = "MainFrame",
 			[3] = "Right",
 			[4] = "Right",
-			[5] = "RecentFrame",
+			[5] = "Grid",
 			[6] = "Settings",
 			[7] = "Button1",
 		},
@@ -545,7 +542,7 @@ function DKP:TutStart(nTut,nProgress)
 		-- Determine Pos
 		if currTut.window == "None" then
 			local x,y = Apollo.GetScreenSize()
-			self.wndTut:Move( (x/2)-self.wndTut:GetWidth()/2, t, self.wndTut:GetWidth(), self.wndTut:GetHeight())
+			self.wndTut:Move( (x/2)-self.wndTut:GetWidth()/2, y/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 		else
 			currTut.targetControl = currTut.wnd:FindChild(currTut.anchor[nProgress])
 			if currTut.anchor[nProgress] == "Mid" then
