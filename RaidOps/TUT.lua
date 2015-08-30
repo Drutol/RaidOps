@@ -10,22 +10,33 @@ local ktTutIndex =
 	[1] = 
 	{
 		title = "Welcome to RaidOps",
-		window = "Main",
+		window = "None",
 		anchor = 
 		{
 			[1] = "Mid",
-			[2] = "Mid",
-			[3] = "Mid"
+			[2] = "Mid"
 		},
 		text = 
 		{
-			[1] = "Thanks for trying out this addon!\n\nAs it's quite rich in features this tutorial will help you understand the basics.\n\nClosing this window will stop the tutorial , you can get back to it from settings window.",
-			[2] = "Please note that these tutorials are not fool-proof .\nThat's not the point , try not to rush things and follow them.\n\nIf something goes wrong you can always restart them :).",
-			[3] = "In order to open main roster window type /epgp"
+			[1] = [===[
+			Welcome! Thank you for checking out this addon!
+
+			In order to get you accustomed with the basics I've created this tutorial.Addon is big enough to justify this :).
+
+			First things first:
+
+			1. I care about users so do not hesitate to create issues on github.You can find more info in settings window under "Support" button.
+			2. This tutorial is not foolproof so don't play against the rules.
+			3. You can progress by pressing blue arror pointing right , or taking certain actions.
+			4. You can access tutorial index via settings window.
+
+			Enjoy!
+			]===],
+			[2] = "In order to open main roster window type /epgp"
 		},
 		events = 
 		{
-			[3] = "MainWindowShow",
+			[2] = "MainWindowShow",
 		},
 		highlight = false,
 	},
@@ -500,6 +511,17 @@ function DKP:TutCanGoto(nTut)
 	if nTut == 9 or nTut == 10 then return false else return true end
 end
 
+local function GetAbsolutePos(wnd)
+	local x ,y = wnd:GetPos()
+	while wnd:GetParent() do
+		wnd = wnd:GetParent()
+		local nx , ny = wnd:GetPos()
+		x = x + nx
+		y = y + ny
+	end
+	return x , y
+end
+
 function DKP:TutStart(nTut,nProgress)
 	if not nTut then nTut = self.tItems["settings"].nTutProgress end
 	if not nProgress then nProgress = 1 end
@@ -521,21 +543,43 @@ function DKP:TutStart(nTut,nProgress)
 		elseif currTut.window == "LLM" then currTut.wnd = self.wndLLM  
 		end
 		-- Determine Pos
-		if currTut.anchor[nProgress] == "Mid" then
-			local x,y = currTut.wnd:GetAnchorOffsets()
-			self.wndTut:Move( x + currTut.wnd:GetWidth()/2 - self.wndTut:GetWidth()/2,  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
-		elseif currTut.anchor[nProgress] == "Right" then
-			local x,y = currTut.wnd:GetAnchorOffsets()
-			self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
+		if currTut.window == "None" then
+			local x,y = Apollo.GetScreenSize()
+			self.wndTut:Move( (x/2)-self.wndTut:GetWidth()/2, t, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 		else
 			currTut.targetControl = currTut.wnd:FindChild(currTut.anchor[nProgress])
-			if currTut.window == "Settings" or currTut.window == "GI" or currTut.window == "PopUp" or currTut.window == "ManualAssign" or currTut.window == "Con" or currTut.window == "LL" or currTut.widnow == "TA" or currTut.window == "LLM" or currTut.window == "CE" then
+			if currTut.anchor[nProgress] == "Mid" then
+				local x,y = currTut.wnd:GetAnchorOffsets()
+				self.wndTut:Move( x + currTut.wnd:GetWidth()/2 - self.wndTut:GetWidth()/2,  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
+			elseif currTut.anchor[nProgress] == "Right" then
 				local x,y = currTut.wnd:GetAnchorOffsets()
 				self.wndTut:Move( x + currTut.wnd:GetWidth(),  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
 			else
-				local x,y = currTut.wnd:GetAnchorOffsets()
-				self.wndTut:Move( x + currTut.wnd:GetWidth()/2 - self.wndTut:GetWidth()/2,  y + currTut.wnd:GetHeight()/2 - self.wndTut:GetHeight()/2, self.wndTut:GetWidth(), self.wndTut:GetHeight())
+				local x,y = GetAbsolutePos(currTut.targetControl)
+				local yf = y - (self.wndTut:GetHeight() - currTut.targetControl:GetHeight())/2
+				if self.wndTut:GetHeight() >= currTut.targetControl:GetHeight() then
+					self.wndTut:Move( x + currTut.targetControl:GetWidth() ,  yf, self.wndTut:GetWidth(), self.wndTut:GetHeight())
+				else
+					self.wndTut:Move( x + currTut.targetControl:GetWidth() ,  yf , self.wndTut:GetWidth(), self.wndTut:GetHeight())
+				end
+
+				local fx , fy = self.wndTut:GetPos() -- check if is visible
+				local mx,my = Apollo.GetScreenSize()
+				if fx < 0 then
+					fx = 0 
+				end
+				if fy < 0 then
+					fy = 0
+				end
+				if fx + self.wndTut:GetWidth() > mx then
+					fx = mx - self.wndTut:GetWidth()
+				end
+				if fy + self.wndTut:GetHeight() > my then
+					fy = my - self.wndTut:GetHeight()
+				end
+				self.wndTut:Move(fx,fy, self.wndTut:GetWidth(),self.wndTut:GetHeight())
 			end
+
 		end
 		-- Handlers
 
@@ -553,17 +597,23 @@ function DKP:TutStart(nTut,nProgress)
 		end
 
 		--Set Text	
-		self.wndTut:FindChild("TutText"):SetText(currTut.text[nProgress])
+		
 		self.wndTut:FindChild("TutTitle"):SetText(currTut.title)
+		self.wndTut:FindChild("TutText"):SetText(currTut.text[nProgress])
+		self.wndTut:FindChild("TutText"):SetVScrollInfo(self.wndTut:FindChild("TutText"):GetVScrollRange()*5,100,100)
 	  	if currTut.highlight and currTut.targetControl then
 			local wnd = Apollo.LoadForm(self.xmlDoc3,"TutGlow",currTut.targetControl,self)
 			currTut.wndGlow = wnd
+			wnd:SetOpacity(.5)
 		end
 		if currTut.func then currTut.func(self) end
 		self.wndTut:Show(true)
 		self.wndTut:ToFront()
+
 	end
 end
+
+
 
 function DKP:TutFront()
 	self.wndTut:ToFront()
