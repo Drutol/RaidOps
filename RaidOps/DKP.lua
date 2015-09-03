@@ -41,6 +41,7 @@ local DKP = {}
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
 local Major, Minor, Patch, Suffix = 2, 25, 0, 0
+local strConcatedString
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -192,6 +193,13 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.31 ---
+{31/08/2015}
+Redesigned tutorials window.
+Code refactoring for tutorials module.
+Updated all existing tutorials.
+Fixed a few anomalies with pop-up window.
+Fixed bug which removed groups when player was removed.
 ---RaidOps version 2.30 ---
 {28/08/2015}
 Redesigned alts window.
@@ -513,6 +521,7 @@ function DKP:OnDocLoaded()
 		self:MoreBottomOptionsInit()
 		self:DataSetsInit()
 		self:ArmoryInit()
+		self:ImportNotifyInit()
 
 		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
@@ -572,7 +581,9 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	self:GetNewItem(70000)
+	for k,v in pairs(self.tItems) do
+		Print(k)
+	end
 end
 
 function DKP:GetNewItem(id)
@@ -1295,6 +1306,10 @@ function DKP:OnSave(eLevel)
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
 			tSave.nTATimer = self.NextAward
+
+			
+			if bSaveWebsite then tSave["importDataForUploader"] = strConcatedString end
+
 			if self.ActiveAuctions then
 				for k,auction in ipairs(self.ActiveAuctions) do
 					if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
@@ -4114,7 +4129,6 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Export Functions
 ---------------------------------------------------------------------------------------------------
-local strConcatedString
 
 function DKP:ExportExport()
 	if not self.wndExport:FindChild("ModeDisplay"):IsChecked() then
@@ -4176,6 +4190,12 @@ function DKP:ExportDatabase()
 
 	self:ExportSetOutputText(serpent.dump(exportTables))
 
+end
+
+function DKP:ExportWebsiteAndSave()
+	self:ExportWebsite()
+	bSaveWebsite = true
+	ChatSystemLib.Command("/reloadui")
 end
 
 function DKP:ExportWebsite()
@@ -5322,7 +5342,7 @@ function DKP:LogsShow(nOverride)
 end
 
 local function convertStringNumberToChars(strNum) -- because grid sorts only by text -.-
-	local val = strNum
+	local val = tonumber(strNum)
 	strNum = tostring(strNum)
 	local strSortText = ""
 	if val and val > 0 then
@@ -8010,6 +8030,24 @@ function DKP:OnRaidOpsCmd(cmd , args)
 		Print("/rops raidsession start|stop|pause")
 	end
 
+end
+
+function DKP:ImportNotifyInit()
+	if self.tItems["importDataFromUploader"] then
+		self.wndNotifyImport = Apollo.LoadForm(self.xmlDoc3,"ImportNotification",nil,self)
+		local x,y = Apollo.GetScreenSize()
+		self.wndNotifyImport:Move( (x/2)-self.wndNotifyImport:GetWidth()/2, y/2 - self.wndNotifyImport:GetHeight()/2, self.wndNotifyImport:GetWidth(), self.wndNotifyImport:GetHeight())
+	end
+end
+
+function DKP:ImportNotifyOk()
+	strConcatedString = self.tItems["importDataFromUploader"]
+	self:ExportImport()
+end
+
+function DKP:ImportNotifyWipe()
+	self.tItems["importDataFromUploader"] = nil
+	self.wndNotifyImport:Destroy()
 end
 
 -----------------------------------------------------------------------------------------------

@@ -184,14 +184,17 @@ function DKP:BidCompleteInit()
 	if not Apollo.GetAddon("RaidOpsLootHex") then
 		if self.tItems["settings"]["ML"].bStandardLayout then
 			self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
-			self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertNetworkBidding",Hook.wndMasterLoot,self)
-			self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc,"InsertChatBidding",Hook.wndMasterLoot,self)
-			self.wndInsertedMasterButton1:Enable(false)
-			self.wndInsertedMasterButton:Enable(false)
+			if self.tItems["settings"]["ML"].bDispBidding then
+				self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertNetworkBidding",Hook.wndMasterLoot,self)
+				self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc,"InsertChatBidding",Hook.wndMasterLoot,self)
+				self.wndInsertedMasterButton1:Enable(false)
+				self.wndInsertedMasterButton:Enable(false)
+				local l,t,r,b = Hook.wndMasterLoot:FindChild("Assignment"):GetAnchorOffsets()
+				Hook.wndMasterLoot:FindChild("Assignment"):SetAnchorOffsets(l,t,r-225,b)
+			end
 			Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(5,84,-131,128)
-			local l,t,r,b = Hook.wndMasterLoot:FindChild("Assignment"):GetAnchorOffsets()
-			Hook.wndMasterLoot:FindChild("Assignment"):SetAnchorOffsets(l,t,r-225,b)
-
+			
+			
 		else
 			Hook.wndMasterLoot:Destroy()
 			Hook.wndMasterLoot = Apollo.LoadForm(self.xmlDoc2,"MasterLootWindowVertLayout",nil,Hook)
@@ -200,10 +203,13 @@ function DKP:BidCompleteInit()
 			Hook.wndMasterLoot_ItemList = Hook.wndMasterLoot:FindChild("ItemList")
 			Hook.wndMasterLoot_LooterList = Hook.wndMasterLoot:FindChild("LooterList")
 			self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
-			self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc2,"InsertChatBidButtonVert",Hook.wndMasterLoot,self)
-			self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc2,"InsertNetworkBidButtonVert",Hook.wndMasterLoot,self)
-			self.wndInsertedMasterButton:Enable(false)
-			self.wndInsertedMasterButton1:Enable(false)
+			if self.tItems["settings"]["ML"].bDispBidding then
+				self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc2,"InsertChatBidButtonVert",Hook.wndMasterLoot,self)
+				self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc2,"InsertNetworkBidButtonVert",Hook.wndMasterLoot,self)
+				self.wndInsertedMasterButton:Enable(false)
+				self.wndInsertedMasterButton1:Enable(false)
+			end
+
 			Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(37,238,-128,282)
 			self.wndInsertedSearch:SetAnchorOffsets(-122,238,-40,282)
 		end
@@ -2945,6 +2951,7 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bStandardLayout == nil then self.tItems["settings"]["ML"].bStandardLayout = true end
 	if self.tItems["settings"]["ML"].bListIndicators == nil then self.tItems["settings"]["ML"].bListIndicators = true end
 	if self.tItems["settings"]["ML"].bGroup == nil then self.tItems["settings"]["ML"].bGroup = false end
+	if self.tItems["settings"]["ML"].bDispBidding == nil then self.tItems["settings"]["ML"].bDispBidding = true end
 	if self.tItems["settings"]["ML"].bShowLastItemBar == nil then self.tItems["settings"]["ML"].bShowLastItemBar = true end
 	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = true end	
 	if self.tItems["settings"]["ML"].bShowCurrItemBar == nil then self.tItems["settings"]["ML"].bShowCurrItemBar = true end
@@ -2968,8 +2975,17 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowCurrItemTile then self.wndMLSettings:FindChild("ShowCurrItemTile"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bAllowMulti then self.wndMLSettings:FindChild("AllowMultiItem"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bDispBidding then self.wndMLSettings:FindChild("DispBiddingButtons"):SetCheck(true) end
 	
 	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
+end
+
+function DKP:MLSettingsShowBiddingButtonEnable()
+	self.tItems["settings"]["ML"].bDispBidding = true
+end
+
+function DKP:MLSettingsShowBiddingButtonDisable()
+	self.tItems["settings"]["ML"].bDispBidding = false
 end
 
 function DKP:MLSettingsValueEnable()

@@ -156,7 +156,7 @@ local ktTutIndex =
 		},
 		text = 
 		{
-			[1] = "\nYou need to import some players first , select ranks and specify minimum level.",
+			[1] = "\nYou need to import some players first , select ranks and specify minimum level.\n\nIf you see checkboxes Rank1..10 press 'Get Data' button in the top left corner.",
 			[2] = "\nNow press import.",
 		},
 		events =
@@ -305,7 +305,7 @@ local ktTutIndex =
 		},
 		text = 
 		{
-			[1] = "There's not much to this window alone , just type ID or select it from loot logs and continue.",
+			[1] = "There's not much to this window alone , just type ID or select it from loot logs.",
 			[2] = "This button will open Loot Logs window with Master Loot items that dropped during this session, you can click one of them to fill in the ID field.\n\n We don't have any items saved so it's empty now.",
 			[3] = "Type some random item ID and proceed. (eg. 60417)",
 		},
