@@ -366,12 +366,12 @@ function DKP:EPGPAdd(strName,EP,GP)
 			self.tItems[ID].EP = self.tItems[ID].EP + EP
 		end
 		if GP ~= nil then
-			self.tItems[ID].GP = self.tItems[ID].GP + GP
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP + GP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-			self.tItems[ID].GP = 1
+			self.tItems[ID].nAwardedGP = 1
 		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			self.tItems[ID].nAwardedGP = self.tItems["EPGP"].BaseGP 
 		end
 	end
 
@@ -389,12 +389,12 @@ function DKP:EPGPSubtract(strName,EP,GP)
 			end
 		end
 		if GP ~= nil then
-			self.tItems[ID].GP = self.tItems[ID].GP - GP
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP - GP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-			self.tItems[ID].GP = 1
+			self.tItems[ID].nAwardedGP = 1
 		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			self.tItems[ID].nAwardedGP = self.tItems["EPGP"].BaseGP 
 		end
 	end
 
@@ -410,12 +410,12 @@ function DKP:EPGPSet(strName,EP,GP)
 			end
 		end
 		if GP ~= nil then
-			self.tItems[ID].GP = GP
+			self.tItems[ID].nAwardedGP = GP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-			self.tItems[ID].GP = 1
+			self.tItems[ID].nAwardedGP = 1
 		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			self.tItems[ID].nAwardedGP = self.tItems["EPGP"].BaseGP 
 		end
 	end
 end
@@ -436,7 +436,7 @@ function DKP:EPGPAwardRaid(EP,GP)
 					end
 				end
 				if GP ~= nil then
-					self.tItems[ID].GP = self.tItems[ID].GP + GP
+					self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP + GP
 				end
 			end
 		end
@@ -454,10 +454,10 @@ function DKP:EPGPCheckTresholds()
 		end
 		
 		if self.tItems["EPGP"].bMinGP and player.GP < 1 then 
-			player.GP = 1
+			player.nAwardedGP = 1
 		end
 		if self.tItems["EPGP"].bMinGPThres and player.GP < self.tItems["EPGP"].BaseGP then 
-			player.GP = self.tItems["EPGP"].BaseGP 
+			player.nAwardedGP = self.tItems["EPGP"].BaseGP 
 		end
 	end
 end
@@ -523,10 +523,10 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
 				local nPreGP = self.tItems[i].GP
-				if self.tItems["EPGP"].bDecayRealGP then
-					self.tItems[i].GP = (self.tItems[i].GP - self.tItems["EPGP"].BaseGP) * ((100 - self.tItems["EPGP"].nDecayValue)/100) + self.tItems["EPGP"].BaseGP
+				if self.tItems["EPGP"].bDecayRealGP then 
+					self.tItems[i].nAwardedGP = self.tItems[i].nAwardedGP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 				else
-					self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
+					self.tItems[i].nAwardedGP =  (self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)) - self.tItems[i].nBaseGP
 				end
 				if self.tItems["settings"].logs == 1 then self:DetailAddLog(self.tItems["EPGP"].nDecayValue .. "% GP Decay","{Decay}",math.floor((nPreGP - self.tItems[i].GP)) * -1 ,i) end
 			end

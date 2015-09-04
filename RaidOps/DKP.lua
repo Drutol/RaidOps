@@ -40,8 +40,9 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 25, 0, 0
+local Major, Minor, Patch, Suffix = 2, 32, 0, 0
 local strConcatedString
+local tMetaTableForBaseGP = {}
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -193,13 +194,11 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.31 ---
-{31/08/2015}
-Redesigned tutorials window.
-Code refactoring for tutorials module.
-Updated all existing tutorials.
-Fixed a few anomalies with pop-up window.
-Fixed bug which removed groups when player was removed.
+---RaidOps version 2.32 ---
+{03/09/2015}
+Added support for Data Import via Uploader.
+Added support for data exposing to Uploader.
+Added option to hide bidding buttons in ML window.
 ---RaidOps version 2.30 ---
 {28/08/2015}
 Redesigned alts window.
@@ -250,15 +249,6 @@ Redesigned bottom part of main window with nicer buttons.
 Added things for new 'Groups' feature - everything disabled right now - more info in future updates.
 Fixed some graphical glitches.
 Doubled attendance verification process , hopefuly no more > 100% att. Sorry.
----RaidOps version 2.25---
-{13/07/2015}
-DKP decay overhaul.
-Added DKP precision sliders.
-Fixed Auto Comment not recognizing DKP changes.
-DKP decay is registered in Recent Activity.
-Added Option to credit player with attendance manually. 
-Added Option to remove player's attendance manually. 
-When switching to Mass Edit currently selected player will transition to this mode.
  ]===]
 
 -- Localization stuff
@@ -377,7 +367,21 @@ function DKP:OnDocLoaded()
 		self.wndSettings:FindChild("ButtonSettingsPurge"):SetTooltip(self.Locale["#wndSettings:Tooltips:Purge"])
 		--
 		
+		-- New Base GP implementation
 		
+		tMetaTableForBaseGP.__index = function(tPlayer,reqKey)
+			if reqKey == "GP" then
+				return tPlayer.nAwardedGP + tPlayer.nBaseGP
+			end
+		end
+		for k , item in ipairs(self.tItems) do
+			if item.GP then item.nAwardedGP = item.GP - self.tItems["EPGP"].BaseGP end
+			item.GP = nil
+			item.nBaseGP = self.tItems["EPGP"].BaseGP
+			setmetatable(item,tMetaTableForBaseGP) -- because of old flawed implementation of .GP field , it's just used in too many places to replace this with function. That's why this metatable is here :)
+		end
+		-- End
+
 		if self.wndMain == nil then
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
@@ -571,6 +575,8 @@ function DKP:OnDocLoaded()
 		if not self.tItems["settings"].tDebugLogs then self.tItems["settings"].tDebugLogs = {} end
 
 
+		
+
 		--OneVersion
 		self:delay(2,function() Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOps", Major, Minor, Patch) end)
 	end
@@ -716,6 +722,7 @@ function DKP:UndoRedo()
 				end
 			elseif tRedoActions[1].bRemove == false  and self:GetPlayerByIDByName(revertee.strName) == -1 then 
 				table.insert(self.tItems,revertee) -- adding player
+				setmetatable(self.tItems[#self.tItems],tMetaTableForBaseGP)
 			end
 		end
 		self:RefreshMainItemList()
@@ -780,6 +787,7 @@ function DKP:Undo()
 					end
 				elseif tUndoActions[1].bRemove == true and self:GetPlayerByIDByName(revertee.strName) == -1 then
 					table.insert(self.tItems,revertee) -- adding player
+					setmetatable(self.tItems[#self.tItems],tMetaTableForBaseGP)
 				elseif tUndoActions[1].bRemove == false then 
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then table.remove(self.tItems,k) break end
@@ -1015,13 +1023,15 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 		newPlayer.tot = self.tItems["settings"].default_dkp
 		newPlayer.Hrs = 0
 		newPlayer.EP = self.tItems["EPGP"].MinEP
-		newPlayer.GP = self.tItems["EPGP"].BaseGP
+		newPlayer.nAwardedGP = 0
+		newPlayer.nBaseGP = self.tItems["EPGP"].BaseGP
 		newPlayer.alts = {}
 		newPlayer.logs = {}
 		newPlayer.role = "DPS"
 		newPlayer.offrole = "None"
 		newPlayer.tLLogs = {}
 		table.insert(self.tItems,newPlayer)
+		setmetatable(self.tItems[#self.tItems],tMetaTableForBaseGP)
 	end
 	if bForceNoRefresh == nil then self:RefreshMainItemList() end
 end
@@ -1268,7 +1278,8 @@ function DKP:OnSave(eLevel)
 				tSave[k].tot = player.tot
 				tSave[k].TradeCap = player.TradeCap
 				tSave[k].EP = player.EP
-				tSave[k].GP = player.GP
+				tSave[k].nAwardedGP = player.nAwardedGP
+				tSave[k].nBaseGP = player.nBaseGP
 				tSave[k].class = player.class
 				tSave[k].alts = player.alts
 				tSave[k].logs = player.logs
@@ -2205,6 +2216,16 @@ function DKP:MassEditCreditAtt()
 	end
 end
 
+function DKP:MassEditBaseGP()
+	local val = tonumber(self.wndMain:FindChild("Controls:EditBox1"):GetText())
+	if val and val >= 0 then
+		for k , wnd in ipairs(selectedMembers) do
+			self.tItems[wnd:GetData().id].nBaseGP = val
+		end
+	end
+	self:RefreshMainItemList()
+end
+
 function DKP:MassEditInviteContinue()
 	local strRealm = GameLib.GetRealmName()
 	local strMsg = "Raid time!"
@@ -2734,8 +2755,8 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	local nGroup = playerItem.wnd:GetData().nGroupId
 	if self.tItems["settings"].bEnableGroups and self:GetActiveGroupID() ~= nGroup and self.tItems["settings"].Groups[nGroup] then
 		tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].Groups[nGroup].strName,playerItem.strName)
-		if tDataSet.GP ~= 0 then
-			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/tDataSet.GP)
+		if tDataSet.nAwardedGP ~= 0 then
+			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/(tDataSet.nAwardedGP+tDataSet.nBaseGP))
 		else
 			tDataSet.PR = 0
 		end
@@ -2805,6 +2826,8 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",tDataSet and tDataSet.tot or playerItem.tot))
 			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
+			elseif self.tItems["settings"].LabelOptions[i] == "BaseGP" then
+				playerItem.wnd:FindChild("Stat"..i):SetText(tDataSet and tDataSet.nBaseGP or playerItem.nBaseGP)
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
 				if playerItem.tLLogs and #playerItem.tLLogs > 0 then
 					local itemID 
@@ -2860,11 +2883,11 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			elseif self.tItems["settings"].LabelOptions[i] == "EP" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.EP or playerItem.EP))
 			elseif self.tItems["settings"].LabelOptions[i] == "GP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.GP or playerItem.GP))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.nAwardedGP+tDataSet.nBaseGP or playerItem.GP))
 			elseif self.tItems["settings"].LabelOptions[i] == "PR" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(tDataSet and tDataSet.PR or self:EPGPGetPRByName(playerItem.strName))
 			elseif self.tItems["settings"].LabelOptions[i] == "RealGP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP - self.tItems["EPGP"].BaseGP))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.nAwardedGP))
 			--Att
 			elseif self.tItems["settings"].LabelOptions[i] == "%GA" then
 				local raidCount = 0
