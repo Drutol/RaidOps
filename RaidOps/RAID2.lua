@@ -1241,9 +1241,15 @@ function DKP:GroupAdd(wndHandler,wndControl,strText)
 end
 
 function DKP:GroupRem(wndHandler,wndControl)
+	local strGroupName = wndControl:GetParent():FindChild("Name"):GetText()
 	table.remove(self.tItems["settings"].Groups,wndControl:GetParent():GetData())
-	if self.tItems["settings"].strActiveGroup == wndControl:GetParent():FindChild("Name"):GetText() then self.tItems["settings"].strActiveGroup = "Def" end
-	self.tItems.tDataSets[wndControl:GetParent():FindChild("Name"):GetText()] = nil
+	if self.tItems["settings"].strActiveGroup == strGroupName then self.tItems["settings"].strActiveGroup = "Def" end
+	self.tItems.tDataSets[strGroupName] = nil
+	for k , player in ipairs(self.tItems) do
+		for l , log in ipairs(player.logs) do
+			if log.strGroup and log.strGroup == strGroupName then table.remove(self.tItems[k].logs,l) end
+		end
+	end
 	self:GroupGUIPopulate()
 	self:RefreshMainItemList()
 end

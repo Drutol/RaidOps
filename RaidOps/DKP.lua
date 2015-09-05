@@ -4312,6 +4312,8 @@ function DKP:ExportImport()
 			end
 			self.tItems.tDataSets = {}
 			for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
+				player.nAwardedGP = player.GP
+				player.GP = nil
 				table.insert(self.tItems,player)
 				for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
 					if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
@@ -4346,6 +4348,8 @@ function DKP:ExportImport()
 				self.tItems[k] = nil
 			end
 			for k,player in ipairs(tImportedTables.tPlayers) do
+				player.nAwardedGP = player.GP
+				player.GP = nil
 				table.insert(self.tItems,player)
 			end
 			for k,player in ipairs(self.tItems) do
@@ -5069,8 +5073,9 @@ function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 		local tCursor = Apollo.GetMouse()
 		self.wndContext:Move(tCursor.x, tCursor.y, self.wndContext:GetWidth(), self.wndContext:GetHeight())
 		self.wndContext:Show(true,false)
-		local ID = self:GetPlayerByIDByName(wndControl:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+		local ID = wndControl:GetData().id
 		self.wndContext:SetData(ID) -- PlayerID
+		if self.tItems["settings"].bEnableGroups and #self.tItems["settings"].Groups > 0 then self.wndContextGroupID = wndControl:GetData().nGroupId end
 		self.wndContext:ToFront()
 		if self.tItems["Standby"] and self.tItems[ID] and self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
 		wndControl:FindChild("OnContext"):Show(true,false)
@@ -5329,6 +5334,8 @@ function DKP:LogsInit()
 	self.wndLogs:Show(false,true)
 	self.wndLogs:SetSizingMinimum(751,332)
 	self.wndLogs:SetSizingMaximum(751,435)
+
+	self.wndLogs:FindChild("FilterGrid"):AddEventHandler("GridSelChange","LogsChangeFilter",self)
 end
 
 function DKP:LogsExport()
@@ -5404,28 +5411,68 @@ local function convertStringNumberToChars(strNum) -- because grid sorts only by 
 	return strSortText
 end
 
+function DKP:LogsChangeFilter(wndHandler,wndControl,iRow,iCol)
+	local strGroup = wndControl:GetCellText(iRow,iCol)
+	self.wndContextGroupID = self:GetGroupIDByName(strGroup)
+	self:LogsPopulate()
+end
+
 function DKP:LogsPopulate()
 	local grid = self.wndLogs:FindChild("Grid")
 	grid:DeleteAll()
+	if self.wndContextGroupID then
+		self.wndLogs:FindChild("FilterNotice"):Show(true)
+		self.wndLogs:FindChild("FilterSelect"):Show(false)
+		self.wndLogs:FindChild("GroupName"):SetText(self.tItems["settings"].Groups[self.wndContextGroupID].strName)
+	else
+		self.wndLogs:FindChild("FilterNotice"):Show(false)
+		if self.tItems["settings"].bEnableGroups or #self.tItems["settings"].Groups > 0 then 
+			self.wndLogs:FindChild("FilterSelect"):Show(true)
+			local grid = self.wndLogs:FindChild("FilterGrid")
+			grid:DeleteAll()
+			local tGroups = {}
+			for k , log in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
+				if log.strGroup then
+					if not tGroups[log.strGroup] then  tGroups[log.strGroup] = {} end
+				end
+			end
+			local nRow = 1
+			for strGroup , _ in pairs(tGroups) do
+				grid:AddRow(nRow)
+				grid:SetCellData(nRow,1,strGroup)
+				nRow = nRow + 1
+			end
+
+		end
+
+	end
+	local nSkipped = 0
 	for k,entry in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
-		grid:AddRow(k..".")
-		grid:SetCellData(k,1,entry.strComment)
-		grid:SetCellData(k,4,entry.strType)
-		if entry.strModifier then
-			grid:SetCellData(k,2,entry.strModifier)
-			grid:SetCellSortText(k,2,convertStringNumberToChars(entry.strModifier))
-		end
-		if entry.strTimestamp then
-			grid:SetCellData(k,5,entry.strTimestamp)
-		elseif entry.nDate then
-			grid:SetCellData(k,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
-			grid:SetCellSortText(k,5,convertStringNumberToChars(entry.nDate))
-		end
-		if entry.nAfter then
-			grid:SetCellData(k,3,entry.nAfter)
-			grid:SetCellSortText(k,3,convertStringNumberToChars(entry.nAfter))
+		
+		if self.wndContextGroupID and entry.strGroup == self.tItems["settings"].Groups[self.wndContextGroupID].strName or not self.wndContextGroupID and (entry.strGroup == "Def" or not entry.strGroup) then
+			local nRow = k - nSkipped
+			grid:AddRow(nRow..".")
+			grid:SetCellData(nRow,1,entry.strComment)
+			grid:SetCellData(nRow,4,entry.strType)
+			if entry.strModifier then
+				grid:SetCellData(nRow,2,entry.strModifier)
+				grid:SetCellSortText(nRow,2,convertStringNumberToChars(entry.strModifier))
+			end
+			if entry.strTimestamp then
+				grid:SetCellData(nRow,5,entry.strTimestamp)
+			elseif entry.nDate then
+				grid:SetCellData(nRow,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
+				grid:SetCellSortText(nRow,5,convertStringNumberToChars(entry.nDate))
+			end
+			if entry.nAfter then
+				grid:SetCellData(nRow,3,entry.nAfter)
+				grid:SetCellSortText(nRow,3,convertStringNumberToChars(entry.nAfter))
+			end
+		else
+			nSkipped = nSkipped + 1
 		end
 	end
+	self.wndContextGroupID = nil 
 end
 
 function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
@@ -5447,12 +5494,25 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 
 		if strType == "{Decay}" and self.tItems[ID].strName == "Guild Bank" then return end
 
-		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after)})
-		if #self.tItems[ID].logs >= 15 then 
-			for k=15,#self.tItems[ID].logs do
-				self.tItems[ID].logs[k] = nil
+		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after),strGroup = self.tItems["settings"].strActiveGroup})
+		
+		local tGroups = {}
+		for k , log in ipairs(self.tItems[ID].logs) do
+			if log.strGroup then
+				if not tGroups[log.strGroup] then  tGroups[log.strGroup] = {} end
+				table.insert(tGroups[log.strGroup],k)
+			else
+				if not tGroups["ung"] then  tGroups["ung"] = {} end
+				table.insert(tGroups["ung"],k)
 			end
 		end
+
+		for k , logGroup in pairs(tGroups) do
+			if #logGroup > 15 then
+				for i=16,#logGroup do table.remove(self.tItems[ID].logs,logGroup[i]) end
+			end
+		end
+
 		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
 
 	end
