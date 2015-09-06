@@ -234,7 +234,7 @@ function DKP:IBTileMenuRemoveConfirm(wndHandler,wndControl)
 	local strName = string.sub(wndControl:FindChild("Tooltip"):GetData(),1,#wndControl:FindChild("Tooltip"):GetData()-2)
 	local nGP = tonumber(self:LLRemLog(strName,wndControl:GetData()))
 	self:UndoAddActivity(string.format("Removed %s from %s",wndControl:GetData():GetName(),strName),nGP*-1,{[1] = self.tItems[self:GetPlayerByIDByName(strName)]})
-	self.tItems[self:GetPlayerByIDByName(strName)].GP = self.tItems[self:GetPlayerByIDByName(strName)].GP - nGP
+	self.tItems[self:GetPlayerByIDByName(strName)].nAwardedGP = self.tItems[self:GetPlayerByIDByName(strName)].nAwardedGP - nGP
 	self:DetailAddLog("Removed : " .. wndControl:GetData():GetName(),"{GP}",nGP*-1,self:GetPlayerByIDByName(strName))
 	self:RefreshMainItemList()
 	self:LLPopuplate()
@@ -1372,7 +1372,7 @@ function DKP:GroupDialogPopulate(forID)
 	local tActive = {}
 	local tAvailable = {}
 
-	for k , group in ipairs(self.tItems["settings"].Groups) do
+	for k , group in ipairs(self.tItems["setti.ngs"].Groups) do
 		local bFound = false
 		for j , id in ipairs(group.tIDs) do
 			if id == forID then bFound = true break end

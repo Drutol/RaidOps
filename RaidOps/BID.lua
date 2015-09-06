@@ -549,8 +549,8 @@ function DKP:BidMasterItemSelected()
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
-		DKPInstance.wndInsertedMasterButton:Enable(true)
-		DKPInstance.wndInsertedMasterButton1:Enable(true)
+		if DKPInstance.wndInsertedMasterButton then DKPInstance.wndInsertedMasterButton:Enable(true) end
+		if DKPInstance.wndInsertedMasterButton then DKPInstance.wndInsertedMasterButton1:Enable(true) end
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
 	end
 end

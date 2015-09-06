@@ -291,3 +291,6 @@ L["#SystemDaemons"] = "System Daemons"
 L["#Gloomclaw"] = "Gloomclaw"
 L["#MaelstormAuthority"] = "Maelstorm Authority"
 L["#Avatus"] = "Avatus"
+
+--v2.34
+L["#wndSettings:ClearLogs"] = "Clear Logs"

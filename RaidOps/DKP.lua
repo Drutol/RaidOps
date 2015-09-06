@@ -170,7 +170,9 @@ local ktUndoActions =
 	["itrem"] = "Removed %s from %s",
 	["maward"] = "Awarded %s with %s",
 	--Decay
-	["dkpdec"] = "{DKP Decay}"
+	["dkpdec"] = "{DKP Decay}",
+	--Logs
+	["logprg"] = "{Logs purge}",
 
 }
 local ktQual = 
@@ -194,6 +196,26 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.33 Beta ---
+{06/09/2015}
+Overhaul of BaseGP system:
+From now on every player has dynamic GP offset (BaseGP) and GP from awards ; GP value is the sum of these two.
+Savefile format is changed and therefore you cannot downgrade versions.(Website export/import is the solution if you want to go back and you dindn't make backup).
+BaseGP value in EPGP settings serves now as default BaseGP value.
+Each player can have different BaseGP value in different context (group).
+
+As this change affects very core of the addon , there will be beta period to check if things work.
+Back to changelog:
+
+Added nBaseGP , nAwardedGP field to player entry , removed GP field.
+Added support for multiple BaseGP values accross groups.
+Added button to set BaseGP value in Mass Edit toolbar.
+Added strGroup field to logs , in order to differentiate which log applies to what.
+Added filtering by logs group of origin to logs window.
+Added BaseGP label.
+Added option to clear all logs.
+Added option to perform logs clear right after website export.
+Fixed bug concering hinding bidding buttons in ML window.
 ---RaidOps version 2.32 ---
 {03/09/2015}
 Added support for Data Import via Uploader.
@@ -2051,7 +2073,7 @@ function DKP:TimeAwardAward()
 			end
 			
 			if self.wndTimeAward:FindChild("Settings"):FindChild("GP"):IsChecked() then
-				self.tItems[ID].GP = self.tItems[ID].GP + self.tItems["AwardTimer"].amount
+				self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP + self.tItems["AwardTimer"].amount
 				self:DetailAddLog("Timed Award","{GP}",self.tItems["AwardTimer"].amount,ID)
 			end
 			
@@ -3818,6 +3840,7 @@ function DKP:SettingsRestore()
 	if self.tItems["settings"].bLLAfterPopUp == nil then self.tItems["settings"].bLLAfterPopUp = false end
 
 	if self.tItems["settings"].bUseFilterForItemLabel == nil then self.tItems["settings"].bUseFilterForItemLabel = true end
+	if self.tItems["settings"].bClearLogsAfterExport == nil then self.tItems["settings"].bClearLogsAfterExport = false end
 
 	-- Sorry for this abomination above :(
 	
@@ -3836,6 +3859,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("LLonPopUp"):SetCheck(self.tItems["settings"].bLLAfterPopUp)
 	self.wndSettings:FindChild(self.tItems["settings"].strDateFormat):SetCheck(true)
 	self.wndSettings:FindChild("FilterItemLabel"):SetCheck(self.tItems["settings"].bUseFilterForItemLabel)
+	self.wndSettings:FindChild("ClrLogsAftWebsite"):SetCheck(self.tItems["settings"].bClearLogsAfterExport)
 
 	--Export
 	if self.tItems["settings"].bUseFilterForWebsiteExport == nil then self.tItems["settings"].bUseFilterForWebsiteExport = true end
@@ -4141,6 +4165,14 @@ function DKP:SettingsSetDKPPrecision( wndHandler, wndControl, fNewValue, fOldVal
 	end
 end
 
+function DKP:SettingClearLogsAfterExportEnable()
+	self.tItems["settings"].bClearLogsAfterExport = true
+end
+
+function DKP:SettingClearLogsAfterExportDisable()
+	self.tItems["settings"].bClearLogsAfterExport = false
+end
+
 function DKP:SettingsEnableFillingBidMinValues()
 	self.tItems["BidSlots"].Enable = 1
 end
@@ -4194,7 +4226,8 @@ function DKP:ExportDatabase()
 		tPlayer.Hrs = player.Hrs
 		tPlayer.logs = player.logs
 		tPlayer.EP = player.EP
-		tPlayer.GP = player.GP
+		tPlayer.nAwardedGP = player.nAwardedGP
+		tPlayer.nBaseGP = player.nBaseGP
 		tPlayer.class = player.class
 		tPlayer.alts = player.alts
 		tPlayer.role = player.role
@@ -4234,7 +4267,6 @@ function DKP:ExportWebsite()
 		tCopy.EP = player.EP
 		tCopy.GP = player.GP
 		tCopy.class = player.class
-		
 		tCopy.alts = {}
 		for k , alt in ipairs(player.alts) do
 			table.insert(tCopy.alts,{name = alt , tArmoryEntry = self.tItems["settings"].bArmoryApp and self.tItems.tArmory[alt] or nil})
@@ -4251,7 +4283,11 @@ function DKP:ExportWebsite()
 		for j , group in ipairs(self.tItems["settings"].Groups) do 
 			for i , id in ipairs(group.tIDs) do
 				if id == k then
-					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)})
+					local tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)
+					tData.GP = tData.nAwardedGP + tData.nBaseGP
+					tData.nAwardedGP = nil
+					tData.nBaseGP = nil
+					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = tData})
 					break
 				end
 			end
@@ -4264,7 +4300,7 @@ function DKP:ExportWebsite()
 			end 
 		end
 	end
-	
+	if self.tItems["settings"].bClearLogsAfterExport then self:LogsDeleteAll() end
 	self:ExportSetOutputText(JSON.encode(tTestTable))
 end
 
@@ -4312,7 +4348,7 @@ function DKP:ExportImport()
 			end
 			self.tItems.tDataSets = {}
 			for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
-				player.nAwardedGP = player.GP
+				player.nAwardedGP = player.GP - (player.nBaseGP or self.tItems["EPGP"].BaseGP)
 				player.GP = nil
 				table.insert(self.tItems,player)
 				for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
@@ -4348,8 +4384,11 @@ function DKP:ExportImport()
 				self.tItems[k] = nil
 			end
 			for k,player in ipairs(tImportedTables.tPlayers) do
-				player.nAwardedGP = player.GP
-				player.GP = nil
+				if player.GP then
+					player.nAwardedGP = player.GP - (player.nBaseGP or self.tItems["EPGP"].BaseGP)
+					player.nBaseGP = self.tItems["EPGP"].BaseGP
+					player.GP = nil
+				end
 				table.insert(self.tItems,player)
 			end
 			for k,player in ipairs(self.tItems) do
@@ -5235,7 +5274,7 @@ function DKP:AltsAddMerge()
 	self.tItems[self.wndAlts:GetData()].net =  self.tItems[self.wndAlts:GetData()].net + mergedPlayer.net
 	self.tItems[self.wndAlts:GetData()].tot =  self.tItems[self.wndAlts:GetData()].tot + mergedPlayer.tot
 	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
-	self.tItems[self.wndAlts:GetData()].GP =  self.tItems[self.wndAlts:GetData()].GP + mergedPlayer.GP
+	self.tItems[self.wndAlts:GetData()].nAwardedGP =  self.tItems[self.wndAlts:GetData()].nAwardedGP + mergedPlayer.nAwardedGP
 	
 	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	
@@ -5335,7 +5374,25 @@ function DKP:LogsInit()
 	self.wndLogs:SetSizingMinimum(751,332)
 	self.wndLogs:SetSizingMaximum(751,435)
 
+	self.wndSettings:FindChild("YouSure?"):SetRotation(180)
+	self.wndSettings:FindChild("YouSure?:Title"):SetRotation(180)
+
 	self.wndLogs:FindChild("FilterGrid"):AddEventHandler("GridSelChange","LogsChangeFilter",self)
+end
+
+function DKP:LogsShowDelConf()
+	self.wndSettings:FindChild("YouSure?"):Show(true)
+end
+
+function DKP:LogsHideDelConf()
+	self.wndSettings:FindChild("YouSure?"):Show(false)
+end
+
+function DKP:LogsDeleteAll()
+	for k , player in ipairs(self.tItems) do
+		player.logs = {}
+	end
+	self.wndSettings:FindChild("YouSure?"):Show(false)
 end
 
 function DKP:LogsExport()
@@ -5436,11 +5493,14 @@ function DKP:LogsPopulate()
 					if not tGroups[log.strGroup] then  tGroups[log.strGroup] = {} end
 				end
 			end
-			local nRow = 1
+			local nRow = 0
 			for strGroup , _ in pairs(tGroups) do
+				nRow = nRow + 1
 				grid:AddRow(nRow)
 				grid:SetCellData(nRow,1,strGroup)
-				nRow = nRow + 1
+			end
+			if nRow == 0 then
+				self.wndLogs:FindChild("FilterSelect"):Show(false)
 			end
 
 		end
@@ -5894,7 +5954,7 @@ function DKP:CETriggerEvent(eID)
 					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{EP}",event.EP*nMultiplier,pID)
 				end
 				if event.GP then
-					self.tItems[pID].GP = self.tItems[pID].GP + (event.GP * nMultiplier)
+					self.tItems[pID].nAwardedGP = self.tItems[pID].nAwardedGP + (event.GP * nMultiplier)
 					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{GP}",event.GP*nMultiplier,pID)
 				end
 				if event.DKP then
@@ -7783,8 +7843,8 @@ function DKP:ReassCommit()
 	local item = self.wndReass:GetData()
 	if GID and RID and GPadd and GPsub and item then
 		self:UndoAddActivity(string.format(ktUndoActions["itreass"],item:GetName(),self.tItems[GID].strName,self.tItems[RID].strName),GPsub .. " / " .. GPadd,{[1] = self.tItems[GID],[2] = self.tItems[RID]})
-		self.tItems[GID].GP = self.tItems[GID].GP - GPsub
-		self.tItems[RID].GP = self.tItems[RID].GP + GPadd
+		self.tItems[GID].nAwardedGP = self.tItems[GID].nAwardedGP - GPsub
+		self.tItems[RID].nAwardedGP = self.tItems[RID].nAwardedGP + GPadd
 		self:DetailAddLog("Removed item : "..item:GetName(),"{GP}",GPsub*-1,GID)
 		self:DetailAddLog("Added item : "..item:GetName(),"{GP}",GPsub,RID)
 		self:OnLootedItem(item,true)
