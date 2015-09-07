@@ -514,6 +514,38 @@ local ktQualColors =
 	[7] = "ItemQuality_Artifact",
 }
 
+local ktKeys = 
+{
+	[81] = "Q",
+	[87] = "W",
+	[69] = "E",
+	[82] = "R",
+	[84] = "T",
+	[89] = "Y",
+	[85] = "U",
+	[73] = "I",
+	[79] = "O",
+	[80] = "P",
+	
+	[65] = "A",
+	[83] = "S",
+	[68] = "D",
+	[70] = "F",
+	[71] = "G",
+	[72] = "H",
+	[74] = "J",
+	[75] = "K",
+	[76] = "L",
+	
+	[90] = "Z",
+	[88] = "X",
+	[67] = "C",
+	[86] = "V",
+	[66] = "B",
+	[78] = "N",
+	[77] = "M",
+}
+
 local function getDummyML(nCount)
 	tDummy = {}
 	while nCount ~= 0 do
@@ -539,6 +571,10 @@ function MasterLoot:gracefullyResize(wnd,tTargets)
 		self.resizeTimer = ApolloTimer.Create(.002,true,"GracefulResize",self)
 		bResizeRunning = true
 	end
+end
+
+function MasterLoot:MLLClose()
+	self.wndMLL:Show(false,false)
 end
 
 function MasterLoot:GracefulResize()
@@ -584,21 +620,27 @@ function MasterLoot:GracefulResize()
 		self.resizeTimer:Stop()
 	end
 end
-
+local nTargetHeight
 function MasterLoot:MLLightInit()
 	self.wndMLL = Apollo.LoadForm(self.xmlDoc,"MasterLootLight",nil,self)
-
+	self.wndMLL:Show(false)
+	Apollo.RegisterEventHandler("SystemKeyDown", "MLLKeyDown", self)
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
 	
 	self.MLDummy = getDummyML(5)
-
+ 	nTargetHeight = self.wndMLL:GetHeight()+40
 	self:MLLPopulateItems()
 end
 
+local bItemSelected = false
 function MasterLoot:MLLPopulateItems(bResize)
+	if #GameLib.GetMasterLoot() > 0 then self.wndMLL:Show(true,false) end
+
+	if bItemSelected then return end
+
 	self.wndMLL:FindChild("Items"):DestroyChildren()
-	local tML = self.MLDummy
+	local tML = GameLib.GetMasterLoot()
 	for k , lootEntry in ipairs(tML) do
 		local wnd = Apollo.LoadForm(self.xmlDoc,"LightItem",self.wndMLL:FindChild("Items"),self)
 		wnd:FindChild("Qual"):SetBGColor(ktQualColors[lootEntry.itemDrop:GetItemQuality()])
@@ -617,17 +659,24 @@ function MasterLoot:MLLPopulateItems(bResize)
 end
 
 function MasterLoot:MLLSelectItem(wndHandler,wndControl)
+	bItemSelected = true
 	for k , child in ipairs(self.wndMLL:FindChild("Items"):GetChildren()) do
 		if child ~= wndControl then child:Show(false) end
 	end
-	self:gracefullyResize(wndControl,{t=5,b=wndControl:GetHeight()+5})
-	self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=200})
-	self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=220})
+	self:gracefullyResize(wndControl,{t=3,b=wndControl:GetHeight()+3})
+	self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=190})
+	self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=200})
 	self:MLLPopulateRecipients(wndControl:GetData())
+	self.nSelectedItem = wndControl:GetData().nLootId
+	
 end
 
 function MasterLoot:MLLDeselectItem(wndHandler,wndControl)
+	bItemSelected = false
 	self:MLLPopulateItems(true)
+	self:MLLRecipientDeselected()
+	self.nSelectedItem = nil
+	
 end
 
 function MasterLoot:MLLPopulateRecipients(lootEntry)
@@ -638,6 +687,11 @@ function MasterLoot:MLLPopulateRecipients(lootEntry)
 		wnd:FindChild("ClassIcon"):SetSprite(ktClassToIcon[looter:GetClassId()])
 		wnd:SetData(looter)
 	end
+	--for k=65,81 do 
+	--	local wnd = Apollo.LoadForm(self.xmlDoc,"LightRecipient",self.wndMLL:FindChild("Recipients"),self)
+	--	wnd:FindChild("CharacterName"):SetText(ktKeys[k])
+	--end
+	self:MLLArrangeRecipients()
 end
 
 function MasterLoot:MLLEnable()
@@ -650,7 +704,83 @@ function MasterLoot:MLLDisable()
 	self:OnMasterLootUpdate()
 end
 
+function MasterLoot:MLLRecipientSelected(wndHandler,wndControl)
+
+	self:gracefullyResize(self.wndMLL:FindChild("Assign"),{t=561})
+	self:gracefullyResize(self.wndMLL,{b=nTargetHeight})
+	self.wndMLL:FindChild("Assign"):SetText("Assign")
+	bRecipientSelected = true
+	self.unitSelected = wndControl:GetData()
+end
+
+function MasterLoot:MLLRecipientDeselected(wndHandler,wndControl)
+	self:gracefullyResize(self.wndMLL:FindChild("Assign"),{t=622})
+	self:gracefullyResize(self.wndMLL,{b=nTargetHeight-40})
+	self.wndMLL:FindChild("Assign"):SetText("")
+	self.unitSelected = nil
+end
+
+function MasterLoot:MLLKeyDown(nKey)
+	if self.wndMLL:IsShown() and bItemSelected then
+		local l,t,r,b 
+		local strKey = ktKeys[nKey]
+		if not strKey then return end
+		for k , child in ipairs(self.wndMLL:FindChild("Recipients"):GetChildren()) do
+			local strName = child:FindChild("CharacterName"):GetText()
+			if string.lower(string.sub(strName,1,1)) == string.lower(strKey) then
+				l,t,r,b = child:GetAnchorOffsets()
+				break
+			end
+		end
+		if t then
+			self.wndMLL:FindChild("Recipients"):SetVScrollPos(t)
+		end
+	end
+end
+
+
+
+function MasterLoot:MLLAssign()
+	if self.nSelectedItem and self.unitSelected then
+		GameLib.AssignMasterLoot(self.nSelectedItem,self.unitSelected)
+	end
+end
+
+function MasterLoot:MLLAssignItemAtRandom(wndHandler,wndControl)
+	local tData =  wndControl:GetParent():GetData()
+	if tData and tData.tLooters then
+		local luckylooter = self:ChooseRandomLooter(tData)
+		if luckylooter then
+			Apollo.GetAddon("RaidOps"):BidAddPlayerToRandomSkip(luckylooter:GetName())
+			GameLib.AssignMasterLoot(tData.nLootId,luckylooter)
+		end
+	end
+end
 -- Different stuffs
+
+function MasterLoot:ChooseRandomLooter(entry)
+	local looters = {}
+	for k , playerUnit in pairs(entry.tLooters or {}) do
+		table.insert(looters,playerUnit)
+	end	
+	return looters[math.random(#looters)]
+end
+
+local prevChild
+function MasterLoot:MLLArrangeRecipients()
+	local list = self.wndMLL:FindChild("Recipients")
+	local children = list:GetChildren()
+	for k , child in ipairs(children) do
+		child:SetAnchorOffsets(-4,0,child:GetWidth()+-4,child:GetHeight())
+	end
+	for k , child in ipairs(children) do
+		if k > 1 then
+			local l,t,r,b = prevChild:GetAnchorOffsets()
+			child:SetAnchorOffsets(-4,b-10,child:GetWidth()+-4,b+child:GetHeight()-10)
+		end
+		prevChild = child
+	end
+end
 
 function MasterLoot:BidMLSearch(wndHandler,wndControl,strText)
 	local Rops = Apollo.GetAddon("RaidOps")

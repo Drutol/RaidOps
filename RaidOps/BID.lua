@@ -330,8 +330,8 @@ function DKP:BidCompleteInit()
 
 	self:BQInit()
 
-	Hook.wndMasterLoot:Show(true,false)
-	--Hook:OnMasterLootUpdate(true)
+	--Hook.wndMasterLoot:Show(true,false)
+	Hook:OnMasterLootUpdate(true)
 	--RaidOps LootHex
   	Apollo.RegisterEventHandler("RaidOpsChatBidding","StartChatBiddingFromOtherSource", self)
   	Apollo.RegisterEventHandler("RaidOpsNetworkBidding","StartNetworkBiddingFromOtherSource", self)
@@ -460,9 +460,11 @@ end
 function DKP:MLLAssignItemAtRandom(wndHandler,wndControl)
 	local tData =  wndControl:GetParent():GetData()
 	if tData and tData.tLooters then
-		local luckylooter = self:ChooseRandomLooter()
-		self:BidAddPlayerToRandomSkip(luckylooter:GetName())
-		GameLib.AssignMasterLoot(tData.nLootId,luckylooter)
+		local luckylooter = self:ChooseRandomLooter(tData)
+		if luckylooter then
+			self:BidAddPlayerToRandomSkip(luckylooter:GetName())
+			GameLib.AssignMasterLoot(tData.nLootId,luckylooter)
+		end
 	end
 end
 
@@ -480,7 +482,6 @@ function DKP:BidAddPlayerToRandomSkip(strName)
 	end
 
 	table.insert(self.tRandomWinners,strName)
-	
 end
 
 function DKP:ChooseRandomLooter(entry)
