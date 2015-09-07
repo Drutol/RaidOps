@@ -44,7 +44,7 @@ function MasterLoot:OnDocumentReady()
 	if self.xmlDoc == nil then
 		return
 	end
-
+	self:MLLightInit()
 	Apollo.RegisterEventHandler("WindowManagementReady", 		"OnWindowManagementReady", self)
 
 	Apollo.RegisterEventHandler("MasterLootUpdate",				"OnMasterLootUpdate", self)
@@ -78,7 +78,11 @@ function MasterLoot:OnDocumentReady()
 	-- Master Looter Global Vars
 	self.tMasterLootSelectedItem = nil
 	self.tMasterLootSelectedLooter = nil
+
+
 end
+
+
 
 function MasterLoot:OnWindowManagementReady()
 	Event_FireGenericEvent("WindowManagementAdd", { wnd = self.wndMasterLoot, strName = Apollo.GetString("Group_MasterLoot"), nSaveVersion = 1 })
@@ -91,6 +95,7 @@ end
 ----------------------------
 
 function MasterLoot:OnMasterLootUpdate(bForceOpen)
+	if self.settings.bLightMode then self:MLLPopulateItems() end
 	local tMasterLoot = GameLib.GetMasterLoot()
 
 	local tMasterLootItemList = {}
@@ -467,6 +472,8 @@ function MasterLoot:OnSave(eType)
 		nSaveVersion = knSaveVersion,
 	}
 
+	tSave.settings = self.settings
+
 	return tSave
 end
 
@@ -486,8 +493,192 @@ function MasterLoot:OnRestore(eType, tSavedData)
 			self.wndGroupBag:Show(bShowWindow)
 			self:RedrawMasterLootWindow()
 		end
+
+		self.settings = tSavedData.settings
+
 	end
 end
 
 local MasterLoot_Singleton = MasterLoot:new()
 MasterLoot_Singleton:Init()
+
+-- Master Loot light
+local ktQualColors = 
+{
+	[1] = "ItemQuality_Inferior",
+	[2] = "ItemQuality_Average",
+	[3] = "ItemQuality_Good",
+	[4] = "ItemQuality_Excellent",
+	[5] = "ItemQuality_Superb",
+	[6] = "ItemQuality_Legendary",
+	[7] = "ItemQuality_Artifact",
+}
+
+local function getDummyML(nCount)
+	tDummy = {}
+	while nCount ~= 0 do
+		local id = math.random(1,60000)
+		local item = Item.GetDataFromId(id)
+		if item then
+			table.insert(tDummy,{nLootId = math.random(1,100000),itemDrop = item,tLooters = {[math.random(100)] = GameLib.GetPlayerUnit()}})
+			nCount = nCount - 1
+		end	
+	end
+	return tDummy
+end
+
+local tResizes = {}
+local bResizeRunning = false
+function MasterLoot:gracefullyResize(wnd,tTargets)
+	for k , resize in ipairs(tResizes) do
+		if resize.wnd:GetName() == wnd:GetName() then table.remove(tResizes,k) end
+	end
+	table.insert(tResizes,{wnd = wnd,tTargets = tTargets})
+	if not bResizeRunning then
+		Apollo.RegisterTimerHandler(.002,"GracefulResize",self)
+		self.resizeTimer = ApolloTimer.Create(.002,true,"GracefulResize",self)
+		bResizeRunning = true
+	end
+end
+
+function MasterLoot:GracefulResize()
+	for k , resize in ipairs(tResizes) do
+		local l,t,r,b = resize.wnd:GetAnchorOffsets()
+		if resize.tTargets.l then
+			if l > resize.tTargets.l then
+				l = l-1
+			elseif l < resize.tTargets.l then
+				l = l+1
+			end		
+		end
+		
+		if resize.tTargets.t then
+			if t > resize.tTargets.t then
+				t = t-1
+			elseif t < resize.tTargets.t then
+				t = t+1
+			end		
+		end
+
+		if resize.tTargets.r then
+			if r > resize.tTargets.r then
+				r = r-1
+			elseif r < resize.tTargets.r then
+				r = r+1
+			end	
+		end
+
+		if resize.tTargets.b then
+			if b > resize.tTargets.b then
+				b = b-1
+			elseif b < resize.tTargets.b then
+				b = b+1
+			end
+		end	
+		resize.wnd:SetAnchorOffsets(l,t,r,b)
+		if l == (resize.tTargets.l or l) and r == (resize.tTargets.r or r) and b == (resize.tTargets.b or b) and t == (resize.tTargets.t or t) then table.remove(tResizes,k) end
+	end
+
+	if #tResizes == 0 then
+		bResizeRunning = false 
+		self.resizeTimer:Stop()
+	end
+end
+
+function MasterLoot:MLLightInit()
+	self.wndMLL = Apollo.LoadForm(self.xmlDoc,"MasterLootLight",nil,self)
+
+	if not self.settings then self.settings = {} end
+	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
+	
+	self.MLDummy = getDummyML(5)
+
+	self:MLLPopulateItems()
+end
+
+function MasterLoot:MLLPopulateItems(bResize)
+	self.wndMLL:FindChild("Items"):DestroyChildren()
+	local tML = self.MLDummy
+	for k , lootEntry in ipairs(tML) do
+		local wnd = Apollo.LoadForm(self.xmlDoc,"LightItem",self.wndMLL:FindChild("Items"),self)
+		wnd:FindChild("Qual"):SetBGColor(ktQualColors[lootEntry.itemDrop:GetItemQuality()])
+		wnd:FindChild("ItemName"):SetText(lootEntry.itemDrop:GetName())
+		wnd:FindChild("ItemIcon"):SetSprite(lootEntry.itemDrop:GetIcon())
+		Tooltip.GetItemTooltipForm(self,wnd,lootEntry.itemDrop,{bPrimary = true})
+		wnd:SetData(lootEntry)
+	end
+	Apollo.GetAddon("RaidOps"):BQUpdateCounters()
+	self.wndMLL:FindChild("Items"):ArrangeChildrenVert() 
+	if bResize then 
+		self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=self.wndMLL:GetHeight()-100})
+		local l,t,r,b = self.wndMLL:FindChild("RecipientsFrame"):GetAnchorOffsets()
+		self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=b})
+	end
+end
+
+function MasterLoot:MLLSelectItem(wndHandler,wndControl)
+	for k , child in ipairs(self.wndMLL:FindChild("Items"):GetChildren()) do
+		if child ~= wndControl then child:Show(false) end
+	end
+	self:gracefullyResize(wndControl,{t=5,b=wndControl:GetHeight()+5})
+	self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=200})
+	self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=220})
+	self:MLLPopulateRecipients(wndControl:GetData())
+end
+
+function MasterLoot:MLLDeselectItem(wndHandler,wndControl)
+	self:MLLPopulateItems(true)
+end
+
+function MasterLoot:MLLPopulateRecipients(lootEntry)
+	self.wndMLL:FindChild("Recipients"):DestroyChildren()
+	for k , looter in pairs(lootEntry.tLooters) do
+		local wnd = Apollo.LoadForm(self.xmlDoc,"LightRecipient",self.wndMLL:FindChild("Recipients"),self)
+		wnd:FindChild("CharacterName"):SetText(looter:GetName())
+		wnd:FindChild("ClassIcon"):SetSprite(ktClassToIcon[looter:GetClassId()])
+		wnd:SetData(looter)
+	end
+end
+
+function MasterLoot:MLLEnable()
+	self.settings.bLightMode = true
+	self:OnMasterLootUpdate(true)
+end
+
+function MasterLoot:MLLDisable()
+	self.settings.bLightMode = false
+	self:OnMasterLootUpdate()
+end
+
+-- Different stuffs
+
+function MasterLoot:BidMLSearch(wndHandler,wndControl,strText)
+	local Rops = Apollo.GetAddon("RaidOps")
+	if strText ~= "Search..." then
+		local children = self.wndMasterLoot:FindChild("LooterList"):GetChildren()
+		
+		for k,child in ipairs(children) do
+			child:Show(true,true)
+		end
+		
+		for k,child in ipairs(children) do
+			if not Rops:string_starts(child:FindChild("CharacterName"):GetText(),strText) then child:Show(false,true) end
+		end
+		
+		if wndControl ~= nil and wndControl:GetText() == "" then wndControl:SetText("Search...") end
+		
+		if Rops.tItems["settings"]["ML"].bArrTiles then
+			self.wndMasterLoot_LooterList:ArrangeChildrenTiles()
+		else
+			self.wndMasterLoot_LooterList:ArrangeChildrenVert()
+		end
+	end
+end
+
+function MasterLoot:BQAddItem(wndH,wndC)
+	Apollo.GetAddon("RaidOps"):BQAddItem(wndH,wndC)
+end
+
+function MasterLoot:BQRemItem(wndH,wndC)
+	Apollo.GetAddon("RaidOps"):BQRemItem(wndH,wndC)
+end

@@ -1108,12 +1108,14 @@ local ktDefaultGroup =
 function DKP:GroupInit()
 
 	-- Check for legacy databases
-	for k,groupSet in pairs(self.tItems.tDataSets) do
-		for k,playerSet in pairs(groupSet) do
-			if playerSet.GP then
-				playerSet.nAwardedGP = playerSet.GP - self.tItems["EPGP"].BaseGP
-				playerSet.nBaseGP = self.tItems["EPGP"].BaseGP
-				playerSet.GP = nil
+	if self.tItems.tDataSets then
+		for k,groupSet in pairs(self.tItems.tDataSets) do
+			for k,playerSet in pairs(groupSet) do
+				if playerSet.GP then
+					playerSet.nAwardedGP = playerSet.GP - self.tItems["EPGP"].BaseGP
+					playerSet.nBaseGP = self.tItems["EPGP"].BaseGP
+					playerSet.GP = nil
+				end
 			end
 		end
 	end

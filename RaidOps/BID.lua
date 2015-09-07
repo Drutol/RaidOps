@@ -183,16 +183,14 @@ function DKP:BidCompleteInit()
 
 	if not Apollo.GetAddon("RaidOpsLootHex") then
 		if self.tItems["settings"]["ML"].bStandardLayout then
-			self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
 			if self.tItems["settings"]["ML"].bDispBidding then
-				self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertNetworkBidding",Hook.wndMasterLoot,self)
-				self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc,"InsertChatBidding",Hook.wndMasterLoot,self)
+				self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertNetworkBidding",Hook.wndMasterLoot:FindChild("Framing"),self)
+				self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc,"InsertChatBidding",Hook.wndMasterLoot:FindChild("Framing"),self)
 				self.wndInsertedMasterButton1:Enable(false)
 				self.wndInsertedMasterButton:Enable(false)
 				local l,t,r,b = Hook.wndMasterLoot:FindChild("Assignment"):GetAnchorOffsets()
 				Hook.wndMasterLoot:FindChild("Assignment"):SetAnchorOffsets(l,t,r-225,b)
 			end
-			Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(5,84,-131,128)
 			
 			
 		else
@@ -210,8 +208,6 @@ function DKP:BidCompleteInit()
 				self.wndInsertedMasterButton1:Enable(false)
 			end
 
-			Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(37,238,-128,282)
-			self.wndInsertedSearch:SetAnchorOffsets(-122,238,-40,282)
 		end
 
 		Hook.wndMasterLoot:SetSizingMinimum(800, 310)
@@ -226,14 +222,15 @@ function DKP:BidCompleteInit()
 			self.wndInsertedControls:FindChild("SortPR"):SetText("DKP")
 		end
 		
-		self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
-		
 		if self.tItems["settings"].BidSortAsc == 1 then 
 			self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):SetCheck(true) 
 		else 
 			self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):SetCheck(true) 
 		end
 		
+	self.wndInsertedControls:FindChild("Window"):FindChild("Asc"):SetRotation(270)
+	self.wndInsertedControls:FindChild("Window"):FindChild("Desc"):SetRotation(90)
+
 		self.wndInsertedControls:FindChild("DispApplicable"):SetCheck(self.tItems["settings"]["ML"].bDisplayApplicable)
 		if not self.tItems["settings"]["ML"].bSortByName then self.wndInsertedControls:FindChild("SortPR"):SetCheck(true) else self.wndInsertedControls:FindChild("SortName"):SetCheck(true) end
 
@@ -330,8 +327,11 @@ function DKP:BidCompleteInit()
 		self.wndSettings:FindChild("ButtonShowGP"):SetCheck(true)
 		self:EPGPHookToETooltip()
 	end
-	--Hook.wndMasterLoot:Show(true,false)
-	Hook:OnMasterLootUpdate(true)
+
+	self:BQInit()
+
+	Hook.wndMasterLoot:Show(true,false)
+	--Hook:OnMasterLootUpdate(true)
 	--RaidOps LootHex
   	Apollo.RegisterEventHandler("RaidOpsChatBidding","StartChatBiddingFromOtherSource", self)
   	Apollo.RegisterEventHandler("RaidOpsNetworkBidding","StartNetworkBiddingFromOtherSource", self)
@@ -409,7 +409,9 @@ function DKP:BidCheckConditions()
 	if self.bIsBidding then
 		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStart"):Enable(false)
 		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStop"):Enable(true)
+		self.wndBid:FindChild("NextFromQueue"):Enable(false)
 	else
+		if self.BQ and #self.BQ > 0 then Print(#self.BQ) self.wndBid:FindChild("NextFromQueue"):Enable(true) else self.wndBid:FindChild("NextFromQueue"):Enable(false) end
 		local bCommandEnabled = false
 		for k,tCommand in pairs(self.tItems["settings"].tBidCommands) do
 			if tCommand.bEnable then bCommandEnabled = true break end
@@ -452,6 +454,15 @@ function DKP:BidRandomLooter()
 		Hook.tMasterLootSelectedLooter = luckyChild:GetData()
 		Hook.wndMasterLoot:FindChild("Assignment"):Enable(true)
 		luckyChild:SetCheck(true)
+	end
+end
+
+function DKP:MLLAssignItemAtRandom(wndHandler,wndControl)
+	local tData =  wndControl:GetParent():GetData()
+	if tData and tData.tLooters then
+		local luckylooter = self:ChooseRandomLooter()
+		self:BidAddPlayerToRandomSkip(luckylooter:GetName())
+		GameLib.AssignMasterLoot(tData.nLootId,luckylooter)
 	end
 end
 
@@ -504,27 +515,7 @@ function DKP:BidUpdateItemDatabase()
 	end
 end
 
-function DKP:BidMLSearch(wndHandler,wndControl)
-	if self.wndInsertedSearch:GetText() ~= "Search..." then
-		local children = Hook.wndMasterLoot:FindChild("LooterList"):GetChildren()
-		
-		for k,child in ipairs(children) do
-			child:Show(true,true)
-		end
-		
-		for k,child in ipairs(children) do
-			if not self:string_starts(child:FindChild("CharacterName"):GetText(),self.wndInsertedSearch:GetText()) then child:Show(false,true) end
-		end
-		
-		if wndControl ~= nil and wndControl:GetText() == "" then wndControl:SetText("Search...") end
-		
-		if self.tItems["settings"]["ML"].bArrTiles then
-			Hook.wndMasterLoot_LooterList:ArrangeChildrenTiles()
-		else
-			Hook.wndMasterLoot_LooterList:ArrangeChildrenVert()
-		end
-	end
-end
+
 
 function DKP:BidMLSortPlayers()
 	Hook:OnMasterLootUpdate(true)
@@ -550,7 +541,7 @@ function DKP:BidMasterItemSelected()
 	if HookML.tMasterLootSelectedItem and HookML.tMasterLootSelectedItem.itemDrop then
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
 		if DKPInstance.wndInsertedMasterButton then DKPInstance.wndInsertedMasterButton:Enable(true) end
-		if DKPInstance.wndInsertedMasterButton then DKPInstance.wndInsertedMasterButton1:Enable(true) end
+		if DKPInstance.wndInsertedMasterButton1 then DKPInstance.wndInsertedMasterButton1:Enable(true) end
 		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
 	end
 end
@@ -570,6 +561,7 @@ function DKP:StartChatBidding(item)
 			local item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
 			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ItemIconFrame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 			Tooltip.GetItemTooltipForm(self, self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ItemIcon") , item , {bPrimary = true, bSelling = false})
+			self.bIsBiddingPrep = true
 		end
 		self.wndBid:SetData(item)
 		if self.CurrentItemChatStr == nil then 
@@ -580,6 +572,7 @@ function DKP:StartChatBidding(item)
 		self.wndBid:Show(true,false)
 		self:BidCheckConditions()
 		if self.tItems["settings"].bAutoStart then self:BidStart() end
+		self.wndBid:FindChild("MainFrame"):FindChild("Frame"):FindChild("List"):DestroyChildren()
 	else
 		self.wndBid:Show(true,false)
 	end
@@ -649,11 +642,12 @@ function DKP:BidDisplayHelp()
 end
 
 function DKP:BidStart(strName)
+	self.bIsBidding = true
+	self.bIsBiddingPrep = false
 	self.CurrentBidSession = nil
 	self.CurrentBidSession = {}
 	self.CurrentBidSession.Bidders = {}
 	self.CurrentBidSession.strItem = self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("HeaderItem"):GetText()
-	self.bIsBidding = true
 	self:BidCheckConditions()
 	self:BidUpdateBiddersList()
 	self:BidEnableAssign()
@@ -980,6 +974,7 @@ function DKP:BidPerformCountdown()
 		end
 		self.bIsBidding = false
 		self:BidCheckConditions()
+		self:BQNext()
 	else
 		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [ChatBidding] " .. tostring(self.tItems["settings"].BidCount - self.BidCounter) .. "...")
 	end
@@ -1011,7 +1006,15 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 			self.tPopUpItemGPvalues[selectedItem.itemDrop:GetName()] = price
 		end
 
-		Event_FireGenericEvent("RaidOpsLootHexAssignThisItem",self.wndBid:GetData().nLootId,self.CurrentBidSession.strSelected)
+		--Event_FireGenericEvent("RaidOpsLootHexAssignThisItem",self.wndBid:GetData().nLootId,self.CurrentBidSession.strSelected)
+
+		for k , playerUnit in pairs(self.wndBid:GetData().tLooters) do
+			if string.lower(playerUnit:GetName()) == string.lower(self.CurrentBidSession.strSelected) then
+				GameLib.AssignMasterLoot(self.wndBid:GetData().nLootId,playerUnit)
+				break
+			end
+		end
+
 		self.wndBid:SetData(nil)
 		return
 	end
@@ -3225,3 +3228,77 @@ function DKP:BidCustomLabelRestore(wndControl,wndHandler)
 	end
 end
 
+--- Bidding Queue
+
+function DKP:BQInit()
+	self.BQ = {}
+end
+
+function DKP:BQAddItem(wndHandler,wndControl)
+	table.insert(self.BQ,wndControl:GetParent():GetData())
+
+	if #self.BQ == 1 and not self.bIsBiddingPrep and not self.bIsBidding then
+		Event_FireGenericEvent("RaidOpsChatBidding",self.BQ[1])
+		self.BQ = {}
+	end
+
+	self:BQUpdateCounters()
+end
+
+function DKP:BQRemItem(wndHandler,wndControl)
+	for k , bid in ipairs(self.BQ) do
+		if bid.nLootId == wndControl:GetParent():GetData().nLootId then table.remove(self.BQ,k) end
+	end
+
+	self:BQUpdateCounters()
+end
+
+function DKP:BQUpdateCounters()
+	if not self.BQ then return end
+
+	local tIDsToRem = {}
+
+	for j , bid in ipairs(self.BQ) do
+		local bFound = false
+		for k , child in ipairs(Hook.wndMLL:FindChild("Items"):GetChildren()) do
+			if child:GetData().nLootId == bid.nLootId then bFound = true end
+		end
+		if not bFound then table.insert(tIDsToRem,j) end
+	end
+
+	for i=#tIDsToRem,1,-1 do
+		table.remove(self.BQ,tIDsToRem[i])
+	end
+
+	for k , child in ipairs(Hook.wndMLL:FindChild("Items"):GetChildren()) do
+		local bFound = false
+		for j , bid in ipairs(self.BQ) do
+			if bid.nLootId == child:GetData().nLootId then 
+				child:FindChild("BQCounter"):SetText(j) 
+				child:FindChild("ChatBidding"):SetCheck(true) 
+				bFound = true
+			end
+		end
+		if not bFound then
+			child:FindChild("BQCounter"):SetText("X") 
+			child:FindChild("ChatBidding"):SetCheck(false) 
+		end
+		if self.wndBid:GetData() and self.wndBid:GetData().nLootId == child:GetData().nLootId then 
+			child:FindChild("NowBidding"):Show(true) 
+			child:FindChild("BQCounter"):SetText("") 
+		elseif not bFound then
+			child:FindChild("BQCounter"):SetText("X") 
+			child:FindChild("NowBidding"):Show(false)
+		end
+	end
+
+end
+
+function DKP:BQNext()
+	if #self.BQ > 0 then
+		Event_FireGenericEvent("RaidOpsChatBidding",self.BQ[1])
+		table.remove(self.BQ,1)
+		self:BQUpdateCounters()
+		self:BidCheckConditions()
+	end
+end
