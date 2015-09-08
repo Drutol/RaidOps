@@ -329,8 +329,8 @@ function DKP:BidCompleteInit()
 
 	self:BQInit()
 
-	Hook.wndMasterLoot:Show(true,false)
-	--Hook:OnMasterLootUpdate(true)
+	--Hook.wndMasterLoot:Show(true,false)
+	Hook:OnMasterLootUpdate(true)
 	--RaidOps LootHex
   	Apollo.RegisterEventHandler("RaidOpsChatBidding","StartChatBiddingFromOtherSource", self)
   	Apollo.RegisterEventHandler("RaidOpsNetworkBidding","StartNetworkBiddingFromOtherSource", self)

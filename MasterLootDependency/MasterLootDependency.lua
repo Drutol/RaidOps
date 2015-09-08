@@ -705,7 +705,7 @@ function MasterLoot:MLLPopulateItems(bResize)
 	if bItemSelected then return end
 
 	self.wndMLL:FindChild("Items"):DestroyChildren()
-	local tML = sort_loot(self.MLDummy)
+	local tML = sort_loot(GameLib.GetMasterLoot())
 
 	for k , lootEntry in ipairs(tML) do
 		local wnd = Apollo.LoadForm(self.xmlDoc,"LightItem",self.wndMLL:FindChild("Items"),self)
