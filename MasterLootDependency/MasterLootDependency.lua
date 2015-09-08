@@ -21,6 +21,16 @@ local ktClassToIcon =
 	[GameLib.CodeEnumClass.Spellslinger]  	= "Icon_Windows_UI_CRB_Spellslinger",
 }
 
+local ktClassToString =
+{
+	[GameLib.CodeEnumClass.Medic]       	= "Medic",
+	[GameLib.CodeEnumClass.Esper]       	= "Esper",
+	[GameLib.CodeEnumClass.Warrior]     	= "Warrior",
+	[GameLib.CodeEnumClass.Stalker]     	= "Stalker",
+	[GameLib.CodeEnumClass.Engineer]    	= "Engineer",
+	[GameLib.CodeEnumClass.Spellslinger]  	= "Spellslinger",
+}
+
 function MasterLoot:new(o)
 
 	o = o or {}
@@ -561,11 +571,25 @@ end
 
 local tResizes = {}
 local bResizeRunning = false
-function MasterLoot:gracefullyResize(wnd,tTargets)
+function MasterLoot:gracefullyResize(wnd,tTargets,bQuick)
 	for k , resize in ipairs(tResizes) do
 		if resize.wnd:GetName() == wnd:GetName() then table.remove(tResizes,k) end
 	end
-	table.insert(tResizes,{wnd = wnd,tTargets = tTargets})
+	if bQuick then
+		if tTargets.l then
+			if tTargets.l - math.floor(tTargets.l/2)*2 ~= 0 then tTargets.l = tTargets.l +1 end
+		end		
+		if tTargets.t then
+			if tTargets.t - math.floor(tTargets.t/2)*2 ~= 0 then tTargets.t = tTargets.t +1 end
+		end		
+		if tTargets.r then
+			if tTargets.r - math.floor(tTargets.r/2)*2 ~= 0 then tTargets.r = tTargets.r +1 end
+		end		
+		if tTargets.b then
+			if tTargets.b - math.floor(tTargets.b/2)*2 ~= 0 then tTargets.b = tTargets.b +1 end
+		end
+	end
+	table.insert(tResizes,{wnd = wnd,tTargets = tTargets,bQuick = bQuick})
 	if not bResizeRunning then
 		Apollo.RegisterTimerHandler(.002,"GracefulResize",self)
 		self.resizeTimer = ApolloTimer.Create(.002,true,"GracefulResize",self)
@@ -580,35 +604,36 @@ end
 function MasterLoot:GracefulResize()
 	for k , resize in ipairs(tResizes) do
 		local l,t,r,b = resize.wnd:GetAnchorOffsets()
+		local nSpeed = resize.bQuick and 2 or 1
 		if resize.tTargets.l then
 			if l > resize.tTargets.l then
-				l = l-1
+				l = l-nSpeed
 			elseif l < resize.tTargets.l then
-				l = l+1
+				l = l+nSpeed
 			end		
 		end
 		
 		if resize.tTargets.t then
 			if t > resize.tTargets.t then
-				t = t-1
+				t = t-nSpeed
 			elseif t < resize.tTargets.t then
-				t = t+1
+				t = t+nSpeed
 			end		
 		end
 
 		if resize.tTargets.r then
 			if r > resize.tTargets.r then
-				r = r-1
+				r = r-nSpeed
 			elseif r < resize.tTargets.r then
-				r = r+1
+				r = r+nSpeed
 			end	
 		end
 
 		if resize.tTargets.b then
 			if b > resize.tTargets.b then
-				b = b-1
+				b = b-nSpeed
 			elseif b < resize.tTargets.b then
-				b = b+1
+				b = b+nSpeed
 			end
 		end	
 		resize.wnd:SetAnchorOffsets(l,t,r,b)
@@ -623,14 +648,54 @@ end
 local nTargetHeight
 function MasterLoot:MLLightInit()
 	self.wndMLL = Apollo.LoadForm(self.xmlDoc,"MasterLootLight",nil,self)
-	self.wndMLL:Show(false)
+	--self.wndMLL:Show(false)
 	Apollo.RegisterEventHandler("SystemKeyDown", "MLLKeyDown", self)
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
 	
-	self.MLDummy = getDummyML(5)
+	self.MLDummy = getDummyML(10)
  	nTargetHeight = self.wndMLL:GetHeight()+40
 	self:MLLPopulateItems()
+end
+
+local ktSlotOrder = 
+{
+	[16] = 1,
+	[15] = 2,
+	[2] = 3,
+	[3] = 4,
+	[0] = 5,
+	[5] = 6,
+	[1] = 7,
+	[7] = 8,
+	[11] = 9,
+	[10] = 10,
+	[4] = 11,
+	[8] = 12
+}
+local function sort_loot_slot( c,d )
+	local s1 = c.itemDrop:GetSlot()
+	local s2 = d.itemDrop:GetSlot()
+	return s1 == s2 and c.itemDrop:GetName() < d.itemDrop:GetName() or ktSlotOrder[s1] < ktSlotOrder[s2]
+end
+
+local function sort_loot(tML)
+	local tReturn = {}
+	local tRandomJunk = {}
+	local tItems = {}
+	for k , item in ipairs(tML) do
+		if item.itemDrop:IsEquippable() then table.insert(tItems,item) else table.insert(tRandomJunk,item) end
+	end
+
+	table.sort(tRandomJunk,function (a,b) return a.itemDrop:GetName() < b.itemDrop:GetName() end)
+	tReturn = tRandomJunk
+	table.sort(tItems,function(a,b)
+		local q1 = a.itemDrop:GetItemQuality()
+		local q2 = b.itemDrop:GetItemQuality()
+		return q1 == q2 and sort_loot_slot(a,b) or q1 > q2
+		end)
+	for k , item in ipairs(tItems) do table.insert(tReturn,item) end
+	return tReturn
 end
 
 local bItemSelected = false
@@ -640,7 +705,8 @@ function MasterLoot:MLLPopulateItems(bResize)
 	if bItemSelected then return end
 
 	self.wndMLL:FindChild("Items"):DestroyChildren()
-	local tML = GameLib.GetMasterLoot()
+	local tML = sort_loot(self.MLDummy)
+
 	for k , lootEntry in ipairs(tML) do
 		local wnd = Apollo.LoadForm(self.xmlDoc,"LightItem",self.wndMLL:FindChild("Items"),self)
 		wnd:FindChild("Qual"):SetBGColor(ktQualColors[lootEntry.itemDrop:GetItemQuality()])
@@ -663,7 +729,7 @@ function MasterLoot:MLLSelectItem(wndHandler,wndControl)
 	for k , child in ipairs(self.wndMLL:FindChild("Items"):GetChildren()) do
 		if child ~= wndControl then child:Show(false) end
 	end
-	self:gracefullyResize(wndControl,{t=3,b=wndControl:GetHeight()+3})
+	self:gracefullyResize(wndControl,{t=3,b=wndControl:GetHeight()+3},true)
 	self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=190})
 	self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=200})
 	self:MLLPopulateRecipients(wndControl:GetData())
@@ -679,18 +745,126 @@ function MasterLoot:MLLDeselectItem(wndHandler,wndControl)
 	
 end
 
+function MasterLoot:MLLGetSuggestestedLooters(tLooters,item)
+	local tS = {}
+	local tR = {}
+
+	local bWantEsp = true
+    local bWantWar = true
+    local bWantSpe = true
+    local bWantMed = true
+    local bWantSta = true
+    local bWantEng = true
+
+	if string.find(item:GetName(),"Prägung") or string.find(item:GetName(),"Imprint") or item:IsEquippable() then
+
+		
+		local tDetails = item:GetDetailedInfo()
+		if tDetails.tPrimary.arClassRequirement then
+
+		    bWantEsp = false
+		    bWantWar = false
+		    bWantSpe = false
+		    bWantMed = false
+		    bWantSta = false
+		    bWantEng = false
+
+			for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do
+				if class == 1 then bWantWar = true
+				elseif class == 2 then bWantEng = true
+				elseif class == 3 then bWantEsp = true
+				elseif class == 4 then bWantMed = true
+				elseif class == 5 then bWantSta = true
+				elseif class == 7 then bWantSpe = true
+				end
+			end
+		else
+			local strCategory = item:GetItemCategoryName()
+			if strCategory ~= "" then
+				if string.find(strCategory,"Light") then
+					bWantEng = false
+					bWantWar = false
+					bWantSta = false
+					bWantMed = false
+				elseif string.find(strCategory,"Medium") then
+					bWantEng = false
+					bWantWar = false
+					bWantSpe = false
+					bWantEsp = false
+				elseif string.find(strCategory,"Heavy") then
+					bWantEsp = false
+					bWantSpe = false
+					bWantSta = false
+					bWantMed = false
+				end
+				
+				if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+					bWantEsp = false
+					bWantWar = false
+					bWantSpe = false
+					bWantMed = false
+					bWantSta = false
+					bWantEng = false
+				end 
+				
+				if string.find(strCategory,"Psyblade") then bWantEsp = true
+				elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
+				elseif string.find(strCategory,"Pistols") then bWantSpe = true
+				elseif string.find(strCategory,"Claws") then bWantSta = true
+				elseif string.find(strCategory,"Greatsword") then bWantWar = true
+				elseif string.find(strCategory,"Resonators") then bWantMed = true
+				end
+			end
+		end 
+	end
+
+	--Print(tostring(bWantEsp))
+	--Print(tostring(bWantEng))
+	--Print(tostring(bWantMed))
+	--Print(tostring(bWantWar))
+	--Print(tostring(bWantSta))
+	--Print(tostring(bWantSpe))
+
+
+	for k , looter in pairs(tLooters) do
+		if bWantEsp and ktClassToString[looter:GetClassId()] == "Esper"  then
+			table.insert(tS,looter)
+		elseif bWantEng and ktClassToString[looter:GetClassId()] == "Engineer"  then
+			table.insert(tS,looter)
+		elseif bWantMed and ktClassToString[looter:GetClassId()] == "Medic"  then
+			table.insert(tS,looter)
+		elseif bWantWar and ktClassToString[looter:GetClassId()] == "Warrior"  then
+			table.insert(tS,looter)
+		elseif bWantSta and ktClassToString[looter:GetClassId()] == "Stalker"  then
+			table.insert(tS,looter)
+		elseif bWantSpe and ktClassToString[looter:GetClassId()] == "Spellslinger"  then
+			table.insert(tS,looter)
+		else
+			table.insert(tR,looter)
+		end
+	end
+
+	return tS , tR
+end
+
 function MasterLoot:MLLPopulateRecipients(lootEntry)
 	self.wndMLL:FindChild("Recipients"):DestroyChildren()
-	for k , looter in pairs(lootEntry.tLooters) do
+
+	local tLootersSuggested , tLootersRest = self:MLLGetSuggestestedLooters(lootEntry.tLooters,lootEntry.itemDrop)
+	table.sort(tLootersSuggested,function (a,b)
+		return a:GetName() < b:GetName()
+	end)	
+	table.sort(tLootersRest,function (a,b)
+		return a:GetName() < b:GetName()
+	end)
+	for k , looter in ipairs(tLootersRest) do table.insert(tLootersSuggested,looter) end
+
+	for k , looter in pairs(tLootersSuggested) do
 		local wnd = Apollo.LoadForm(self.xmlDoc,"LightRecipient",self.wndMLL:FindChild("Recipients"),self)
 		wnd:FindChild("CharacterName"):SetText(looter:GetName())
 		wnd:FindChild("ClassIcon"):SetSprite(ktClassToIcon[looter:GetClassId()])
 		wnd:SetData(looter)
 	end
-	--for k=65,81 do 
-	--	local wnd = Apollo.LoadForm(self.xmlDoc,"LightRecipient",self.wndMLL:FindChild("Recipients"),self)
-	--	wnd:FindChild("CharacterName"):SetText(ktKeys[k])
-	--end
 	self:MLLArrangeRecipients()
 end
 
@@ -812,3 +986,4 @@ end
 function MasterLoot:BQRemItem(wndH,wndC)
 	Apollo.GetAddon("RaidOps"):BQRemItem(wndH,wndC)
 end
+

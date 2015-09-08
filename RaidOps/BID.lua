@@ -200,10 +200,9 @@ function DKP:BidCompleteInit()
 			Hook.wndMasterLoot:MoveToLocation(Hook.locSavedMasterWindowLoc)
 			Hook.wndMasterLoot_ItemList = Hook.wndMasterLoot:FindChild("ItemList")
 			Hook.wndMasterLoot_LooterList = Hook.wndMasterLoot:FindChild("LooterList")
-			self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc2,"InsertSearchBox",Hook.wndMasterLoot,self)
 			if self.tItems["settings"]["ML"].bDispBidding then
-				self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc2,"InsertChatBidButtonVert",Hook.wndMasterLoot,self)
-				self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc2,"InsertNetworkBidButtonVert",Hook.wndMasterLoot,self)
+				self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc2,"InsertChatBidButtonVert",Hook.wndMasterLoot:FindChild("Framing"),self)
+				self.wndInsertedMasterButton1 = Apollo.LoadForm(self.xmlDoc2,"InsertNetworkBidButtonVert",Hook.wndMasterLoot:FindChild("Framing"),self)
 				self.wndInsertedMasterButton:Enable(false)
 				self.wndInsertedMasterButton1:Enable(false)
 			end
@@ -330,8 +329,8 @@ function DKP:BidCompleteInit()
 
 	self:BQInit()
 
-	--Hook.wndMasterLoot:Show(true,false)
-	Hook:OnMasterLootUpdate(true)
+	Hook.wndMasterLoot:Show(true,false)
+	--Hook:OnMasterLootUpdate(true)
 	--RaidOps LootHex
   	Apollo.RegisterEventHandler("RaidOpsChatBidding","StartChatBiddingFromOtherSource", self)
   	Apollo.RegisterEventHandler("RaidOpsNetworkBidding","StartNetworkBiddingFromOtherSource", self)
@@ -411,7 +410,7 @@ function DKP:BidCheckConditions()
 		self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonStop"):Enable(true)
 		self.wndBid:FindChild("NextFromQueue"):Enable(false)
 	else
-		if self.BQ and #self.BQ > 0 then Print(#self.BQ) self.wndBid:FindChild("NextFromQueue"):Enable(true) else self.wndBid:FindChild("NextFromQueue"):Enable(false) end
+		if self.BQ and #self.BQ > 0 then self.wndBid:FindChild("NextFromQueue"):Enable(true) else self.wndBid:FindChild("NextFromQueue"):Enable(false) end
 		local bCommandEnabled = false
 		for k,tCommand in pairs(self.tItems["settings"].tBidCommands) do
 			if tCommand.bEnable then bCommandEnabled = true break end
