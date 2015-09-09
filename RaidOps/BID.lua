@@ -148,7 +148,7 @@ function DKP:OnWait()
 end
 
 function DKP:BidCompleteInit()
-	Hook = Apollo.GetAddon("MasterLootDependency") or Apollo.GetAddon("RaidOpsLootHex")
+	Hook = Apollo.GetAddon("MasterLootDependency") --or Apollo.GetAddon("RaidOpsLootHex")
 	Apollo.RegisterEventHandler("MasterLootUpdate","BidUpdateItemDatabase", self)
 	Apollo.RegisterEventHandler("ThrottledEvent","BidUpdateItemDatabase", self)
 
@@ -542,7 +542,6 @@ function DKP:BidMasterItemSelected()
 		DKPInstance.SelectedMasterItem = HookML.tMasterLootSelectedItem.itemDrop:GetName()
 		if DKPInstance.wndInsertedMasterButton then DKPInstance.wndInsertedMasterButton:Enable(true) end
 		if DKPInstance.wndInsertedMasterButton1 then DKPInstance.wndInsertedMasterButton1:Enable(true) end
-		DKPInstance.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(true)
 	end
 end
 
@@ -2718,7 +2717,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						if myName then
 							DKPInstance:SendRequestsForCurrItem(tItem.itemDrop:GetItemId())
 							self.tEquippedItems[myName] = {}
-							self.tEquippedItems[myName][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
+							--self.tEquippedItems[myName][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
 						end
 					end
 				end
@@ -2814,7 +2813,6 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 								local wndCounter = Apollo.LoadForm(DKPInstance.xmlDoc,"InsertDKPIndicator",wndCurrentLooter,DKPInstance)
 								if DKPInstance.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. DKPInstance.tItems[ID].net)
 								else wndCounter:SetText("PR : ".. DKPInstance:EPGPGetPRByName(DKPInstance.tItems[ID].strName)) end
-								wndCounter:FindChild("Indicator"):Show(false,true)
 							end
 						end
 						wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())

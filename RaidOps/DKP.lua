@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 32, 0, 0
+local Major, Minor, Patch, Suffix = 2, 34, 0, 0
 local strConcatedString
 local tMetaTableForBaseGP = {}
 -----------------------------------------------------------------------------------------------
@@ -196,6 +196,15 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.34 Beta 2 ---
+{09/09/2015}
+Fixes from previous beta.
+Reskin for ML widnow (horizontal and vertical)
+Redesign of ML settings.
+Reskin of Standby list.
+Removed random button from ML toolbar.
+Added random buttons directly on item bars.
+Added "Light Master Loot" in order to save space.(feather button in top left corener of ML window)
 ---RaidOps version 2.33 Beta ---
 {06/09/2015}
 Overhaul of BaseGP system:

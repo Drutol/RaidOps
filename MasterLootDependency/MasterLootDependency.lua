@@ -105,7 +105,7 @@ end
 ----------------------------
 
 function MasterLoot:OnMasterLootUpdate(bForceOpen)
-	if self.settings.bLightMode then self:MLLPopulateItems() end
+	if self.settings.bLightMode then self:MLLPopulateItems() return end
 	local tMasterLoot = GameLib.GetMasterLoot()
 
 	local tMasterLootItemList = {}
@@ -742,7 +742,6 @@ function MasterLoot:MLLDeselectItem(wndHandler,wndControl)
 	self:MLLPopulateItems(true)
 	self:MLLRecipientDeselected()
 	self.nSelectedItem = nil
-	
 end
 
 function MasterLoot:MLLGetSuggestestedLooters(tLooters,item)
@@ -818,14 +817,6 @@ function MasterLoot:MLLGetSuggestestedLooters(tLooters,item)
 		end 
 	end
 
-	--Print(tostring(bWantEsp))
-	--Print(tostring(bWantEng))
-	--Print(tostring(bWantMed))
-	--Print(tostring(bWantWar))
-	--Print(tostring(bWantSta))
-	--Print(tostring(bWantSpe))
-
-
 	for k , looter in pairs(tLooters) do
 		if bWantEsp and ktClassToString[looter:GetClassId()] == "Esper"  then
 			table.insert(tS,looter)
@@ -870,16 +861,17 @@ end
 
 function MasterLoot:MLLEnable()
 	self.settings.bLightMode = true
+	self.wndMasterLoot:Show(false,false)
 	self:OnMasterLootUpdate(true)
 end
 
 function MasterLoot:MLLDisable()
 	self.settings.bLightMode = false
+	self.wndMLL:Show(false,false)
 	self:OnMasterLootUpdate()
 end
 
 function MasterLoot:MLLRecipientSelected(wndHandler,wndControl)
-
 	self:gracefullyResize(self.wndMLL:FindChild("Assign"),{t=561})
 	self:gracefullyResize(self.wndMLL,{b=nTargetHeight})
 	self.wndMLL:FindChild("Assign"):SetText("Assign")
@@ -917,6 +909,9 @@ end
 function MasterLoot:MLLAssign()
 	if self.nSelectedItem and self.unitSelected then
 		GameLib.AssignMasterLoot(self.nSelectedItem,self.unitSelected)
+		bItemSelected = false
+		self:MLLPopulateItems(true)
+		self:MLLRecipientDeselected()
 	end
 end
 
