@@ -735,6 +735,7 @@ function DKP:UndoRedo()
 				for k,player in ipairs(self.tItems) do
 					if player.strName == revertee.strName then -- modifications 
 						self.tItems[k] = revertee
+						setmetatable(self.tItems[k],tMetaTableForBaseGP)
 						break
 					end
 				end
@@ -804,6 +805,7 @@ function DKP:Undo()
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then -- modifications 
 							self.tItems[k] = revertee
+							setmetatable(self.tItems[k],tMetaTableForBaseGP)
 							break
 						end
 					end

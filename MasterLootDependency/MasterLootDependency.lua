@@ -648,7 +648,7 @@ end
 local nTargetHeight
 function MasterLoot:MLLightInit()
 	self.wndMLL = Apollo.LoadForm(self.xmlDoc,"MasterLootLight",nil,self)
-	--self.wndMLL:Show(false)
+	self.wndMLL:Show(false)
 	Apollo.RegisterEventHandler("SystemKeyDown", "MLLKeyDown", self)
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
@@ -957,6 +957,7 @@ function MasterLoot:MLLArrangeRecipients()
 end
 
 function MasterLoot:BidMLSearch(wndHandler,wndControl,strText)
+	strText = self.wndMasterLoot:FindChild("SearchBox"):GetText()
 	local Rops = Apollo.GetAddon("RaidOps")
 	if strText ~= "Search..." then
 		local children = self.wndMasterLoot:FindChild("LooterList"):GetChildren()

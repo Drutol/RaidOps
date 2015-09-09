@@ -2847,7 +2847,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						wndCurrentLooter:Enable(false)
 					end
 				end
-				DKPInstance:BidMLSearch()
+				Hook:BidMLSearch()
 				
 				if DKPInstance.tItems["settings"]["ML"].bArrTiles then
 					luaCaller.wndMasterLoot_LooterList:ArrangeChildrenTiles()
