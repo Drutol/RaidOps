@@ -618,9 +618,8 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	for k,v in pairs(self.tItems) do
-		Print(k)
-	end
+	local unit = GameLib.GetPlayerUnit()
+	self:ExportShowPreloadedText(tohtml(unit:GetUnitProperties()))
 end
 
 function DKP:GetNewItem(id)
@@ -6156,7 +6155,7 @@ function DKP:CEOnUnitDamage(tArgs)
 	end
 
 	local name = tArgs.unitTarget:GetName()
-
+	--if lol then name = lol end
 	-- Counting Council Fights
 	if name == self.Locale["#PhagetechCommander"] then tKilledBossesInSession.tech1 = true end
 	if name == self.Locale["#PhagetechAugmentor"] then tKilledBossesInSession.tech2 = true end
@@ -6169,8 +6168,8 @@ function DKP:CEOnUnitDamage(tArgs)
 	if name == self.Locale["#GolgoxtheLifecrusher"] then tKilledBossesInSession.born4 = true  end
 	if name == self.Locale["#NoxmindtheInsidious"] then tKilledBossesInSession.born5 = true end
 
-	if name == self.Locale["#BinarySystemDaemon"] then tKilledBossesInSession.daem1 = true end
-	if name == self.Locale["#NullSystemDaemon"] then tKilledBossesInSession.daem2 = true end
+	if name == self.Locale["#BinarySystemDaemon"] then Print('fd') tKilledBossesInSession.daem1 = true end
+	if name == self.Locale["#NullSystemDaemon"] then Print ('ffd') tKilledBossesInSession.daem2 = true end
 		
 		
 	
@@ -6191,7 +6190,7 @@ function DKP:CEOnUnitDamage(tArgs)
 	
 	if #tBosses > 0 then
 		for k,boss in ipairs(tBosses) do
-			if boss.bType ~= self.Locale["#PhagebornConvergence"] and boss.bType ~= self.Locale["#PhagetechPrototypes"] then
+			if boss.bType ~= self.Locale["#PhagebornConvergence"] and boss.bType ~= self.Locale["#PhagetechPrototypes"] and boss.bType ~= self.Locale["#SystemDaemons"] then
 				if string.lower(boss.bType) == string.lower(name) then
 					self:CETriggerEvent(boss.ID)
 					break

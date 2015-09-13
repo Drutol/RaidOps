@@ -595,7 +595,7 @@ function ML:FigureShow(bForce)
 	local bML = false
 	local bLooter = false
 	
-	if  true--[[#GameLib.GetMasterLoot() > 0]] then
+	if #GameLib.GetMasterLoot() > 0 then
 		for k , entry in pairs(tCachedItems) do
 			if entry.lootEntry.bIsMaster then bML = true
 			else bLooter = true end
@@ -1067,7 +1067,7 @@ function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRe
 		end
 		
 		if wndHandler:GetName() == "RecipientEntry" then wndHandler:FindChild("NonApp"):Show(false) end
-	else
+	elseif eMouseButton == GameLib.CodeEnumInputMouse.Right then
 		local nLootId 
 		if wndControl:GetName() == "BubbleItemTile" then
 			nLootId = wndControl:GetData().nLootId
@@ -1089,6 +1089,14 @@ function ML:OnTileMouseButtonDown( wndHandler, wndControl, eMouseButton, nLastRe
 		end
 
 		self:DrawItems()
+	else -- middle
+		if wndControl:GetName() == "BubbleItemTile" then
+			Event_FireGenericEvent("GenericEvent_ContextMenuItem", wndControl:GetData().itemDrop)
+			--ChatSystemLib.Command("/p " .. :GetChatLinkString())
+		elseif wndControl:GetName() == "PlayerItemTile" and wndControl:GetData() then
+			Event_FireGenericEvent("GenericEvent_ContextMenuItem", wndControl:GetData().lootEntry.itemDrop)
+			--ChatSystemLib.Command("/p " .. wndControl:GetData().lootEntry:GetChatLinkString())
+		end
 	end
 end
 

@@ -290,6 +290,7 @@ L["#DreadphageOhmna"] = "Dreadphage Ohmna"
 L["#SystemDaemons"] = "System Daemons"
 L["#Gloomclaw"] = "Gloomclaw"
 L["#MaelstormAuthority"] = "Maelstorm Authority"
+L["#VolatilityLattice"] = "Volatility Lattice"
 L["#Avatus"] = "Avatus"
 
 --v2.34
