@@ -404,7 +404,7 @@ function DKP:EPGPSet(strName,EP,GP)
 			end
 		end
 		if GP ~= nil then
-			self.tItems[ID].nAwardedGP = GP
+			self.tItems[ID].nAwardedGP = GP - self.tItems[ID].nBaseGP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
 			self.tItems[ID].nAwardedGP = 1
@@ -450,8 +450,8 @@ function DKP:EPGPCheckTresholds()
 		if self.tItems["EPGP"].bMinGP and player.GP < 1 then 
 			player.nAwardedGP = 1
 		end
-		if self.tItems["EPGP"].bMinGPThres and player.GP < self.tItems[ID].nBaseGP then 
-			player.nAwardedGP = self.tItems[ID].nBaseGP
+		if self.tItems["EPGP"].bMinGPThres and player.GP < player.nBaseGP then 
+			player.nAwardedGP = 0
 		end
 	end
 end

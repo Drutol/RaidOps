@@ -362,6 +362,13 @@ function DKP:BidAutoStartDisable()
 	self.tItems["settings"].bAutoStart = false
 end
 
+function DKP:BidFireContextMenu(wndHandler,wndControl)
+	if wndHandler ~= wndControl then return end
+	if wndHandler:GetData() then
+		Event_FireGenericEvent("GenericEvent_ContextMenuItem", wndHandler:GetData())
+	end
+end
+
 function DKP:ReArr()
 	 if self.tItems["settings"]["ML"].bArrTiles then
 		Hook.wndMasterLoot_LooterList:ArrangeChildrenTiles()
@@ -461,7 +468,7 @@ function DKP:MLLAssignItemAtRandom(wndHandler,wndControl)
 	if tData and tData.tLooters then
 		local luckylooter = self:ChooseRandomLooter(tData)
 		if luckylooter then
-			self:BidAddPlayerToRandomSkip(luckylooter:GetName())
+			self:BidAddPlayerToRandomSkip(luckylooter:GetName(),tData.itemDrop:GetItemId())
 			GameLib.AssignMasterLoot(tData.nLootId,luckylooter)
 		end
 	end
@@ -470,17 +477,13 @@ end
 function DKP:BidDistributeAllAtRandom()
 	for k , item in ipairs(self.tSelectedItems) do
 		local luckylooter = self:ChooseRandomLooter(item)
-		self:BidAddPlayerToRandomSkip(luckylooter:GetName())
+		self:BidAddPlayerToRandomSkip(luckylooter:GetName(),item.itemDrop:GetItemId())
 		GameLib.AssignMasterLoot(item.nLootId,luckylooter)
 	end
 end
 
-function DKP:BidAddPlayerToRandomSkip(strName)
-	for random in ipairs(self.tRandomWinners) do -- in theory there should be no duplicates , but let's check just in case
-		if string.lower(strName) == string.lower(random) then return end
-	end
-
-	table.insert(self.tRandomWinners,strName)
+function DKP:BidAddPlayerToRandomSkip(strName,itemID)
+	table.insert(self.tRandomWinners,{strName = strName,item = itemID})
 end
 
 function DKP:ChooseRandomLooter(entry)
@@ -559,15 +562,11 @@ function DKP:StartChatBidding(item)
 			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ItemIcon"):SetSprite(self.ItemDatabase[strItem].sprite)
 			local item = Item.GetDataFromId(self.ItemDatabase[strItem].ID)
 			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ItemIconFrame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
+			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ItemIconFrame"):SetData(item)
 			Tooltip.GetItemTooltipForm(self, self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ItemIcon") , item , {bPrimary = true, bSelling = false})
 			self.bIsBiddingPrep = true
 		end
 		self.wndBid:SetData(item)
-		if self.CurrentItemChatStr == nil then 
-			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonLink"):Enable(false)
-		else 
-			self.wndBid:FindChild("ControlsContainer"):FindChild("Header"):FindChild("ButtonLink"):Enable(true) 
-		end
 		self.wndBid:Show(true,false)
 		self:BidCheckConditions()
 		if self.tItems["settings"].bAutoStart then self:BidStart() end
@@ -2437,13 +2436,13 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 		luaCaller.tMasterLootSelectedItem = nil
 		if #DKPInstance.tSelectedItems > 1 then
 			for k,item in ipairs(DKPInstance.tSelectedItems) do
-				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild) end
+				if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild,item.itemDrop:GetItemId()) end
 				GameLib.AssignMasterLoot(item.nLootId,SelectedLooter)
 				DKPInstance:MLRegisterItemWinner()
 			end
 			DKPInstance.tSelectedItems = {}
 		else
-			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild) end
+			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild,luaCaller.tMasterLootSelectedItem.itemDrop:GetItemId()) end
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
 	end

@@ -197,14 +197,30 @@ local nSortedGroup = nil
 local strChangelog = 
 [===[
 ---RaidOps version 2.34 Beta 2 ---
-{09/09/2015}
-Fixes from previous beta.
+{16/09/2015}
 Reskin for ML widnow (horizontal and vertical)
 Redesign of ML settings.
 Reskin of Standby list.
 Removed random button from ML toolbar.
 Added random buttons directly on item bars.
 Added "Light Master Loot" in order to save space.(feather button in top left corener of ML window)
+Added nBaseGP , nAwardedGP field to player entry , removed GP field.
+Added support for multiple BaseGP values accross groups.
+Added button to set BaseGP value in Mass Edit toolbar.
+Added strGroup field to logs , in order to differentiate which log applies to what.
+Added filtering by logs group of origin to logs window.
+Added BaseGP label.
+Added option to clear all logs.
+Added option to perform logs clear right after website export.
+Fixed bug concering hinding bidding buttons in ML window.
+Fixed alts merge bug.
+Fixed System Daemons trigger bug for Custom Events.
+Added Volatility Lattice to Custom events boss dropdown.
+Added '/rops tutorial' cmd.
+---RaidOps version 2.34 Beta 2 ---
+{09/09/2015}
+Fixes from previous beta.
+
 ---RaidOps version 2.33 Beta ---
 {06/09/2015}
 Overhaul of BaseGP system:
@@ -216,15 +232,7 @@ Each player can have different BaseGP value in different context (group).
 As this change affects very core of the addon , there will be beta period to check if things work.
 Back to changelog:
 
-Added nBaseGP , nAwardedGP field to player entry , removed GP field.
-Added support for multiple BaseGP values accross groups.
-Added button to set BaseGP value in Mass Edit toolbar.
-Added strGroup field to logs , in order to differentiate which log applies to what.
-Added filtering by logs group of origin to logs window.
-Added BaseGP label.
-Added option to clear all logs.
-Added option to perform logs clear right after website export.
-Fixed bug concering hinding bidding buttons in ML window.
+
 ---RaidOps version 2.32 ---
 {03/09/2015}
 Added support for Data Import via Uploader.
@@ -244,42 +252,6 @@ Fixed Alts merge bug.
 {24/08/2015}
 Redesigned export window.
 Fixed some GP formula bugs.
----RaidOps version 2.28 ---
-{05/08/2015}
-Added first kills menu to Custom events.
-Added option to import from file , instructions in the export/import window.
-Added following commands:
-	/rops add|sub|set ep|gp|dkp value strComment rm|rmq|strName
-	/rops timeaward start|stop
-	/rops undo
-	/rops armoryscan
-	/rops help
-	/rops raidsession start|stop|pause
-Fixed bug concnerning drag&fropping between groups.
----RaidOps version 2.27 ---
-{30/07/2015}
-Added grouping mechanism.
-Added different data sets for each group.
-Added restriction to modify only certain data set.
-Added multiple display mechanisms to accomodate grouping.
-Added grouping interface to context menu.
-Added groups GUI to the bottom part of the indow ('+' button).
-Added sorting to Master Loot loot window.
-Added button to assign multiple items at random each to different person.
-Fixed LUA error concerning chat bidding (roll).
-Fixed Bug that prevented to undo guild import.
-Added Armory module.
-Added 2nd GP formula profile dependent on item's level. 
----RaidOps version 2.26---
-{17/07/2015}
-Fixed Guild Bank pop-up issue.
-Fixed rare pop-up skip on random players.
-Added 'Assign randomly' button to chat bidding.
-Fixed rare lua error on raid session's end.
-Redesigned bottom part of main window with nicer buttons.
-Added things for new 'Groups' feature - everything disabled right now - more info in future updates.
-Fixed some graphical glitches.
-Doubled attendance verification process , hopefuly no more > 100% att. Sorry.
  ]===]
 
 -- Localization stuff
@@ -399,17 +371,24 @@ function DKP:OnDocLoaded()
 		--
 		
 		-- New Base GP implementation
-		
+		for k , item in ipairs(self.tItems) do
+			if item.GP then
+				item.nAwardedGP = item.GP - self.tItems["EPGP"].BaseGP
+				item.GP = nil
+				item.nBaseGP = self.tItems["EPGP"].BaseGP
+			end
+			if not item.nBaseGP then
+				item.nBaseGP = self.tItems["EPGP"].BaseGP
+			end
+			setmetatable(item,tMetaTableForBaseGP) -- because of old flawed implementation of .GP field , it's just used in too many places to replace this with function. That's why this metatable is here :)
+		end
 		tMetaTableForBaseGP.__index = function(tPlayer,reqKey)
 			if reqKey == "GP" then
+				if not tPlayer.nAwardedGP then tPlayer.nAwardedGP = 0 end -- it should never happen
+				if not tPlayer.nBaseGP then tPlayer.nBaseGP = Apollo.GetAddon("RaidOps").tItems["EPGP"].BaseGP end -- nor this ... just in case
+				if not tPlayer.nAwardedGP or not tPlayer.nBaseGP then return -1 end
 				return tPlayer.nAwardedGP + tPlayer.nBaseGP
 			end
-		end
-		for k , item in ipairs(self.tItems) do
-			if item.GP then item.nAwardedGP = item.GP - self.tItems["EPGP"].BaseGP end
-			item.GP = nil
-			item.nBaseGP = self.tItems["EPGP"].BaseGP
-			setmetatable(item,tMetaTableForBaseGP) -- because of old flawed implementation of .GP field , it's just used in too many places to replace this with function. That's why this metatable is here :)
 		end
 		-- End
 
@@ -431,6 +410,7 @@ function DKP:OnDocLoaded()
 
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
+		self.wndMain:Show(true)
 		self.wndMain:Show(false, true)
 		self.wndSettings:Show(false , true)
 		self.wndExport:Show(false , true)
@@ -558,7 +538,6 @@ function DKP:OnDocLoaded()
 		self:ArmoryInit()
 		self:ImportNotifyInit()
 
-		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
 		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
 		self.wndMain:FindChild("ShowTank"):SetCheck(true)
@@ -604,10 +583,6 @@ function DKP:OnDocLoaded()
 
 		--DEBUG
 		if not self.tItems["settings"].tDebugLogs then self.tItems["settings"].tDebugLogs = {} end
-
-
-		
-
 		--OneVersion
 		self:delay(2,function() Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOps", Major, Minor, Patch) end)
 	end
@@ -618,8 +593,8 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	local unit = GameLib.GetPlayerUnit()
-	self:ExportShowPreloadedText(tohtml(unit:GetUnitProperties()))
+	Event_FireGenericEvent("RaidOpsChatBidding",{nLootId = 324,itemDrop = Item.GetDataFromId(60417)})
+	--self:BidAddPlayerToRandomSkip("Drutol Windchaser",60417)
 end
 
 function DKP:GetNewItem(id)
@@ -4276,6 +4251,7 @@ function DKP:ExportWebsite()
 		tCopy.tot = player.tot
 		tCopy.EP = player.EP
 		tCopy.GP = player.GP
+		tCopy.nBaseGP = player.nBaseGP
 		tCopy.class = player.class
 		tCopy.alts = {}
 		for k , alt in ipairs(player.alts) do
@@ -4435,6 +4411,7 @@ function DKP:ExportLoadFromFile()
 		strConcatedString = self:GetExportStringFromFile()
 		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 		if string.len(strConcatedString) ~= 0 then self.wndExport:FindChild("ClearString"):Show(true) end
+		self:ExportCheckImport()
 	end
 end
 
@@ -4700,7 +4677,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	if self.tItems["settings"].bPopUpRandomSkip and self.tRandomWinners then
 		local bFound = false
 		for k , winner in ipairs(self.tRandomWinners) do
-			if winner == entry.strName then
+			if winner.strName == entry.strName and winner.item == entry.item:GetItemId() then
 				bFound = true
 				table.remove(self.tRandomWinners,k)
 				break
@@ -5276,6 +5253,7 @@ end
 
 function DKP:AltsAddMerge()
 	local mergedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
+	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	if self.tItems["settings"].bTrackUndo then
 		self:UndoAddActivity(string.format(ktUndoActions["amrg"],mergedPlayer.strName,recipent),"--",{[1] = mergedPlayer},true,nil,true)
 	end
@@ -5286,7 +5264,7 @@ function DKP:AltsAddMerge()
 	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
 	self.tItems[self.wndAlts:GetData()].nAwardedGP =  self.tItems[self.wndAlts:GetData()].nAwardedGP + mergedPlayer.nAwardedGP
 	
-	local recipent = self.tItems[self.wndAlts:GetData()].strName
+	
 	
 
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
@@ -8082,7 +8060,7 @@ function DKP:OnRaidOpsCmd(cmd , args)
 	for word in string.gmatch(args,"%S+") do
 		table.insert(words,word)
 	end
-	if #words < 1 then Print("Use '/rops help' for help") end
+	if #words < 1 then Print("Use '/rops help' for help. You can open main window with '/epgp'.") end
 	-- /rops add|sub|set ep|gp|dkp nMod strComment rm|rmq|strName
 	if words[1] == "add" or words[1] == "sub" or words[1] == "set" then
 		local mEdit = self.MassEdit
@@ -8171,6 +8149,10 @@ function DKP:OnRaidOpsCmd(cmd , args)
 		self:AttStartScan()
 	end
 
+	if words[1] == 'tutorial' then
+		self.wndTutList:Show(true,false)
+	end
+
 	if words[1] == 'help' then
 		Print("===RaidOps - CMDs===")
 		Print("Symbol '|' means that you have to choose one from all possible.")
@@ -8181,6 +8163,7 @@ function DKP:OnRaidOpsCmd(cmd , args)
 		Print("/rops undo")
 		Print("/rops armoryscan")
 		Print("/rops raidsession start|stop|pause")
+		Print("/rops tutorial")
 	end
 
 end
