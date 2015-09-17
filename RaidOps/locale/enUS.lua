@@ -33,6 +33,7 @@ L["#LabelTooltips:PR"] =  "Value calculated by dividing the EP value by GP value
 L["#LabelTooltips:Raids"] =  "Value of player's attended raids"
 L["#LabelTooltips:Item"] =   "Last item received.Recoreded via Loot Logs"
 L["#LabelTooltips:RealGP"] =  "Current GP Value decreased by BaseGP"
+L["#LabelTooltips:BaseGP"] =  "Offset GP value for player in current context. GP = AwardedGP + BaseGP"
 L["#LabelTooltips:Nil"] =  "Empty column"
 --wndMain:Controls
 L["#wndMain:Controls:InputValue"] = "Input value"
@@ -243,3 +244,54 @@ L["#wndSettings:DKPPrec"] = "Set DKP values precision."
 L["#wndEPGPSettings:Enable"] = "Enable EPGP"
 --v2.26
 L["#wndBid:AssignRandom"] = "Assign Randomly"
+
+
+
+L["#wndCE:NotifyDur"] = "Notification's Duration:"
+
+
+
+-- Internal strings
+L["#Imprint"] = "Imprint"
+
+L["#Chestplate"] = "Chestplate"
+L["#Greaves"] = "Greaves"
+L["#Pauldron"] = "Pauldron"
+L["#Glove"] = "Glove"
+L["#Boot"] = "Boot"
+L["#Helm"] = "Helm"
+
+L["#Calculated"] = "Calculated"
+L["#Algebraic"] = "Algebraic"
+L["#Logarithmic"] = "Logarithmic"
+
+L["#Xenological"] = "Xenological"
+L["#Xenobiotic"] = "Xenobiotic"
+L["#Xenogenetic"] = "Xenogenetic"
+
+L["#PhagetechCommander"] = "Phagetech Commander"
+L["#PhagetechAugmentor"] = "Phagetech Augmentor"
+L["#PhagetechProtector"] = "Phagetech Protector"
+L["#PhagetechFabricator"] = "Phagetech Fabricator"
+L["#ErsothCurseform"] = "Ersoth Curseform"
+L["#FleshmongerVratorg"] = "Fleshmonger Vratorg"
+L["#TerexBlightweaver"] = "Terax Blightweaver"
+L["#GolgoxtheLifecrusher"] = "Golgox the Lifecrusher"
+L["#NoxmindtheInsidious"] = "Noxmind the Insidious"
+L["#BinarySystemDaemon"] = "Binary System Daemon"
+L["#NullSystemDaemon"] = "Null System Daemon"
+
+L["#Experiment X-89"] = "Experiment X-89"
+L["#KuralaktheDefiler"] = "Kuralak the Defiler"
+L["#PhageMaw"] = "Phage Maw"
+L["#PhagebornConvergence"] = "Phageborn Convergence"
+L["#PhagetechPrototypes"] = "Phagetech Prototypes"
+L["#DreadphageOhmna"] = "Dreadphage Ohmna"
+L["#SystemDaemons"] = "System Daemons"
+L["#Gloomclaw"] = "Gloomclaw"
+L["#MaelstormAuthority"] = "Maelstorm Authority"
+L["#VolatilityLattice"] = "Volatility Lattice"
+L["#Avatus"] = "Avatus"
+
+--v2.34
+L["#wndSettings:ClearLogs"] = "Clear Logs"

@@ -244,3 +244,50 @@ L["#wndSettings:DKPPrec"] = "Setzte DKP Präzision."
 L["#wndEPGPSettings:Enable"] = "Aktiviere EPGP"
 --v2.26
 L["#wndBid:AssignRandom"] = "Zufällige Verteilung"
+
+
+
+L["#wndCE:NotifyDur"] = "Notification's Duration:(in german)"
+
+
+-- Internal strings
+L["#Imprint"] = "Prägung"
+
+L["#Chestplate"] = "Brust"
+L["#Greaves"] = "Beine"
+L["#Pauldron"] = "Schulter"
+L["#Glove"] = "Hände"
+L["#Boot"] = "Füße"
+L["#Helm"] = "Kopf"
+
+L["#Calculated"] = "Berechnet"
+L["#Algebraic"] = "Algebraisch"
+L["#Logarithmic"] = "Logarithmisch"
+
+L["#Xenological"] = "Xenological"
+L["#Xenobiotic"] = "Xenobiotic"
+L["#Xenogenetic"] = "Xenogenetic"
+
+L["#PhagetechCommander"] = "Phagentech-Kommandant"
+L["#PhagetechAugmentor"] = "Phagentech-Augmentor"
+L["#PhagetechProtector"] = "Phagentech-Protektor"
+L["#PhagetechFabricator"] = "Phagentech-Fabrikant"
+L["#ErsothCurseform"] = "Ersoth Fluchform"
+L["#FleshmongerVratorg"] = "Fleischhändler Vratorg"
+L["#TerexBlightweaver"] = "Terax Faulflechter"
+L["#GolgoxtheLifecrusher"] = "Golgox der Lebenszermalmer"
+L["#NoxmindtheInsidious"] = "Noxgeist der Hinterlistige"
+L["#BinarySystemDaemon"] = "Binärsystem-Dämon"
+L["#NullSystemDaemon"] = "Nullsystem-Dämon"
+
+L["#Experiment X-89"] = "Experiment X-89"
+L["#KuralaktheDefiler"] = "Kuralak die Schänderin"
+L["#PhageMaw"] = "Phagenschlund"
+L["#PhagebornConvergence"] = "Konvergenz der Phagengeborenen"
+L["#PhagetechPrototypes"] = "Phagentech Prototypen"
+L["#DreadphageOhmna"] = "Schreckensphage Ohmna"
+L["#SystemDaemons"] = "System-Dämonen"
+L["#Gloomclaw"] = "Düsterklaue"
+L["#MaelstormAuthority"] = "Mahlstromgewalt"
+L["#VolatilityLattice"] = "Explosionsraster"
+L["#Avatus"] = "Avatus"

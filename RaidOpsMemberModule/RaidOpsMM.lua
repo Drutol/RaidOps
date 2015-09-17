@@ -6,7 +6,7 @@
 require "Window"
 require "ICComm"
 
-local Major, Minor, Patch, Suffix = 1, 17, 0, 0
+local Major, Minor, Patch, Suffix = 1, 19, 0, 0
  
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMM Module Definition
@@ -687,7 +687,7 @@ function RaidOpsMM:AutoPassCloseDisable( wndHandler, wndControl, eMouseButton )
 end
 
 function RaidOpsMM:CloseSettings( wndHandler, wndControl, eMouseButton )
-	wndControl:GetParent():Show(false,false)
+	self.wndSettings:Show(false,false)
 end
 
 function RaidOpsMM:DisplayApplicableEnable()
@@ -1040,7 +1040,7 @@ function RaidOpsMM:EPGPItemSlotValueChanged( wndHandler, wndControl, strText )
 end
 function RaidOpsMM:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+		if string.find(wndControl:GetParent():GetName(),"Below") then	
 			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
 				self.QualityValues["Purple"] = tonumber(strText)
 			else
@@ -1054,7 +1054,7 @@ function RaidOpsMM:EPGPItemQualityValueChanged( wndHandler, wndControl, strText 
 			end
 		end
 	else
-		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+		if string.find(wndControl:GetParent():GetName(),"Below") then
 			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
 				wndControl:SetText(self.QualityValues["Purple"])
 			else

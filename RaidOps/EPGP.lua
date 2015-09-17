@@ -152,21 +152,21 @@ function DKP:OnLootedItem(item,bSuspend)
 end
 
 function DKP:EPGPGetTokenItemID(strToken)
-	if string.find(strToken,"Calculated") or string.find(strToken,"Algebraic") or string.find(strToken,"Logarithmic") then --DS
-		if string.find(strToken,"Chestplate") then return DataScapeTokenIds["Chest"] 
-		elseif string.find(strToken,"Greaves") then return DataScapeTokenIds["Legs"] 
-		elseif string.find(strToken,"Helm") then return DataScapeTokenIds["Head"] 
-		elseif string.find(strToken,"Pauldron") then return DataScapeTokenIds["Shoulders"] 
-		elseif string.find(strToken,"Glove") then return DataScapeTokenIds["Hands"] 
-		elseif string.find(strToken,"Boot") then return DataScapeTokenIds["Feet"] 
+	if string.find(strToken,self.Locale["#Calculated"]) or string.find(strToken,self.Locale["#Algebraic"]) or string.find(strToken,self.Locale["#Logarithmic"]) then --DS
+		if string.find(strToken,self.Locale["#Chestplate"]) then return DataScapeTokenIds["Chest"] 
+		elseif string.find(strToken,self.Locale["#Greaves"]) then return DataScapeTokenIds["Legs"] 
+		elseif string.find(strToken,self.Locale["#Helm"]) then return DataScapeTokenIds["Head"] 
+		elseif string.find(strToken,self.Locale["#Pauldron"]) then return DataScapeTokenIds["Shoulders"] 
+		elseif string.find(strToken,self.Locale["#Glove"]) then return DataScapeTokenIds["Hands"] 
+		elseif string.find(strToken,self.Locale["#Boot"]) then return DataScapeTokenIds["Feet"] 
 		end
-	elseif string.find(strToken,"Xenological") or string.find(strToken,"Xenobiotic") or string.find(strToken,"Xenogenetic") then --GA
-		if string.find(strToken,"Chestplate") then return GeneticTokenIds["Chest"] 
-		elseif string.find(strToken,"Greaves") then return GeneticTokenIds["Legs"] 
-		elseif string.find(strToken,"Helm") then return GeneticTokenIds["Head"] 
-		elseif string.find(strToken,"Pauldron") then return GeneticTokenIds["Shoulders"] 
-		elseif string.find(strToken,"Glove") then return GeneticTokenIds["Hands"] 
-		elseif string.find(strToken,"Boot") then return GeneticTokenIds["Feet"] 
+	elseif string.find(strToken,self.Locale["#Xenological"]) or string.find(strToken,self.Locale["#Xenobiotic"]) or string.find(strToken,self.Locale["#Xenogenetic"]) then --GA
+		if string.find(strToken,self.Locale["#Chestplate"]) then return GeneticTokenIds["Chest"] 
+		elseif string.find(strToken,self.Locale["#Greaves"]) then return GeneticTokenIds["Legs"] 
+		elseif string.find(strToken,self.Locale["#Helm"]) then return GeneticTokenIds["Head"] 
+		elseif string.find(strToken,self.Locale["#Pauldron"]) then return GeneticTokenIds["Shoulders"] 
+		elseif string.find(strToken,self.Locale["#Glove"]) then return GeneticTokenIds["Hands"] 
+		elseif string.find(strToken,self.Locale["#Boot"]) then return GeneticTokenIds["Feet"] 
 		end
 	end
 end
@@ -248,17 +248,17 @@ function DKP:EPGPGetSlotValueByString(strSlot)
 end
 
 function DKP:EPGPGetSlotStringByID(ID)
-	if ID == "Primary Weapon" then return "Weapon"
+	if ID == 16 then return "Weapon"
 	elseif ID == 7 then return "Attachment"
-	elseif ID == "Shoulder" then return "Shoulders"
-	elseif ID == "Chest" then return "Chest"
-	elseif ID == "Feet" then return "Feet"
-	elseif ID == "Gadget" then return "Gadget"
-	elseif ID == "Hands" then return "Hands"
-	elseif ID == "Head" then return "Head"
-	elseif ID == "Augment" then return "Implant"
-	elseif ID == "Legs" then return "Legs"
-	elseif ID == "Shields" then return "Shield"
+	elseif ID == 3 then return "Shoulders"
+	elseif ID == 0 then return "Chest"
+	elseif ID == 4 then return "Feet"
+	elseif ID == 11 then return "Gadget"
+	elseif ID == 5 then return "Hands"
+	elseif ID == 2 then return "Head"
+	elseif ID == 10 then return "Implant"
+	elseif ID == 1 then return "Legs"
+	elseif ID == 15 then return "Shield"
 	elseif ID == 8  then return "Support"
 	end
 end
@@ -344,12 +344,6 @@ function DKP:EPGPChangeUI()
 end
 
 function DKP:EPGPReset()
-	for i=1,table.maxn(self.tItems) do
-		if self.tItems[i] ~= nil then
-			self.tItems[i].EP = self.tItems["EPGP"].MinEP
-			self.tItems[i].GP = self.tItems["EPGP"].BaseGP
-		end
-	end
 	self.tItems["EPGP"].SlotValues = defaultSlotValues
 	self.tItems["EPGP"].QualityValues = defaultQualityValues
 	self.tItems["EPGP"].FormulaModifier = 0.5
@@ -366,12 +360,12 @@ function DKP:EPGPAdd(strName,EP,GP)
 			self.tItems[ID].EP = self.tItems[ID].EP + EP
 		end
 		if GP ~= nil then
-			self.tItems[ID].GP = self.tItems[ID].GP + GP
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP + GP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-			self.tItems[ID].GP = 1
-		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			self.tItems[ID].nAwardedGP = 1
+		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems[ID].nBaseGP then 
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nBaseGP
 		end
 	end
 
@@ -389,12 +383,12 @@ function DKP:EPGPSubtract(strName,EP,GP)
 			end
 		end
 		if GP ~= nil then
-			self.tItems[ID].GP = self.tItems[ID].GP - GP
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP - GP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-			self.tItems[ID].GP = 1
-		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			self.tItems[ID].nAwardedGP = 1
+		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems[ID].nBaseGP then 
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nBaseGP
 		end
 	end
 
@@ -410,12 +404,12 @@ function DKP:EPGPSet(strName,EP,GP)
 			end
 		end
 		if GP ~= nil then
-			self.tItems[ID].GP = GP
+			self.tItems[ID].nAwardedGP = GP - self.tItems[ID].nBaseGP
 		end
 		if self.tItems["EPGP"].bMinGP and self.tItems[ID].GP < 1 then 
-			self.tItems[ID].GP = 1
-		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems["EPGP"].BaseGP then 
-			self.tItems[ID].GP = self.tItems["EPGP"].BaseGP 
+			self.tItems[ID].nAwardedGP = 1
+		elseif self.tItems["EPGP"].bMinGPThres and self.tItems[ID].GP < self.tItems[ID].nBaseGP then 
+			self.tItems[ID].nAwardedGP = self.tItems[ID].nBaseGP
 		end
 	end
 end
@@ -436,7 +430,7 @@ function DKP:EPGPAwardRaid(EP,GP)
 					end
 				end
 				if GP ~= nil then
-					self.tItems[ID].GP = self.tItems[ID].GP + GP
+					self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP + GP
 				end
 			end
 		end
@@ -454,10 +448,10 @@ function DKP:EPGPCheckTresholds()
 		end
 		
 		if self.tItems["EPGP"].bMinGP and player.GP < 1 then 
-			player.GP = 1
+			player.nAwardedGP = 1
 		end
-		if self.tItems["EPGP"].bMinGPThres and player.GP < self.tItems["EPGP"].BaseGP then 
-			player.GP = self.tItems["EPGP"].BaseGP 
+		if self.tItems["EPGP"].bMinGPThres and player.GP < player.nBaseGP then 
+			player.nAwardedGP = 0
 		end
 	end
 end
@@ -513,7 +507,7 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 		if self.tItems[i] ~= nil and self.tItems["Standby"][string.lower(self.tItems[i].strName)] == nil then
 			if self.tItems["EPGP"].bDecayPrec then
 				self.tItems[i].EP = tonumber(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[i].EP))
-				self.tItems[i].GP = tonumber(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[i].GP))
+				self.tItems[i].nAwardedGP = tonumber(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",self.tItems[i].nAwardedGP))
 			end
 			
 			if self.wndEPGPSettings:FindChild("DecayEP"):IsChecked() == true then
@@ -523,10 +517,10 @@ function DKP:EPGPDecay( wndHandler, wndControl, eMouseButton )
 			end
 			if self.wndEPGPSettings:FindChild("DecayGP"):IsChecked() == true then
 				local nPreGP = self.tItems[i].GP
-				if self.tItems["EPGP"].bDecayRealGP then
-					self.tItems[i].GP = (self.tItems[i].GP - self.tItems["EPGP"].BaseGP) * ((100 - self.tItems["EPGP"].nDecayValue)/100) + self.tItems["EPGP"].BaseGP
+				if self.tItems["EPGP"].bDecayRealGP then 
+					self.tItems[i].nAwardedGP = self.tItems[i].nAwardedGP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
 				else
-					self.tItems[i].GP = self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)
+					self.tItems[i].nAwardedGP =  (self.tItems[i].GP * ((100 - self.tItems["EPGP"].nDecayValue)/100)) - self.tItems[i].nBaseGP
 				end
 				if self.tItems["settings"].logs == 1 then self:DetailAddLog(self.tItems["EPGP"].nDecayValue .. "% GP Decay","{Decay}",math.floor((nPreGP - self.tItems[i].GP)) * -1 ,i) end
 			end
@@ -596,7 +590,7 @@ end
 
 function DKP:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
-		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+		if string.find(wndControl:GetParent():GetName(),"Below") then	
 			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
 				self.tItems["EPGP"].QualityValues["Purple"] = tonumber(strText)
 			else
@@ -610,7 +604,7 @@ function DKP:EPGPItemQualityValueChanged( wndHandler, wndControl, strText )
 			end
 		end
 	else
-		if wndControl:GetParent():GetName() == "PurpleQualBelow" then	
+		if string.find(wndControl:GetParent():GetName(),"Below") then	
 			if wndControl:GetParent():FindChild("Name"):GetText() == "Purple Quality" then
 				wndControl:SetText(self.tItems["EPGP"].QualityValues["Purple"])
 			else
@@ -648,16 +642,12 @@ end
 function DKP:EPGPGetItemCostByID(itemID,bCut)
 	if not bCut then bCut = false end
 	local item = Item.GetDataFromId(itemID)
-	if string.find(item:GetName(),"Imprint") then
+	if string.find(item:GetName(),self.Locale["#Imprint"]) then
 		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
 	end
 	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then
 		local slot 
-		if item:GetSlotName() ~= "" then
-			slot = item:GetSlotName()
-		else
-			slot = item:GetSlot()
-		end
+		slot = item:GetSlot()
 		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
 		
 		if item:GetDetailedInfo().tPrimary.nEffectiveLevel <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
@@ -715,7 +705,7 @@ end
 function DKP:EPGPMinGPEnable()
 	self.tItems["EPGP"].bMinGP = true
 	self:EPGPGPBaseThresDisable()
-	for k ,player in ipairs(self.tItems) do if player.GP < 1 then player.GP = 1 end end
+	for k ,player in ipairs(self.tItems) do if player.GP < 1 then player.nAwardedGP = 1 end end
 end
 
 function DKP:EPGPMinDisable()
@@ -726,7 +716,7 @@ end
 function DKP:EPGPGPBaseThresEnable()
 	self.tItems["EPGP"].bMinGPThres = true
 	self:EPGPMinDisable()
-	for k ,player in ipairs(self.tItems) do if player.GP < self.tItems["EPGP"].BaseGP then player.GP = self.tItems["EPGP"].BaseGP end end
+	for k ,player in ipairs(self.tItems) do if player.GP < player.nBaseGP then player.nAwardedGP = player.nBaseGP end end
 end
 
 function DKP:EPGPGPBaseThresDisable()
@@ -818,9 +808,12 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
     	end
     end
-    if wndTooltip and string.find(item:GetName(),"Imprint") then
+    if wndTooltip and string.find(item:GetName(),this.Locale["#Imprint"]) then
     	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
-    	wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    	--89Print(wndTooltip:FindChild("ItemBasicStatsLine"):GetText())
+    	if wndBox then
+    		wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    	end
     end   
 
 

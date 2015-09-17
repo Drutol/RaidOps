@@ -40,7 +40,9 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 25, 0, 0
+local Major, Minor, Patch, Suffix = 2, 34, 0, 0
+local strConcatedString
+local tMetaTableForBaseGP = {}
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -168,7 +170,9 @@ local ktUndoActions =
 	["itrem"] = "Removed %s from %s",
 	["maward"] = "Awarded %s with %s",
 	--Decay
-	["dkpdec"] = "{DKP Decay}"
+	["dkpdec"] = "{DKP Decay}",
+	--Logs
+	["logprg"] = "{Logs purge}",
 
 }
 local ktQual = 
@@ -192,68 +196,64 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.28 ---
-{05/08/2015}
-Added first kills menu to Custom events.
-Added option to import from file , instructions in the export/import window.
-Added following commands:
-	/rops add|sub|set ep|gp|dkp value strComment rm|rmq|strName
-	/rops timeaward start|stop
-	/rops undo
-	/rops armoryscan
-	/rops help
-	/rops raidsession start|stop|pause
-Fixed bug concnerning drag&fropping between groups.
----RaidOps version 2.27 ---
-{30/07/2015}
-Added grouping mechanism.
-Added different data sets for each group.
-Added restriction to modify only certain data set.
-Added multiple display mechanisms to accomodate grouping.
-Added grouping interface to context menu.
-Added groups GUI to the bottom part of the indow ('+' button).
-Added sorting to Master Loot loot window.
-Added button to assign multiple items at random each to different person.
-Fixed LUA error concerning chat bidding (roll).
-Fixed Bug that prevented to undo guild import.
-Added Armory module.
-Added 2nd GP formula profile dependent on item's level. 
----RaidOps version 2.26---
-{17/07/2015}
-Fixed Guild Bank pop-up issue.
-Fixed rare pop-up skip on random players.
-Added 'Assign randomly' button to chat bidding.
-Fixed rare lua error on raid session's end.
-Redesigned bottom part of main window with nicer buttons.
-Added things for new 'Groups' feature - everything disabled right now - more info in future updates.
-Fixed some graphical glitches.
-Doubled attendance verification process , hopefuly no more > 100% att. Sorry.
----RaidOps version 2.25---
-{13/07/2015}
-DKP decay overhaul.
-Added DKP precision sliders.
-Fixed Auto Comment not recognizing DKP changes.
-DKP decay is registered in Recent Activity.
-Added Option to credit player with attendance manually. 
-Added Option to remove player's attendance manually. 
-When switching to Mass Edit currently selected player will transition to this mode.
----RaidOps version 2.24---
-{12/07/2015}
-Fixed GP values on tokens' tooltips - standalone.
-Added option to import/export settings only.
-Fixed LUA error on attemting to clear raids based on day difference.
-Small UI fixes and enhancements.
-Another iteration of Custom events UI maybe the final one.
-From versions 2.23 b and c :
-Added option to filter out trash items in website export.
-Added option to filter Item label with Loot Logs filtering.
----RaidOps version 2.23---
-{08/07/2015}
-Added Decay reminder.
-Fixed Gp values not showing on certain item types - for standalone tooltips.
-Added option to start and stop 'Timed Award' on raid session start/end.
-Fixed small Attendace + Raid Queue UI bug.
-Time award timer is now saved between sessions.
+---RaidOps version 2.34---
+{16/09/2015}
+Reskin for ML widnow (horizontal and vertical)
+Redesign of ML settings.
+Reskin of Standby list.
+Removed random button from ML toolbar.
+Added random buttons directly on item bars.
+Added "Light Master Loot" in order to save space.(feather button in top left corener of ML window)
+Added nBaseGP , nAwardedGP field to player entry , removed GP field.
+Added support for multiple BaseGP values accross groups.
+Added button to set BaseGP value in Mass Edit toolbar.
+Added strGroup field to logs , in order to differentiate which log applies to what.
+Added filtering by logs group of origin to logs window.
+Added BaseGP label.
+Added option to clear all logs.
+Added option to perform logs clear right after website export.
+Fixed bug concering hinding bidding buttons in ML window.
+Fixed alts merge bug.
+Fixed System Daemons trigger bug for Custom Events.
+Added Volatility Lattice to Custom events boss dropdown.
+Added '/rops tutorial' cmd.
+Reskin of Chat Bidding window.
+At last fixed all issues with missing pop-ups.
+---RaidOps version 2.34 Beta 2 ---
+{09/09/2015}
+Fixes from previous beta.
+
+---RaidOps version 2.33 Beta ---
+{06/09/2015}
+Overhaul of BaseGP system:
+From now on every player has dynamic GP offset (BaseGP) and GP from awards ; GP value is the sum of these two.
+Savefile format is changed and therefore you cannot downgrade versions.(Website export/import is the solution if you want to go back and you dindn't make backup).
+BaseGP value in EPGP settings serves now as default BaseGP value.
+Each player can have different BaseGP value in different context (group).
+
+As this change affects very core of the addon , there will be beta period to check if things work.
+Back to changelog:
+
+
+---RaidOps version 2.32 ---
+{03/09/2015}
+Added support for Data Import via Uploader.
+Added support for data exposing to Uploader.
+Added option to hide bidding buttons in ML window.
+---RaidOps version 2.30 ---
+{28/08/2015}
+Redesigned alts window.
+Redesigned logs window.
+Fixed sorting in logs window.
+Fixed visual bug when exporting importable database.
+Fixed harmless error when exporting settings.
+Fixed various issues with German localisation.
+Added 1st kill multipliers to custom events for units.
+Fixed Alts merge bug.
+---RaidOps version 2.29 ---
+{24/08/2015}
+Redesigned export window.
+Fixed some GP formula bugs.
  ]===]
 
 -- Localization stuff
@@ -372,7 +372,28 @@ function DKP:OnDocLoaded()
 		self.wndSettings:FindChild("ButtonSettingsPurge"):SetTooltip(self.Locale["#wndSettings:Tooltips:Purge"])
 		--
 		
-		
+		-- New Base GP implementation
+		for k , item in ipairs(self.tItems) do
+			if item.GP then
+				item.nAwardedGP = item.GP - self.tItems["EPGP"].BaseGP
+				item.GP = nil
+				item.nBaseGP = self.tItems["EPGP"].BaseGP
+			end
+			if not item.nBaseGP then
+				item.nBaseGP = self.tItems["EPGP"].BaseGP
+			end
+			setmetatable(item,tMetaTableForBaseGP) -- because of old flawed implementation of .GP field , it's just used in too many places to replace this with function. That's why this metatable is here :)
+		end
+		tMetaTableForBaseGP.__index = function(tPlayer,reqKey)
+			if reqKey == "GP" then
+				if not tPlayer.nAwardedGP then tPlayer.nAwardedGP = 0 end -- it should never happen
+				if not tPlayer.nBaseGP then tPlayer.nBaseGP = Apollo.GetAddon("RaidOps").tItems["EPGP"].BaseGP end -- nor this ... just in case
+				if not tPlayer.nAwardedGP or not tPlayer.nBaseGP then return -1 end
+				return tPlayer.nAwardedGP + tPlayer.nBaseGP
+			end
+		end
+		-- End
+
 		if self.wndMain == nil then
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
@@ -391,6 +412,7 @@ function DKP:OnDocLoaded()
 
 		Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 		self.wndItemList = self.wndMain:FindChild("ItemList")
+		self.wndMain:Show(true)
 		self.wndMain:Show(false, true)
 		self.wndSettings:Show(false , true)
 		self.wndExport:Show(false , true)
@@ -516,8 +538,8 @@ function DKP:OnDocLoaded()
 		self:MoreBottomOptionsInit()
 		self:DataSetsInit()
 		self:ArmoryInit()
+		self:ImportNotifyInit()
 
-		
 		self.wndMain:FindChild("ShowDPS"):SetCheck(true)
 		self.wndMain:FindChild("ShowHeal"):SetCheck(true)
 		self.wndMain:FindChild("ShowTank"):SetCheck(true)
@@ -563,8 +585,6 @@ function DKP:OnDocLoaded()
 
 		--DEBUG
 		if not self.tItems["settings"].tDebugLogs then self.tItems["settings"].tDebugLogs = {} end
-
-
 		--OneVersion
 		self:delay(2,function() Event_FireGenericEvent("OneVersion_ReportAddonInfo", "RaidOps", Major, Minor, Patch) end)
 	end
@@ -575,7 +595,8 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	self:GetNewItem(70000)
+	Event_FireGenericEvent("RaidOpsChatBidding",{nLootId = 324,itemDrop = Item.GetDataFromId(60417)})
+	--self:BidAddPlayerToRandomSkip("Drutol Windchaser",60417)
 end
 
 function DKP:GetNewItem(id)
@@ -699,6 +720,7 @@ function DKP:UndoRedo()
 				for k,player in ipairs(self.tItems) do
 					if player.strName == revertee.strName then -- modifications 
 						self.tItems[k] = revertee
+						setmetatable(self.tItems[k],tMetaTableForBaseGP)
 						break
 					end
 				end
@@ -708,6 +730,7 @@ function DKP:UndoRedo()
 				end
 			elseif tRedoActions[1].bRemove == false  and self:GetPlayerByIDByName(revertee.strName) == -1 then 
 				table.insert(self.tItems,revertee) -- adding player
+				setmetatable(self.tItems[#self.tItems],tMetaTableForBaseGP)
 			end
 		end
 		self:RefreshMainItemList()
@@ -767,21 +790,13 @@ function DKP:Undo()
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then -- modifications 
 							self.tItems[k] = revertee
-							--[[if string.find(tUndoActions[1].strType,"Reassigned") then
-								local item = Item.GetDataFromId(tUndoActions[1].item)
-								if item then
-									if k == 1 then -- Giver -> Add
-										self
-									elseif k == 2 then -- Recipient -> Rem
-
-									end
-								end
-							end]]
+							setmetatable(self.tItems[k],tMetaTableForBaseGP)
 							break
 						end
 					end
 				elseif tUndoActions[1].bRemove == true and self:GetPlayerByIDByName(revertee.strName) == -1 then
 					table.insert(self.tItems,revertee) -- adding player
+					setmetatable(self.tItems[#self.tItems],tMetaTableForBaseGP)
 				elseif tUndoActions[1].bRemove == false then 
 					for k,player in ipairs(self.tItems) do
 						if player.strName == revertee.strName then table.remove(self.tItems,k) break end
@@ -1017,13 +1032,15 @@ function DKP:OnUnitCreated(unit,isStr,bForceNoRefresh)
 		newPlayer.tot = self.tItems["settings"].default_dkp
 		newPlayer.Hrs = 0
 		newPlayer.EP = self.tItems["EPGP"].MinEP
-		newPlayer.GP = self.tItems["EPGP"].BaseGP
+		newPlayer.nAwardedGP = 0
+		newPlayer.nBaseGP = self.tItems["EPGP"].BaseGP
 		newPlayer.alts = {}
 		newPlayer.logs = {}
 		newPlayer.role = "DPS"
 		newPlayer.offrole = "None"
 		newPlayer.tLLogs = {}
 		table.insert(self.tItems,newPlayer)
+		setmetatable(self.tItems[#self.tItems],tMetaTableForBaseGP)
 	end
 	if bForceNoRefresh == nil then self:RefreshMainItemList() end
 end
@@ -1270,7 +1287,8 @@ function DKP:OnSave(eLevel)
 				tSave[k].tot = player.tot
 				tSave[k].TradeCap = player.TradeCap
 				tSave[k].EP = player.EP
-				tSave[k].GP = player.GP
+				tSave[k].nAwardedGP = player.nAwardedGP
+				tSave[k].nBaseGP = player.nBaseGP
 				tSave[k].class = player.class
 				tSave[k].alts = player.alts
 				tSave[k].logs = player.logs
@@ -1308,6 +1326,10 @@ function DKP:OnSave(eLevel)
 			tSave.newUpdateAltCleanup = self.tItems.newUpdateAltCleanup
 			tSave.tQueuedPlayers = self.tItems.tQueuedPlayers
 			tSave.nTATimer = self.NextAward
+
+			
+			if bSaveWebsite then tSave["importDataForUploader"] = strConcatedString end
+
 			if self.ActiveAuctions then
 				for k,auction in ipairs(self.ActiveAuctions) do
 					if auction.bActive or auction.nTimeLeft > 0 then table.insert(tSave["Auctions"],{itemID = auction.wnd:GetData(),bidders = auction.bidders,votes = auction.votes,bMaster = auction.bMaster,progress = auction.nTimeLeft}) end
@@ -1360,7 +1382,7 @@ function DKP:AddDKP(cycling,value,comment) -- Mass Edit check
 		return
 	end
 	Event_FireGenericEvent("ModifiedSomething")
-	if self.wndSelectedListItem ~=nil then
+	if self.wndSelectedListItem then
 		if self:LabelGetColumnNumberForValue("Name") ~= -1 then
 			local strName = self.wndSelectedListItem:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText()
 			
@@ -1615,12 +1637,11 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 					if self.tItems["settings"].strLootFiltering == "WL" then
 						if string.lower(fWord) == string.lower(word) then bFound = true break end
 					elseif self.tItems["settings"].strLootFiltering == "BL" then
-						if string.lower(fWord) == string.lower(word) then self:dbglog(">Query Fail > Reason: 'Blacklisted'") return end
+						if string.lower(fWord) == string.lower(word) then return end
 					end
 				end
 				if bFound then break end
 			end
-			self:dbglog(">Query passed > blacklist")
 
 			if self.ItemDatabase and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
@@ -1658,7 +1679,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				strItem = strItem .. " " .. words[k]
 			 end
 			 
-			for word in string.gmatch(string.sub(itemStr,2),"%S+") do
+			for word in string.gmatch(string.sub(strItem,2),"%S+") do
 				for fWord in string.gmatch(self.tItems["settings"].strFilteredKeywords, '([^;]+)') do
 					if self.tItems["settings"].strLootFiltering == "WL" then
 						if string.lower(fWord) == string.lower(word) then bFound = true break end
@@ -1669,8 +1690,8 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 				if bFound then break end
 			end
 			
-			if self.ItemDatabase[string.sub(itemStr,2)] then
-				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
+			if self.ItemDatabase[string.sub(strItem,2)] then
+				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(strItem,2)].ID)
 				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
 				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
 				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then return end
@@ -2039,7 +2060,7 @@ function DKP:TimeAwardAward()
 			end
 			
 			if self.wndTimeAward:FindChild("Settings"):FindChild("GP"):IsChecked() then
-				self.tItems[ID].GP = self.tItems[ID].GP + self.tItems["AwardTimer"].amount
+				self.tItems[ID].nAwardedGP = self.tItems[ID].nAwardedGP + self.tItems["AwardTimer"].amount
 				self:DetailAddLog("Timed Award","{GP}",self.tItems["AwardTimer"].amount,ID)
 			end
 			
@@ -2202,6 +2223,16 @@ function DKP:MassEditCreditAtt()
 		end
 		self:RefreshMainItemList()
 	end
+end
+
+function DKP:MassEditBaseGP()
+	local val = tonumber(self.wndMain:FindChild("Controls:EditBox1"):GetText())
+	if val and val >= 0 then
+		for k , wnd in ipairs(selectedMembers) do
+			self.tItems[wnd:GetData().id].nBaseGP = val
+		end
+	end
+	self:RefreshMainItemList()
 end
 
 function DKP:MassEditInviteContinue()
@@ -2733,8 +2764,8 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	local nGroup = playerItem.wnd:GetData().nGroupId
 	if self.tItems["settings"].bEnableGroups and self:GetActiveGroupID() ~= nGroup and self.tItems["settings"].Groups[nGroup] then
 		tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].Groups[nGroup].strName,playerItem.strName)
-		if tDataSet.GP ~= 0 then
-			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/tDataSet.GP)
+		if tDataSet.nAwardedGP ~= 0 then
+			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/(tDataSet.nAwardedGP+tDataSet.nBaseGP))
 		else
 			tDataSet.PR = 0
 		end
@@ -2804,6 +2835,8 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..self.tItems["settings"].nPrecisionDKP.."f",tDataSet and tDataSet.tot or playerItem.tot))
 			elseif self.tItems["settings"].LabelOptions[i] == "Raids" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(playerItem.raids or "0")
+			elseif self.tItems["settings"].LabelOptions[i] == "BaseGP" then
+				playerItem.wnd:FindChild("Stat"..i):SetText(tDataSet and tDataSet.nBaseGP or playerItem.nBaseGP)
 			elseif self.tItems["settings"].LabelOptions[i] == "Item" then
 				if playerItem.tLLogs and #playerItem.tLLogs > 0 then
 					local itemID 
@@ -2859,11 +2892,11 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 			elseif self.tItems["settings"].LabelOptions[i] == "EP" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.EP or playerItem.EP))
 			elseif self.tItems["settings"].LabelOptions[i] == "GP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.GP or playerItem.GP))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tDataSet and tDataSet.nAwardedGP+tDataSet.nBaseGP or playerItem.GP))
 			elseif self.tItems["settings"].LabelOptions[i] == "PR" then
 				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(tDataSet and tDataSet.PR or self:EPGPGetPRByName(playerItem.strName))
 			elseif self.tItems["settings"].LabelOptions[i] == "RealGP" then
-				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.GP - self.tItems["EPGP"].BaseGP))
+				playerItem.wnd:FindChild("Stat"..tostring(i)):SetText(string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",playerItem.nAwardedGP))
 			--Att
 			elseif self.tItems["settings"].LabelOptions[i] == "%GA" then
 				local raidCount = 0
@@ -3794,6 +3827,7 @@ function DKP:SettingsRestore()
 	if self.tItems["settings"].bLLAfterPopUp == nil then self.tItems["settings"].bLLAfterPopUp = false end
 
 	if self.tItems["settings"].bUseFilterForItemLabel == nil then self.tItems["settings"].bUseFilterForItemLabel = true end
+	if self.tItems["settings"].bClearLogsAfterExport == nil then self.tItems["settings"].bClearLogsAfterExport = false end
 
 	-- Sorry for this abomination above :(
 	
@@ -3812,6 +3846,7 @@ function DKP:SettingsRestore()
 	self.wndSettings:FindChild("LLonPopUp"):SetCheck(self.tItems["settings"].bLLAfterPopUp)
 	self.wndSettings:FindChild(self.tItems["settings"].strDateFormat):SetCheck(true)
 	self.wndSettings:FindChild("FilterItemLabel"):SetCheck(self.tItems["settings"].bUseFilterForItemLabel)
+	self.wndSettings:FindChild("ClrLogsAftWebsite"):SetCheck(self.tItems["settings"].bClearLogsAfterExport)
 
 	--Export
 	if self.tItems["settings"].bUseFilterForWebsiteExport == nil then self.tItems["settings"].bUseFilterForWebsiteExport = true end
@@ -4117,6 +4152,14 @@ function DKP:SettingsSetDKPPrecision( wndHandler, wndControl, fNewValue, fOldVal
 	end
 end
 
+function DKP:SettingClearLogsAfterExportEnable()
+	self.tItems["settings"].bClearLogsAfterExport = true
+end
+
+function DKP:SettingClearLogsAfterExportDisable()
+	self.tItems["settings"].bClearLogsAfterExport = false
+end
+
 function DKP:SettingsEnableFillingBidMinValues()
 	self.tItems["BidSlots"].Enable = 1
 end
@@ -4128,198 +4171,240 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Export Functions
 ---------------------------------------------------------------------------------------------------
-local strConcatedString
 
 function DKP:ExportExport()
-
-	if not self.wndExport:FindChild("List"):IsChecked() then
-		if self.wndExport:FindChild("EPGP"):IsChecked() then
-			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+	if not self.wndExport:FindChild("ModeDisplay"):IsChecked() then
+		if self.wndExport:FindChild("ModeEPGP"):IsChecked() then
+			if self.wndExport:FindChild("TypeCSV"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsCSVEPGP())
-			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTML"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsHTMLEPGP())
-			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTMLF"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsFormattedHTMLEPGP())
 			end
-		elseif self.wndExport:FindChild("DKP"):IsChecked() then
-			if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+		elseif self.wndExport:FindChild("ModeDKP"):IsChecked() then
+			if self.wndExport:FindChild("TypeCSV"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsCSVDKP())
-			elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTML"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsHTMLDKP())
-			elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+			elseif  self.wndExport:FindChild("TypeHTMLF"):IsChecked() then
 				self:ExportSetOutputText(self:ExportAsFormattedHTMLDKP())
 			end
 		end
 	else
-		if self.wndExport:FindChild("ButtonExportCSV"):IsChecked() then
+		if self.wndExport:FindChild("TypeCSV"):IsChecked() then
 			self:ExportSetOutputText(self:ExportAsCSVList())
-		elseif  self.wndExport:FindChild("ButtonExportHTML"):IsChecked() then
+		elseif  self.wndExport:FindChild("TypeHTML"):IsChecked() then
 			self:ExportSetOutputText(self:ExportAsHTMLList())
-		elseif  self.wndExport:FindChild("ButtonExportFromattedHTML"):IsChecked() then
+		elseif  self.wndExport:FindChild("TypeHTMLF"):IsChecked() then
 			self:ExportSetOutputText(self:ExportAsFormattedHTMLList())
 		end
 	end
+end
+
+function DKP:ExportDatabase()
+	local exportTables = {}
+	exportTables.tPlayers = {}
+	for k , player in ipairs(self.tItems) do
+		local tPlayer = {}
+		tPlayer.strName = player.strName
+		tPlayer.net = player.net
+		tPlayer.tot = player.tot
+		tPlayer.Hrs = player.Hrs
+		tPlayer.logs = player.logs
+		tPlayer.EP = player.EP
+		tPlayer.nAwardedGP = player.nAwardedGP
+		tPlayer.nBaseGP = player.nBaseGP
+		tPlayer.class = player.class
+		tPlayer.alts = player.alts
+		tPlayer.role = player.role
+		tPlayer.offrole = player.offrole
+		tPlayer.tLLogs = player.tLLogs
+		tPlayer.tAtt = player.tAtt
+		table.insert(exportTables.tPlayers,tPlayer)
+	end
+	exportTables.tRaids = self.tItems.tRaids
+	exportTables.tSettings = self.tItems["settings"]
+	exportTables.tEPGP = self.tItems["EPGP"]
+	exportTables.tStandby = self.tItems["Standby"]
+	exportTables.tCE = self.tItems["CE"]
+	exportTables.tDataSets = self.tItems.tDataSets
 	
-	if self.wndExport:FindChild("ButtonExportSerialize"):IsChecked() then
-		local exportTables = {}
-		exportTables.tPlayers = {}
-		for k , player in ipairs(self.tItems) do
-			local tPlayer = {}
-			tPlayer.strName = player.strName
-			tPlayer.net = player.net
-			tPlayer.tot = player.tot
-			tPlayer.Hrs = player.Hrs
-			tPlayer.logs = player.logs
-			tPlayer.EP = player.EP
-			tPlayer.GP = player.GP
-			tPlayer.class = player.class
-			tPlayer.alts = player.alts
-			tPlayer.role = player.role
-			tPlayer.offrole = player.offrole
-			tPlayer.tLLogs = player.tLLogs
-			tPlayer.tAtt = player.tAtt
-			table.insert(exportTables.tPlayers,tPlayer)
+
+	self:ExportSetOutputText(serpent.dump(exportTables))
+
+end
+
+function DKP:ExportWebsiteAndSave()
+	self:ExportWebsite()
+	bSaveWebsite = true
+	ChatSystemLib.Command("/reloadui")
+end
+
+function DKP:ExportWebsite()
+	local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+	local tTestTable = {}
+	tTestTable['tMembers'] = {}
+	tTestTable['tRaids'] = self.tItems.tRaids
+	for k , player in ipairs(self.tItems) do
+		local tCopy = {}
+		tCopy.strName = player.strName
+		tCopy.net = player.net
+		tCopy.tot = player.tot
+		tCopy.EP = player.EP
+		tCopy.GP = player.GP
+		tCopy.nBaseGP = player.nBaseGP
+		tCopy.class = player.class
+		tCopy.alts = {}
+		for k , alt in ipairs(player.alts) do
+			table.insert(tCopy.alts,{name = alt , tArmoryEntry = self.tItems["settings"].bArmoryApp and self.tItems.tArmory[alt] or nil})
 		end
-		exportTables.tRaids = self.tItems.tRaids
-		exportTables.tSettings = self.tItems["settings"]
-		exportTables.tEPGP = self.tItems["EPGP"]
-		exportTables.tStandby = self.tItems["Standby"]
-		exportTables.tCE = self.tItems["CE"]
-		exportTables.tDataSets = self.tItems.tDataSets
-		
-
-		self:ExportSetOutputText(serpent.dump(exportTables))
-
-	elseif self.wndExport:FindChild("ButtonImport"):IsChecked() then
-		self.wndExport:FindChild("ClearString"):Show(false)
-		self.wndExport:FindChild("StoredLength"):SetText("0")
-		local strImportString = strConcatedString
-		strConcatedString = nil
-		if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
-		if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{' then
-			local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
-			local tImportedPlayers = JSON.decode(strImportString)
-			if tImportedPlayers then
-
-				for k,player in ipairs(self.tItems) do
-					self.tItems[k] = nil
+		tCopy.logs = player.logs
+		tCopy.role = player.role
+		tCopy.offrole = player.offrole
+		tCopy.tLLogs = player.tLLogs
+		tCopy.tAtt = player.tAtt
+		tCopy.tLLogs = {}
+		tCopy.tDataSets = {}
+		tCopy.tLLogs = {}
+		if self.tItems["settings"].bArmoryAppend then tCopy.tArmoryEntry = self.tItems.tArmory[tCopy.strName] end
+		for j , group in ipairs(self.tItems["settings"].Groups) do 
+			for i , id in ipairs(group.tIDs) do
+				if id == k then
+					local tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)
+					tData.GP = tData.nAwardedGP + tData.nBaseGP
+					tData.nAwardedGP = nil
+					tData.nBaseGP = nil
+					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = tData})
+					break
 				end
-				for k,raid in ipairs(self.tItems.tRaids or {}) do
-					if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
-				end
-				self.tItems.tDataSets = {}
-				for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
-					table.insert(self.tItems,player)
-					for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
-						if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
-						self.tItems.tDataSets[set.strGroup][player.strName] = set.tData
-					end
-					self.tItems[#self.tItems].tDataSets = nil
-				end
-				if not self.tItems.tRaids then self.tItems.tRaids = {} end
-				for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
-					table.insert(self.tItems.tRaids,raid)
-				end
- 				self:AltsBuildDictionary()
-				for alt , owner in ipairs(self.tItems["alts"]) do
-					for k , player in ipairs(self.tItems) do
-						if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
-						break
-					end
-				end
-				self:AltsBuildDictionary()
 			end
-			ChatSystemLib.Command("/reloadui")
-		else
-			local tImportedTables
-			if string.sub(strImportString, 1, 2) == 'do' then
-				tImportedTables = serpent.load(strImportString)
-			else
-				tImportedTables = serpent.load(Base64.Decode(strImportString))
-			end
-
-			if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
-				for k,player in ipairs(self.tItems) do
-					self.tItems[k] = nil
-				end
-				for k,player in ipairs(tImportedTables.tPlayers) do
-					table.insert(self.tItems,player)
-				end
-				for k,player in ipairs(self.tItems) do
-					if not self.tItems[k].logs then self.tItems[k].logs = {} end
-				end
-				self.tItems["settings"] = tImportedTables.tSettings
-				self.tItems["EPGP"] = tImportedTables.tEPGP
-				self.tItems["Standby"] = tImportedTables.tStandby
-				self.tItems["CE"] = tImportedTables.tCE
-				self.tItems.tDataSets = tImportedTables.tDataSets
-				self.tItems.tRaids = tImportedTables.tRaids
-				self:AltsBuildDictionary()
-				for alt , owner in ipairs(self.tItems["alts"]) do
-					for k , player in ipairs(self.tItems) do
-						if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
-						break
-					end
-				end
-				self:AltsBuildDictionary()
-				ChatSystemLib.Command("/reloadui")
-			elseif tImportedTables["settings"] and tImportedTables["EPGP"] then
-				self.tItems["settings"] = tImportedTables["settings"]
-				self.tItems["EPGP"] = tImportedTables["EPGP"]
-				self.tItems["CE"] = tImportedTables["CE"]
-				ChatSystemLib.Command("/reloadui")
-			else
-				Print("Error processing database")
-			end
+		end
+		if #tCopy.tDataSets == 0 then tCopy.tDataSets = nil end
+		table.insert(tTestTable['tMembers'],tCopy)
+		for k , entry in ipairs(player.tLLogs or {}) do
+			if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
+				table.insert(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs,entry)
+			end 
 		end
 	end
+	if self.tItems["settings"].bClearLogsAfterExport then self:LogsDeleteAll() end
+	self:ExportSetOutputText(JSON.encode(tTestTable))
+end
 
-	if self.wndExport:FindChild("WebExport"):IsChecked() then
+function DKP:ExportCheckImport()
+	local strImportString = strConcatedString
+	if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
+	local bResult = false
+	local strType = "----"
+	if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{'  then
+		bResult = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage.decode(strImportString) and true or false
+		strType = "Website"
+	elseif string.sub(strImportString, 1, 2) == 'do' then
+		bResult = string.sub(strImportString,-5) == "_;end" and true or false
+		strType = "Database"
+	else
+		strType = "Invalid"
+	end
+	if bResult then
+		self.wndExport:FindChild("ImportStatusOK"):Show(true)
+		self.wndExport:FindChild("ImportStatusNope"):Show(false)
+	else
+		self.wndExport:FindChild("ImportStatusOK"):Show(false)
+		self.wndExport:FindChild("ImportStatusNope"):Show(true)
+	end
+	self.wndExport:FindChild("ImportTypeLabel"):SetText(strType)
+	self.wndExport:FindChild("Import"):Enable(bResult)
+end
+
+function DKP:ExportImport()
+	self.wndExport:FindChild("ClearString"):Show(false)
+	self.wndExport:FindChild("StoredLength"):SetText("0")
+	local strImportString = strConcatedString
+	strConcatedString = nil
+	if not strImportString then strImportString = self.wndExport:FindChild("ExportBox"):GetText() end
+	if string.sub(strImportString, 1, 2) == '[' or string.sub(strImportString, 1, 1) == '{' then
 		local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
-		local tTestTable = {}
-		tTestTable['tMembers'] = {}
-		tTestTable['tRaids'] = self.tItems.tRaids
-		for k , player in ipairs(self.tItems) do
-			local tCopy = {}
-			tCopy.strName = player.strName
-			tCopy.net = player.net
-			tCopy.tot = player.tot
-			tCopy.EP = player.EP
-			tCopy.GP = player.GP
-			tCopy.class = player.class
-			
-			tCopy.alts = {}
-			for k , alt in ipairs(player.alts) do
-				table.insert(tCopy.alts,{name = alt , tArmoryEntry = self.tItems["settings"].bArmoryApp and self.tItems.tArmory[alt] or nil})
+		local tImportedPlayers = JSON.decode(strImportString)
+		if tImportedPlayers then
+
+			for k,player in ipairs(self.tItems) do
+				self.tItems[k] = nil
 			end
-			tCopy.logs = player.logs
-			tCopy.role = player.role
-			tCopy.offrole = player.offrole
-			tCopy.tLLogs = player.tLLogs
-			tCopy.tAtt = player.tAtt
-			tCopy.tLLogs = {}
-			tCopy.tDataSets = {}
-			tCopy.tLLogs = {}
-			if self.tItems["settings"].bArmoryAppend then tCopy.tArmoryEntry = self.tItems.tArmory[tCopy.strName] end
-			for j , group in ipairs(self.tItems["settings"].Groups) do 
-				for i , id in ipairs(group.tIDs) do
-					if id == k then
-						table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)})
-						break
-					end
+			for k,raid in ipairs(self.tItems.tRaids or {}) do
+				if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
+			end
+			self.tItems.tDataSets = {}
+			for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
+				player.nAwardedGP = player.GP - (player.nBaseGP or self.tItems["EPGP"].BaseGP)
+				player.GP = nil
+				table.insert(self.tItems,player)
+				for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
+					if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
+					self.tItems.tDataSets[set.strGroup][player.strName] = set.tData
+				end
+				self.tItems[#self.tItems].tDataSets = nil
+			end
+			if not self.tItems.tRaids then self.tItems.tRaids = {} end
+			for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
+				table.insert(self.tItems.tRaids,raid)
+			end
+				self:AltsBuildDictionary()
+			for alt , owner in ipairs(self.tItems["alts"]) do
+				for k , player in ipairs(self.tItems) do
+					if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
+					break
 				end
 			end
-			if #tCopy.tDataSets == 0 then tCopy.tDataSets = nil end
-			table.insert(tTestTable['tMembers'],tCopy)
-			for k , entry in ipairs(player.tLLogs or {}) do
-				if self.tItems["settings"].bUseFilterForWebsiteExport and self:LLMeetsFilters(Item.GetDataFromId(entry.itemID),player,entry.nGP) or not self.tItems["settings"].bUseFilterForWebsiteExport then
-					table.insert(tTestTable['tMembers'][#tTestTable['tMembers']].tLLogs,entry)
-				end 
-			end
+			self:AltsBuildDictionary()
 		end
-		
-		self:ExportSetOutputText(JSON.encode(tTestTable))
-	    
+		ChatSystemLib.Command("/reloadui")
+	else
+		local tImportedTables
+		if string.sub(strImportString, 1, 2) == 'do' then
+			tImportedTables = serpent.load(strImportString)
+		else
+			tImportedTables = serpent.load(Base64.Decode(strImportString))
+		end
+
+		if tImportedTables and tImportedTables.tPlayers and tImportedTables.tSettings and tImportedTables.tStandby and tImportedTables.tCE then
+			for k,player in ipairs(self.tItems) do
+				self.tItems[k] = nil
+			end
+			for k,player in ipairs(tImportedTables.tPlayers) do
+				if player.GP then
+					player.nAwardedGP = player.GP - (player.nBaseGP or self.tItems["EPGP"].BaseGP)
+					player.nBaseGP = self.tItems["EPGP"].BaseGP
+					player.GP = nil
+				end
+				table.insert(self.tItems,player)
+			end
+			for k,player in ipairs(self.tItems) do
+				if not self.tItems[k].logs then self.tItems[k].logs = {} end
+			end
+			self.tItems["settings"] = tImportedTables.tSettings
+			self.tItems["EPGP"] = tImportedTables.tEPGP
+			self.tItems["Standby"] = tImportedTables.tStandby
+			self.tItems["CE"] = tImportedTables.tCE
+			self.tItems.tDataSets = tImportedTables.tDataSets
+			self.tItems.tRaids = tImportedTables.tRaids
+			self:AltsBuildDictionary()
+			for alt , owner in ipairs(self.tItems["alts"]) do
+				for k , player in ipairs(self.tItems) do
+					if string.lower(player.strName) == string.lower(alt) then table.remove(self.tItems,k) end
+					break
+				end
+			end
+			self:AltsBuildDictionary()
+			ChatSystemLib.Command("/reloadui")
+		elseif tImportedTables["settings"] and tImportedTables["EPGP"] then
+			self.tItems["settings"] = tImportedTables["settings"]
+			self.tItems["EPGP"] = tImportedTables["EPGP"]
+			self.tItems["CE"] = tImportedTables["CE"]
+			ChatSystemLib.Command("/reloadui")
+		else
+			Print("Error processing database")
+		end
 	end
 end
 
@@ -4327,9 +4412,10 @@ function DKP:ExportLoadFromFile()
 	if self.GetExportStringFromFile then
 		strConcatedString = self:GetExportStringFromFile()
 		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
+		if string.len(strConcatedString) ~= 0 then self.wndExport:FindChild("ClearString"):Show(true) end
+		self:ExportCheckImport()
 	end
 end
-
 
 function DKP:ExportEnableLootFiltering()
 	self.tItems["settings"].bUseFilterForWebsiteExport = true
@@ -4344,12 +4430,12 @@ function DKP:ExportAddStringPart()
 	self.wndExport:FindChild("ClearString"):Show(true)
 	if not strConcatedString then
 		strConcatedString = self.wndExport:FindChild("ExportBox"):GetText()
-		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	else
 		strConcatedString = strConcatedString .. self.wndExport:FindChild("ExportBox"):GetText()
-		self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	end
+	self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
 	self.wndExport:FindChild("ExportBox"):SetText("")
+	self:ExportCheckImport()
 end
 
 function DKP:ExportResetString()
@@ -4361,6 +4447,9 @@ end
 function DKP:ExportSetOutputText(strText)
 	if string.len(strText) < 30000 then self.wndExport:FindChild("ExportBox"):SetText(strText) else self.wndExport:FindChild("ExportBox"):SetText("String is too long , use copy to clipboard button.") end
 	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, strText)
+	strConcatedString = strText
+	self.wndExport:FindChild("StoredLength"):SetText(string.len(strConcatedString))
+	self:ExportCheckImport()
 end
 
 function DKP:ExportCloseWindow( wndHandler, wndControl, eMouseButton )
@@ -4370,8 +4459,9 @@ end
 
 function DKP:ExportShowWindow( wndHandler, wndControl, eMouseButton )
 	self.wndExport:Show(true,false)
-	self.wndExport:FindChild("ButtonExportCSV"):SetCheck(true)
 	self.wndExport:ToFront()
+	self.wndExport:FindChild("Import"):Enable(false)
+
 end
 
 function DKP:ExportShowPreloadedText(exportString)
@@ -4379,8 +4469,6 @@ function DKP:ExportShowPreloadedText(exportString)
 	self.wndExport:FindChild("ExportBox"):SetText(exportString)
 	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, exportString)
 	self.wndExport:ToFront()
-	self.wndExport:FindChild("ButtonExportHTML"):SetCheck(false)
-	self.wndExport:FindChild("ButtonExportCSV"):SetCheck(false)
 end
 
 function DKP:ExportAsCSVEPGP()
@@ -4503,7 +4591,7 @@ function DKP:ExportAsFormattedHTMLDKP()
 			if self.tItems[i].logs ~= nil then
 				formatedTable[self.tItems[i].strName]["Logs"] = {}
 				for k,logs in ipairs(self.tItems[i].logs) do
-					if string.find(logs.comment,"EP") == nil and string.find(logs.comment,"GP") == nil then 
+					if string.find(logs.strComment,"EP") == nil and string.find(logs.strComment,"GP") == nil then 
 						table.insert(formatedTable[self.tItems[i].strName]["Logs"],logs)
 					end
 				end
@@ -4591,7 +4679,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 	if self.tItems["settings"].bPopUpRandomSkip and self.tRandomWinners then
 		local bFound = false
 		for k , winner in ipairs(self.tRandomWinners) do
-			if winner == entry.strName then
+			if winner.strName == entry.strName and winner.item == entry.item:GetItemId() then
 				bFound = true
 				table.remove(self.tRandomWinners,k)
 				break
@@ -4686,6 +4774,8 @@ function DKP:PopUpAssign(entry,nPrice)
 	self:PopUpCheckUpdate()
 
 	if self.tItems[ID].wnd then self:UpdateItem(self.tItems[ID]) end
+
+	Event_FireGenericEvent("PopUpAccepted")
 end
 
 function DKP:PopUpGetCurrentPrice()
@@ -5011,8 +5101,9 @@ function DKP:ConShow(wndHandler,wndControl,eMouseButton)
 		local tCursor = Apollo.GetMouse()
 		self.wndContext:Move(tCursor.x, tCursor.y, self.wndContext:GetWidth(), self.wndContext:GetHeight())
 		self.wndContext:Show(true,false)
-		local ID = self:GetPlayerByIDByName(wndControl:FindChild("Stat"..self:LabelGetColumnNumberForValue("Name")):GetText())
+		local ID = wndControl:GetData().id
 		self.wndContext:SetData(ID) -- PlayerID
+		if self.tItems["settings"].bEnableGroups and #self.tItems["settings"].Groups > 0 then self.wndContextGroupID = wndControl:GetData().nGroupId end
 		self.wndContext:ToFront()
 		if self.tItems["Standby"] and self.tItems[ID] and self.tItems["Standby"][string.lower(self.tItems[ID].strName)] ~= nil then self.wndContext:FindChild("Standby"):SetCheck(true) else self.wndContext:FindChild("Standby"):SetCheck(false) end
 		wndControl:FindChild("OnContext"):Show(true,false)
@@ -5048,8 +5139,8 @@ function DKP:ConLootLogs()
 end
 
 function DKP:ConManualAward()
-	Event_FireGenericEvent("ManualAssignOpen")
 	self:MAOpen(self.wndContext:GetData())
+	Event_FireGenericEvent("ManualAssignOpen")
 end
 
 function DKP:ConStandbyEnable()
@@ -5117,6 +5208,7 @@ function DKP:AltsShow()
 	
 	self.wndAlts:FindChild("Player"):SetText(self.tItems[self.wndAlts:GetData()].strName)
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	self:AltsPopulate()
 end
 
@@ -5140,6 +5232,7 @@ function DKP:AltsAdd()
 	local strAlt = self.wndAlts:FindChild("NewAltBox"):GetText()
 	if string.lower(strAlt) == string.lower(self.tItems[self.wndAlts:GetData()].strName) then return end
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	local ID 
 	for k,player in ipairs(self.tItems) do if string.lower(player.strName) == string.lower(strAlt) then ID = k break end end
 	if ID == nil then -- just add
@@ -5154,6 +5247,7 @@ function DKP:AltsAdd()
 		end
 	elseif self.tItems["alts"][strAlt] == nil then -- further input required
 		self.wndAlts:FindChild("FoundBox"):Show(true,false)
+		self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(31,285,245,407)
 	else
 		Print("Alt already registred") 
 	end
@@ -5161,19 +5255,20 @@ end
 
 function DKP:AltsAddMerge()
 	local mergedPlayer = self.tItems[self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText())]
+	local recipent = self.tItems[self.wndAlts:GetData()].strName
+	if self.tItems["settings"].bTrackUndo then
+		self:UndoAddActivity(string.format(ktUndoActions["amrg"],mergedPlayer.strName,recipent),"--",{[1] = mergedPlayer},true,nil,true)
+	end
 	local save = self:RaidQueueSaveRestoreAndClear()
 	self:GroupSaveMembers()
 	self.tItems[self.wndAlts:GetData()].net =  self.tItems[self.wndAlts:GetData()].net + mergedPlayer.net
 	self.tItems[self.wndAlts:GetData()].tot =  self.tItems[self.wndAlts:GetData()].tot + mergedPlayer.tot
 	self.tItems[self.wndAlts:GetData()].EP =  self.tItems[self.wndAlts:GetData()].EP + mergedPlayer.EP
-	self.tItems[self.wndAlts:GetData()].GP =  self.tItems[self.wndAlts:GetData()].GP + mergedPlayer.GP
-	self.tItems[self.wndAlts:GetData()].Hrs =  self.tItems[self.wndAlts:GetData()].Hrs + mergedPlayer.Hrs
+	self.tItems[self.wndAlts:GetData()].nAwardedGP =  self.tItems[self.wndAlts:GetData()].nAwardedGP + mergedPlayer.nAwardedGP
 	
-	local recipent = self.tItems[self.wndAlts:GetData()].strName
 	
-	if self.tItems["settings"].bTrackUndo then
-		self:UndoAddActivity(string.format(ktUndoActions["amrg"],mergedPlayer.strName,recipent),"--",{[1] = mergedPlayer},true,nil,true)
-	end
+	
+
 	table.remove(self.tItems,self:GetPlayerByIDByName(self.wndAlts:FindChild("NewAltBox"):GetText()))
 	
 	for k,player in ipairs(self.tItems) do if player.strName == recipent then self.wndAlts:SetData(k) end end
@@ -5186,6 +5281,7 @@ function DKP:AltsAddMerge()
 	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	self:AltsPopulate()
 end
 
@@ -5242,6 +5338,7 @@ function DKP:AltsAddConvert()
 	self:GroupRestoreMembers()
 	self:RefreshMainItemList()
 	self.wndAlts:FindChild("FoundBox"):Show(false,false)
+	self.wndAlts:FindChild("SectionAddAlt"):SetAnchorOffsets(141,285,355,407)
 	self:AltsPopulate()
 end
 
@@ -5250,7 +5347,6 @@ function DKP:AltsInit()
 	self.wndAltsDict = Apollo.LoadForm(self.xmlDoc2,"AltsDictionary",nil,self)
 	self.wndAlts:Show(false,true)
 	self.wndAltsDict:Show(false,true)
-	self.wndAlts:FindChild("Art"):SetOpacity(.5)
 	self:AltsBuildDictionary()
 end
 
@@ -5267,6 +5363,26 @@ function DKP:LogsInit()
 	self.wndLogs:Show(false,true)
 	self.wndLogs:SetSizingMinimum(751,332)
 	self.wndLogs:SetSizingMaximum(751,435)
+
+	self.wndSettings:FindChild("YouSure?"):SetRotation(180)
+	self.wndSettings:FindChild("YouSure?:Title"):SetRotation(180)
+
+	self.wndLogs:FindChild("FilterGrid"):AddEventHandler("GridSelChange","LogsChangeFilter",self)
+end
+
+function DKP:LogsShowDelConf()
+	self.wndSettings:FindChild("YouSure?"):Show(true)
+end
+
+function DKP:LogsHideDelConf()
+	self.wndSettings:FindChild("YouSure?"):Show(false)
+end
+
+function DKP:LogsDeleteAll()
+	for k , player in ipairs(self.tItems) do
+		player.logs = {}
+	end
+	self.wndSettings:FindChild("YouSure?"):Show(false)
 end
 
 function DKP:LogsExport()
@@ -5302,25 +5418,111 @@ function DKP:LogsShow(nOverride)
 	
 end
 
+local function convertStringNumberToChars(strNum) -- because grid sorts only by text -.-
+	local val = tonumber(strNum)
+	strNum = tostring(strNum)
+	local strSortText = ""
+	if val and val > 0 then
+		for i = 1, #strNum do
+    		local c = strNum:sub(i,i)
+			if c == "1" then strSortText = strSortText .. "i" 
+			elseif c == "2" then strSortText = strSortText .. "h" 
+			elseif c == "3" then strSortText = strSortText .. "g" 
+			elseif c == "4" then strSortText = strSortText .. "f" 
+			elseif c == "5" then strSortText = strSortText .. "e" 
+			elseif c == "6" then strSortText = strSortText .. "d" 
+			elseif c == "7" then strSortText = strSortText .. "c" 
+			elseif c == "8" then strSortText = strSortText .. "b" 
+			elseif c == "0" then strSortText = strSortText .. "x" 
+			elseif c == "9" then strSortText = strSortText .. "a" end
+		end
+	elseif val and val < 0 then
+		strSortText = "z"
+		for i = 1, #strNum do
+    		local c = strNum:sub(i,i)
+			if c == "1" then strSortText = strSortText .. "a" 
+			elseif c == "2" then strSortText = strSortText .. "b" 
+			elseif c == "3" then strSortText = strSortText .. "c" 
+			elseif c == "4" then strSortText = strSortText .. "d" 
+			elseif c == "5" then strSortText = strSortText .. "e" 
+			elseif c == "6" then strSortText = strSortText .. "f" 
+			elseif c == "7" then strSortText = strSortText .. "g" 
+			elseif c == "8" then strSortText = strSortText .. "h" 
+			elseif c == "0" then strSortText = strSortText .. "x" 
+			elseif c == "9" then strSortText = strSortText .. "i" end
+		end
+	end
+	for k=#strSortText,11 do
+		strSortText = "y" .. strSortText
+	end
+	return strSortText
+end
+
+function DKP:LogsChangeFilter(wndHandler,wndControl,iRow,iCol)
+	local strGroup = wndControl:GetCellText(iRow,iCol)
+	self.wndContextGroupID = self:GetGroupIDByName(strGroup)
+	self:LogsPopulate()
+end
+
 function DKP:LogsPopulate()
 	local grid = self.wndLogs:FindChild("Grid")
 	grid:DeleteAll()
+	if self.wndContextGroupID then
+		self.wndLogs:FindChild("FilterNotice"):Show(true)
+		self.wndLogs:FindChild("FilterSelect"):Show(false)
+		self.wndLogs:FindChild("GroupName"):SetText(self.tItems["settings"].Groups[self.wndContextGroupID].strName)
+	else
+		self.wndLogs:FindChild("FilterNotice"):Show(false)
+		if self.tItems["settings"].bEnableGroups or #self.tItems["settings"].Groups > 0 then 
+			self.wndLogs:FindChild("FilterSelect"):Show(true)
+			local grid = self.wndLogs:FindChild("FilterGrid")
+			grid:DeleteAll()
+			local tGroups = {}
+			for k , log in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
+				if log.strGroup then
+					if not tGroups[log.strGroup] then  tGroups[log.strGroup] = {} end
+				end
+			end
+			local nRow = 0
+			for strGroup , _ in pairs(tGroups) do
+				nRow = nRow + 1
+				grid:AddRow(nRow)
+				grid:SetCellData(nRow,1,strGroup)
+			end
+			if nRow == 0 then
+				self.wndLogs:FindChild("FilterSelect"):Show(false)
+			end
+
+		end
+
+	end
+	local nSkipped = 0
 	for k,entry in ipairs(self.tItems[self.wndLogs:GetData()].logs) do
-		grid:AddRow(k..".")
-		grid:SetCellData(k,1,entry.strComment)
-		grid:SetCellData(k,4,entry.strType)
-		if entry.strModifier then
-			grid:SetCellData(k,2,entry.strModifier)
-		end
-		if entry.strTimestamp then
-			grid:SetCellData(k,5,entry.strTimestamp)
-		elseif entry.nDate then
-			grid:SetCellData(k,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
-		end
-		if entry.nAfter then
-			grid:SetCellData(k,3,entry.nAfter)
+		
+		if self.wndContextGroupID and entry.strGroup == self.tItems["settings"].Groups[self.wndContextGroupID].strName or not self.wndContextGroupID and (entry.strGroup == "Def" or not entry.strGroup) then
+			local nRow = k - nSkipped
+			grid:AddRow(nRow..".")
+			grid:SetCellData(nRow,1,entry.strComment)
+			grid:SetCellData(nRow,4,entry.strType)
+			if entry.strModifier then
+				grid:SetCellData(nRow,2,entry.strModifier)
+				grid:SetCellSortText(nRow,2,convertStringNumberToChars(entry.strModifier))
+			end
+			if entry.strTimestamp then
+				grid:SetCellData(nRow,5,entry.strTimestamp)
+			elseif entry.nDate then
+				grid:SetCellData(nRow,5,self:ConvertDate(os.date("%x",entry.nDate)) .. "  " .. os.date("%X",entry.nDate))
+				grid:SetCellSortText(nRow,5,convertStringNumberToChars(entry.nDate))
+			end
+			if entry.nAfter then
+				grid:SetCellData(nRow,3,entry.nAfter)
+				grid:SetCellSortText(nRow,3,convertStringNumberToChars(entry.nAfter))
+			end
+		else
+			nSkipped = nSkipped + 1
 		end
 	end
+	self.wndContextGroupID = nil 
 end
 
 function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
@@ -5342,12 +5544,25 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 
 		if strType == "{Decay}" and self.tItems[ID].strName == "Guild Bank" then return end
 
-		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after)})
-		if #self.tItems[ID].logs >= 15 then 
-			for k=15,#self.tItems[ID].logs do
-				self.tItems[ID].logs[k] = nil
+		table.insert(self.tItems[ID].logs,1,{strComment = strComment,strType = strType, strModifier = strModifier,nDate = os.time(),nAfter = (after == nil and "" or after),strGroup = self.tItems["settings"].strActiveGroup})
+		
+		local tGroups = {}
+		for k , log in ipairs(self.tItems[ID].logs) do
+			if log.strGroup then
+				if not tGroups[log.strGroup] then  tGroups[log.strGroup] = {} end
+				table.insert(tGroups[log.strGroup],k)
+			else
+				if not tGroups["ung"] then  tGroups["ung"] = {} end
+				table.insert(tGroups["ung"],k)
 			end
 		end
+
+		for k , logGroup in pairs(tGroups) do
+			if #logGroup > 15 then
+				for i=16,#logGroup do table.remove(self.tItems[ID].logs,logGroup[i]) end
+			end
+		end
+
 		if self.wndLogs:GetData() == ID then self:LogsPopulate() end
 
 	end
@@ -5472,6 +5687,9 @@ local tCreatedEvent = {}
 function DKP:CEInit()
 	self.wndCE = Apollo.LoadForm(self.xmlDoc,"CustomEvents",nil,self)
 	self.wndFirstKills = Apollo.LoadForm(self.xmlDoc,"FirstKills",nil,self)
+
+	self.GeminiLocale:TranslateWindow(self.Locale, self.wndCE)
+
 	--self.wndCE:SetSizingMaximum(692,700)
 	--self.wndCE:SetSizingMinimum(692,414)
 	
@@ -5505,6 +5723,9 @@ function DKP:CEInit()
 		self.wndFirstKills:FindChild(k):SetCheck(v.bKilled)
 		self.wndFirstKills:FindChild(k.."M"):SetText(v.nMultiplier)
 	end
+
+	self.GeminiLocale:TranslateWindow(self.Locale, self.wndCE)
+
 end
 
 function DKP:CEHideSuccess()
@@ -5634,6 +5855,20 @@ function DKP:BossItemSelected(wndHandler,wndControl)
 	self:CECollapseBosses()
 end
 
+local function normalizeBossName(strName) -- aka translate
+	if strName == "Kuralak die Schänderin" then strName = "Kuralak the Defiler"
+	elseif strName == "Phagenschlund" then strName = "Phage Maw"
+	elseif strName == "Konvergenz der Phagengeborenen" then strName = "Phageborn Convergence"
+	elseif strName == "Phagentech Prototypen" then strName = "Phagetech Prototypes"
+	elseif strName == "Schreckensphage Ohmna" then strName = "Dreadphage Ohmna"
+	elseif strName == "System-Dämonen" then strName = "System Daemons"
+	elseif strName == "Düsterklaue" then strName = "Gloomclaw"
+	elseif strName == "Mahlstromgewalt" then strName = "Maelstorm Authority"
+	end
+
+	return strName
+end
+
 function DKP:CETriggerEvent(eID)
 	local event = self.tItems["CE"][eID]
 	if event then
@@ -5651,12 +5886,21 @@ function DKP:CETriggerEvent(eID)
 				end
 			end
 		end
-		
-		if self.tItems["settings"].tCEFirstMultipliers[strMob] and not self.tItems["settings"].tCEFirstMultipliers[strMob].bKilled then
-			self.tItems["settings"].tCEFirstMultipliers[strMob].bKilled = true
+		local strMobTrans = strMob
+
+		if self.tItems["settings"].tCEFirstMultipliers[strMobTrans] and not self.tItems["settings"].tCEFirstMultipliers[strMobTrans].bKilled then
+			self.tItems["settings"].tCEFirstMultipliers[strMobTrans].bKilled = true
 			bFirst = true
-			nMultiplier = self.tItems["settings"].tCEFirstMultipliers[strMob].nMultiplier
+			nMultiplier = self.tItems["settings"].tCEFirstMultipliers[strMobTrans].nMultiplier
 		end
+
+		if event.nTriggerCount == 0 and event.uType == "Unit" then
+			bFirst = true
+			if not event.nMultiplier then event.nMultiplier = 1 end
+			nMultiplier = event.nMultiplier
+		end
+
+		if not nMultiplier then nMultiplier = 1 end
 
 		local tMembers = {}
 		if self.tItems["settings"].bTrackUndo then
@@ -5700,7 +5944,7 @@ function DKP:CETriggerEvent(eID)
 					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{EP}",event.EP*nMultiplier,pID)
 				end
 				if event.GP then
-					self.tItems[pID].GP = self.tItems[pID].GP + (event.GP * nMultiplier)
+					self.tItems[pID].nAwardedGP = self.tItems[pID].nAwardedGP + (event.GP * nMultiplier)
 					self:DetailAddLog("Award for triggering event : "..eID.." (" .. strMob .. ")" .. strFirstKill,"{GP}",event.GP*nMultiplier,pID)
 				end
 				if event.DKP then
@@ -5712,7 +5956,7 @@ function DKP:CETriggerEvent(eID)
 		end
 		event.nTriggerCount = event.nTriggerCount + 1
 		if self.tItems["settings"].tCETriggeredEvents == nil then self.tItems["settings"].tCETriggeredEvents = {} end
-		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")",strDate = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time())})
+		table.insert(self.tItems["settings"].tCETriggeredEvents,1,{strEv = "(ID : ".. eID ..") (" .. strMob .. ")" .. strFirstKill,strDate = self:ConvertDate(os.date("%x",os.time())) .. " " .. os.date("%X",os.time())})
 		if #self.tItems["settings"].tCETriggeredEvents > 20 then table.remove(self.tItems["settings"].tCETriggeredEvents,20) end
 		if self.wndCE:IsShown() then self:CEPopulate() end
 
@@ -5745,17 +5989,36 @@ function DKP:CECreate()
 			if self.wndCE:FindChild("DKP"):IsChecked() then
 				tCreatedEvent.DKP = tonumber(self.wndCE:FindChild("ValueDKP"):GetText())
 			end
-			
-			table.insert(self.tItems["CE"],{uType = tCreatedEvent.uType,bType = tCreatedEvent.bType,rType = tCreatedEvent.rType,EP = tCreatedEvent.EP,GP = tCreatedEvent.GP,DKP = tCreatedEvent.DKP,strUnit = tCreatedEvent.strUnit,nTriggerCount = 0})
+			if tCreatedEvent.uType == "Unit" then
+				tCreatedEvent.nMultiplier = tonumber(self.wndCE:FindChild("FirstKillMulti"):GetText())
+			end
+			table.insert(self.tItems["CE"],{uType = tCreatedEvent.uType,bType = tCreatedEvent.bType,rType = tCreatedEvent.rType,EP = tCreatedEvent.EP,GP = tCreatedEvent.GP,DKP = tCreatedEvent.DKP,strUnit = tCreatedEvent.strUnit,nTriggerCount = 0,nMultiplier = tCreatedEvent.nMultiplier})
 			
 			tCreatedEvent.EP = nil
 			tCreatedEvent.GP = nil
 			tCreatedEvent.DKP = nil
+
 			if self.wndCEL:IsShown() then self:CELPopulate() end
 			self.wndCE:FindChild("Success"):SetOpacity(1)
 			self:delay(3,self.CEHideSuccess)
 			Event_FireGenericEvent("CEEventCreated")
 		end
+	end
+end
+
+function DKP:CESetMultiplier(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if not val or val < 0 then
+		wndControl:SetText(1)
+	end
+end
+
+function DKP:CEEntryUpdateMultiplier(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if not val or val < 0 then
+		wndControl:SetText(1)
+	else
+		self.tItems["CE"][wndControl:GetParent():GetData()].nMultiplier = val
 	end
 end
 
@@ -5820,8 +6083,11 @@ function DKP:CELPopulate()
 			local wnd = Apollo.LoadForm(self.xmlDoc,"CEEntry",self.wndCEL:FindChild("List"),self)
 			if event.uType == "Unit" then 
 				wnd:FindChild("UnitName"):SetText(event.strUnit)
+				wnd:FindChild("Multi"):SetText(event.nMultiplier or 1)
 			else
 				wnd:FindChild("UnitName"):SetText(event.bType)
+				wnd:FindChild("Multi"):Show(false)
+				wnd:FindChild("MultiTitle"):Show(false)
 			end
 			wnd:FindChild("Recipents"):SetText(event.rType == "RM" and "Raid Members" or "Raid Members + Queue")
 			local strAwards = ""
@@ -5855,7 +6121,6 @@ local tKilledBossesInSession = {
 	daem1 = false,
 	daem2 = false,
 	daemTriggered = false,
-
 }
 
 function DKP:CEOnUnitDamage(tArgs)
@@ -5870,21 +6135,21 @@ function DKP:CEOnUnitDamage(tArgs)
 	end
 
 	local name = tArgs.unitTarget:GetName()
-
+	--if lol then name = lol end
 	-- Counting Council Fights
-	if name == "Phagetech Commander" then tKilledBossesInSession.tech1 = true end
-	if name == "Phagetech Augmentor" then tKilledBossesInSession.tech2 = true end
-	if name == "Phagetech Protector" then tKilledBossesInSession.tech3 = true end
-	if name == "Phagetech Fabricator" then tKilledBossesInSession.tech4 = true end
+	if name == self.Locale["#PhagetechCommander"] then tKilledBossesInSession.tech1 = true end
+	if name == self.Locale["#PhagetechAugmentor"] then tKilledBossesInSession.tech2 = true end
+	if name == self.Locale["#PhagetechProtector"] then tKilledBossesInSession.tech3 = true end
+	if name == self.Locale["#PhagetechFabricator"] then tKilledBossesInSession.tech4 = true end
 	
-	if name == "Ersoth Curseform" then tKilledBossesInSession.born1 = true end
-	if name == "Fleshmonger Vratorg" then tKilledBossesInSession.born2 = true end
-	if name == "Terex Blightweaver" then tKilledBossesInSession.born3 = true end
-	if name == "Golgox the Lifecrusher" then tKilledBossesInSession.born4 = true  end
-	if name == "Noxmind the Insidious" then tKilledBossesInSession.born5 = true end
+	if name == self.Locale["#ErsothCurseform"] then tKilledBossesInSession.born1 = true end
+	if name == self.Locale["#FleshmongerVratorg"] then tKilledBossesInSession.born2 = true end
+	if name == self.Locale["#TerexBlightweaver"] then tKilledBossesInSession.born3 = true end
+	if name == self.Locale["#GolgoxtheLifecrusher"] then tKilledBossesInSession.born4 = true  end
+	if name == self.Locale["#NoxmindtheInsidious"] then tKilledBossesInSession.born5 = true end
 
-	if name == "Binary System Daemon" then tKilledBossesInSession.daem1 = true end
-	if name == "Null System Daemon" then tKilledBossesInSession.daem2 = true end
+	if name == self.Locale["#BinarySystemDaemon"] then Print('fd') tKilledBossesInSession.daem1 = true end
+	if name == self.Locale["#NullSystemDaemon"] then Print ('ffd') tKilledBossesInSession.daem2 = true end
 		
 		
 	
@@ -5905,25 +6170,25 @@ function DKP:CEOnUnitDamage(tArgs)
 	
 	if #tBosses > 0 then
 		for k,boss in ipairs(tBosses) do
-			if boss.bType ~= "Phageborn Convergence" and boss.bType ~= "Phagetech Prototypes" then
+			if boss.bType ~= self.Locale["#PhagebornConvergence"] and boss.bType ~= self.Locale["#PhagetechPrototypes"] and boss.bType ~= self.Locale["#SystemDaemons"] then
 				if string.lower(boss.bType) == string.lower(name) then
 					self:CETriggerEvent(boss.ID)
 					break
 				end
 			else
-				if boss.bType == "Phageborn Convergence" and not tKilledBossesInSession.bornTriggerred then
+				if boss.bType == self.Locale["#PhagebornConvergence"] and not tKilledBossesInSession.bornTriggerred then
 					if bornCounter >= 4 then 
 						tKilledBossesInSession.bornTriggerred = true
 						self:CETriggerEvent(boss.ID)
 						break
 					end
-				elseif boss.bType == "Phagetech Prototypes" and not tKilledBossesInSession.techTriggered then
+				elseif boss.bType == self.Locale["#PhagetechPrototypes"] and not tKilledBossesInSession.techTriggered then
 					if tKilledBossesInSession.tech1 or tKilledBossesInSession.tech2 or tKilledBossesInSession.tech3 or tKilledBossesInSession.tech4 then
 						tKilledBossesInSession.techTriggered = true
 						self:CETriggerEvent(boss.ID)
 						break
 					end
-				elseif boss.bType == "System Daemons" and not tKilledBossesInSession.daemTriggered then
+				elseif boss.bType == self.Locale["#SystemDaemons"] and not tKilledBossesInSession.daemTriggered then
 					if tKilledBossesInSession.daem1 and tKilledBossesInSession.daem2 then
 						tKilledBossesInSession.daemTriggered = true
 						self:CETriggerEvent(boss.ID)
@@ -7568,8 +7833,8 @@ function DKP:ReassCommit()
 	local item = self.wndReass:GetData()
 	if GID and RID and GPadd and GPsub and item then
 		self:UndoAddActivity(string.format(ktUndoActions["itreass"],item:GetName(),self.tItems[GID].strName,self.tItems[RID].strName),GPsub .. " / " .. GPadd,{[1] = self.tItems[GID],[2] = self.tItems[RID]})
-		self.tItems[GID].GP = self.tItems[GID].GP - GPsub
-		self.tItems[RID].GP = self.tItems[RID].GP + GPadd
+		self.tItems[GID].nAwardedGP = self.tItems[GID].nAwardedGP - GPsub
+		self.tItems[RID].nAwardedGP = self.tItems[RID].nAwardedGP + GPadd
 		self:DetailAddLog("Removed item : "..item:GetName(),"{GP}",GPsub*-1,GID)
 		self:DetailAddLog("Added item : "..item:GetName(),"{GP}",GPsub,RID)
 		self:OnLootedItem(item,true)
@@ -7797,7 +8062,7 @@ function DKP:OnRaidOpsCmd(cmd , args)
 	for word in string.gmatch(args,"%S+") do
 		table.insert(words,word)
 	end
-	if #words < 1 then Print("Use '/rops help' for help") end
+	if #words < 1 then Print("Use '/rops help' for help. You can open main window with '/epgp'.") end
 	-- /rops add|sub|set ep|gp|dkp nMod strComment rm|rmq|strName
 	if words[1] == "add" or words[1] == "sub" or words[1] == "set" then
 		local mEdit = self.MassEdit
@@ -7886,6 +8151,10 @@ function DKP:OnRaidOpsCmd(cmd , args)
 		self:AttStartScan()
 	end
 
+	if words[1] == 'tutorial' then
+		self.wndTutList:Show(true,false)
+	end
+
 	if words[1] == 'help' then
 		Print("===RaidOps - CMDs===")
 		Print("Symbol '|' means that you have to choose one from all possible.")
@@ -7896,8 +8165,27 @@ function DKP:OnRaidOpsCmd(cmd , args)
 		Print("/rops undo")
 		Print("/rops armoryscan")
 		Print("/rops raidsession start|stop|pause")
+		Print("/rops tutorial")
 	end
 
+end
+
+function DKP:ImportNotifyInit()
+	if self.tItems["importDataFromUploader"] then
+		self.wndNotifyImport = Apollo.LoadForm(self.xmlDoc3,"ImportNotification",nil,self)
+		local x,y = Apollo.GetScreenSize()
+		self.wndNotifyImport:Move( (x/2)-self.wndNotifyImport:GetWidth()/2, y/2 - self.wndNotifyImport:GetHeight()/2, self.wndNotifyImport:GetWidth(), self.wndNotifyImport:GetHeight())
+	end
+end
+
+function DKP:ImportNotifyOk()
+	strConcatedString = self.tItems["importDataFromUploader"]
+	self:ExportImport()
+end
+
+function DKP:ImportNotifyWipe()
+	self.tItems["importDataFromUploader"] = nil
+	self.wndNotifyImport:Destroy()
 end
 
 -----------------------------------------------------------------------------------------------

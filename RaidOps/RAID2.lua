@@ -234,7 +234,7 @@ function DKP:IBTileMenuRemoveConfirm(wndHandler,wndControl)
 	local strName = string.sub(wndControl:FindChild("Tooltip"):GetData(),1,#wndControl:FindChild("Tooltip"):GetData()-2)
 	local nGP = tonumber(self:LLRemLog(strName,wndControl:GetData()))
 	self:UndoAddActivity(string.format("Removed %s from %s",wndControl:GetData():GetName(),strName),nGP*-1,{[1] = self.tItems[self:GetPlayerByIDByName(strName)]})
-	self.tItems[self:GetPlayerByIDByName(strName)].GP = self.tItems[self:GetPlayerByIDByName(strName)].GP - nGP
+	self.tItems[self:GetPlayerByIDByName(strName)].nAwardedGP = self.tItems[self:GetPlayerByIDByName(strName)].nAwardedGP - nGP
 	self:DetailAddLog("Removed : " .. wndControl:GetData():GetName(),"{GP}",nGP*-1,self:GetPlayerByIDByName(strName))
 	self:RefreshMainItemList()
 	self:LLPopuplate()
@@ -913,7 +913,7 @@ function DKP:AttStart()
 		-- Alts
 		for k , player in ipairs(players) do
 			if self.tItems["alts"][string.lower(player.strName)] and self.tItems[self.tItems["alts"][string.lower(player.strName)]] then
-				players[k].strName = self.tItems[self.tItems["alts"][string.lower(player)]].strName
+				players[k].strName = self.tItems[self.tItems["alts"][string.lower(player.strName)]].strName
 			end
 		end
 		
@@ -1106,6 +1106,20 @@ local ktDefaultGroup =
 
 
 function DKP:GroupInit()
+
+	-- Check for legacy databases
+	if self.tItems.tDataSets then
+		for k,groupSet in pairs(self.tItems.tDataSets) do
+			for k,playerSet in pairs(groupSet) do
+				if playerSet.GP then
+					playerSet.nAwardedGP = playerSet.GP - self.tItems["EPGP"].BaseGP
+					playerSet.nBaseGP = self.tItems["EPGP"].BaseGP
+					playerSet.GP = nil
+				end
+			end
+		end
+	end
+
 	self.wndGroupGUI = Apollo.LoadForm(self.xmlDoc3,"Groups",nil,self)
 	self.wndGroupGUI:Show(false)
 
@@ -1229,9 +1243,15 @@ function DKP:GroupAdd(wndHandler,wndControl,strText)
 end
 
 function DKP:GroupRem(wndHandler,wndControl)
+	local strGroupName = wndControl:GetParent():FindChild("Name"):GetText()
 	table.remove(self.tItems["settings"].Groups,wndControl:GetParent():GetData())
-	if self.tItems["settings"].strActiveGroup == wndControl:GetParent():FindChild("Name"):GetText() then self.tItems["settings"].strActiveGroup = "Def" end
-	self.tItems.tDataSets[wndControl:GetParent():FindChild("Name"):GetText()] = nil
+	if self.tItems["settings"].strActiveGroup == strGroupName then self.tItems["settings"].strActiveGroup = "Def" end
+	self.tItems.tDataSets[strGroupName] = nil
+	for k , player in ipairs(self.tItems) do
+		for l , log in ipairs(player.logs) do
+			if log.strGroup and log.strGroup == strGroupName then table.remove(self.tItems[k].logs,l) end
+		end
+	end
 	self:GroupGUIPopulate()
 	self:RefreshMainItemList()
 end
@@ -1300,14 +1320,15 @@ function DKP:GroupIsPlayerInAny(ofID)
 	end
 	return false
 end
+
 local tSavedGroups = {}
 function DKP:GroupSaveMembers()
+	tSavedGroups = {}
 	for k , group in ipairs(self.tItems["settings"].Groups) do
 		tSavedGroups[group.strName] = {}
 		for  j , id in ipairs(group.tIDs) do
-			table.insert(tSavedGroups[group.strName],self.tItems[id].name)
+			table.insert(tSavedGroups[group.strName],self.tItems[id].strName)
 		end
-		group.tIDs = {}
 	end
 end
 
@@ -1315,8 +1336,10 @@ function DKP:GroupRestoreMembers()
 	if not tSavedGroups then return end
 
 	for k , group in ipairs(self.tItems["settings"].Groups) do
+		group.tIDs = {}
 		for j , strName in ipairs(tSavedGroups[group.strName]) do
-			table.insert(group.tIDs,self:GetPlayerByIDByName(strName))
+			local id = self:GetPlayerByIDByName(strName)
+			if id ~= -1 then table.insert(self.tItems["settings"].Groups[k].tIDs,id) end
 		end
 	end
 end
@@ -1345,17 +1368,13 @@ function DKP:GroupDialogShow()
 	self:GroupDialogPopulate(self.wndContext:GetData())
 end
 
-function DKP:GroupDialogHide()
-
-end
-
 local knDialogEntryHeight = 26
 
 function DKP:GroupDialogPopulate(forID)
 	local tActive = {}
 	local tAvailable = {}
 
-	for k , group in ipairs(self.tItems["settings"].Groups) do
+	for k , group in ipairs(self.tItems["setti.ngs"].Groups) do
 		local bFound = false
 		for j , id in ipairs(group.tIDs) do
 			if id == forID then bFound = true break end
@@ -1459,6 +1478,9 @@ end
 -- Group Data Sets
 
 function DKP:DataSetsInit()
+
+
+
 	if not self.tItems["settings"].strActiveGroup then self.tItems["settings"].strActiveGroup = "Def" end
 
 	if not self.tItems.tDataSets then 
@@ -1466,7 +1488,7 @@ function DKP:DataSetsInit()
 		if not self.tItems.tDataSets["Def"] then self.tItems.tDataSets["Def"] = {} end
 		for k , player in ipairs(self.tItems) do
 			if not self.tItems.tDataSets["Def"][player.strName] then
-				self.tItems.tDataSets["Def"][player.strName] = {EP = player.EP,GP = player.GP,net = player.net,tot = player.tot}
+				self.tItems.tDataSets["Def"][player.strName] = {EP = player.EP,nAwardedGP = player.nAwardedGP,net = player.net,tot = player.tot,nBaseGP = player.nBaseGP}
 			end
 		end
 	end
@@ -1477,7 +1499,7 @@ function DKP:DataSetsInit()
 		
 		for k , id in ipairs(group.tIDs) do
 			if self.tItems[id] and not self.tItems.tDataSets[group.strName][self.tItems[id].strName] then
-				self.tItems.tDataSets[group.strName][self.tItems[id].strName] = {EP = self.tItems[id].EP,GP = self.tItems[id].GP,net = self.tItems[id].net,tot = self.tItems[id].tot}
+				self.tItems.tDataSets[group.strName][self.tItems[id].strName] = {EP = self.tItems[id].EP,nAwardedGP = self.tItems[id].nAwardedGP,net = self.tItems[id].net,tot = self.tItems[id].tot,nBaseGP = self.tItems[id].nBaseGP}
 			end
 		end
 
@@ -1489,7 +1511,7 @@ function DKP:GetDataSetForGroupPlayer(strGroup,strPlayer)
 	if self.tItems.tDataSets and self.tItems.tDataSets[strGroup] then 
 		if not self.tItems.tDataSets[strGroup][strPlayer] then --if no data set then create one
 			local id = self:GetPlayerByIDByName(strPlayer)
-			self.tItems.tDataSets[strGroup][self.tItems[id].strName] = {EP = self.tItems[id].EP,GP = self.tItems[id].GP,net = self.tItems[id].net,tot = self.tItems[id].tot}
+			self.tItems.tDataSets[strGroup][self.tItems[id].strName] = {EP = self.tItems[id].EP,nAwardedGP = self.tItems[id].nAwardedGP,net = self.tItems[id].net,tot = self.tItems[id].tot,nBaseGP = self.tItems[id].nBaseGP}
 		end
 		return self.tItems.tDataSets[strGroup][strPlayer]
 	end
@@ -1506,7 +1528,7 @@ end
 function DKP:CommitDataSetGroupPlayer(strGroup,strPlayer,playerId)
 	if strGroup == "Ungrouped" then strGroup = "Def" end
 	if self.tItems.tDataSets and self.tItems.tDataSets[strGroup] and self.tItems.tDataSets[strGroup][strPlayer] then
-		self.tItems.tDataSets[strGroup][strPlayer] = {EP = self.tItems[playerId].EP,GP = self.tItems[playerId].GP,net = self.tItems[playerId].net,tot = self.tItems[playerId].tot}
+		self.tItems.tDataSets[strGroup][strPlayer] = {EP = self.tItems[playerId].EP,nAwardedGP = self.tItems[playerId].nAwardedGP,net = self.tItems[playerId].net,tot = self.tItems[playerId].tot,nBaseGP = self.tItems[playerId].nBaseGP}
 	end
 end
 
@@ -1542,9 +1564,10 @@ function DKP:ActiveGroupSwitch(wndHandler,wndControl)
 		local newDataSet = self:GetDataSetForGroupPlayer(strGroupName,self.tItems[id].strName)
 		if newDataSet then
 			self.tItems[id].EP = newDataSet.EP
-			self.tItems[id].GP = newDataSet.GP
+			self.tItems[id].nAwardedGP = newDataSet.nAwardedGP
 			self.tItems[id].net = newDataSet.net
 			self.tItems[id].tot = newDataSet.tot
+			self.tItems[id].nBaseGP = newDataSet.nBaseGP
 		end
 	end
 
