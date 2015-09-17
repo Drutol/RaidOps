@@ -196,7 +196,7 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
----RaidOps version 2.34 Beta 2 ---
+---RaidOps version 2.34---
 {16/09/2015}
 Reskin for ML widnow (horizontal and vertical)
 Redesign of ML settings.
@@ -217,6 +217,8 @@ Fixed alts merge bug.
 Fixed System Daemons trigger bug for Custom Events.
 Added Volatility Lattice to Custom events boss dropdown.
 Added '/rops tutorial' cmd.
+Reskin of Chat Bidding window.
+At last fixed all issues with missing pop-ups.
 ---RaidOps version 2.34 Beta 2 ---
 {09/09/2015}
 Fixes from previous beta.

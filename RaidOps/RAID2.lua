@@ -913,7 +913,7 @@ function DKP:AttStart()
 		-- Alts
 		for k , player in ipairs(players) do
 			if self.tItems["alts"][string.lower(player.strName)] and self.tItems[self.tItems["alts"][string.lower(player.strName)]] then
-				players[k].strName = self.tItems[self.tItems["alts"][string.lower(player)]].strName
+				players[k].strName = self.tItems[self.tItems["alts"][string.lower(player.strName)]].strName
 			end
 		end
 		
