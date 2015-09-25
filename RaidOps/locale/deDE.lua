@@ -291,3 +291,6 @@ L["#Gloomclaw"] = "Düsterklaue"
 L["#MaelstormAuthority"] = "Mahlstromgewalt"
 L["#VolatilityLattice"] = "Explosionsraster"
 L["#Avatus"] = "Avatus"
+
+--v2.34b
+L["#LimboInfo"] = "Limbus-Infomatrix"

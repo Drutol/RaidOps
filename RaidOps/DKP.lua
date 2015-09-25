@@ -196,6 +196,17 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.34b---
+{25/09/2015}
+Fixed bug that prevented groups from being imported.
+Fixed issue with sorting by pr when using groups.
+Fixed graphical glithes in class order settings window.
+Added Limbo Infomatrix to Custom events boss list.
+Added LimboInfo and Lettuce to First kills list.
+---RaidOps version 2.34a---
+{23/09/2015}
+Fixed rare crash concerning guild roster.
+Fixed crash when changing player gropus via pop-up.
 ---RaidOps version 2.34---
 {16/09/2015}
 Reskin for ML widnow (horizontal and vertical)
@@ -219,6 +230,7 @@ Added Volatility Lattice to Custom events boss dropdown.
 Added '/rops tutorial' cmd.
 Reskin of Chat Bidding window.
 At last fixed all issues with missing pop-ups.
+Fixed issue with alts and raid sessions.
 ---RaidOps version 2.34 Beta 2 ---
 {09/09/2015}
 Fixes from previous beta.
@@ -2495,6 +2507,10 @@ end
 
 function DKP:GetOnlinePlayers()
 	local tOnlineMembers = {}
+	if not tGuildRoster then
+		self:ImportFromGuild()
+		return
+	end
 	for k,player in ipairs(tGuildRoster) do
 		if player.fLastOnline == 0 then 
 			local strNewName = ""
@@ -2640,7 +2656,7 @@ function DKP:RefreshMainItemList()
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
 
-										-- *underine* key part */underline*--
+										-- *underline* key part */underline*--
 										player.wnd:SetData({id = playerId,nGroupId = i})
 										-------------------------------------
 										
@@ -3272,7 +3288,7 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 				return pra > prb
 			elseif sortBy == "EP" then return a.EP > b.EP
 			elseif sortBy == "GP" then return a.GP > b.GP
-			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.GP) > DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.GP)
+			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.nAwardedGP+tSetA.nBaseGP) > DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.nAwardedGP+tSetB.nBaseGP)
 			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
 			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
 			elseif sortBy == "%Y" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_Y) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_Y)
@@ -3302,7 +3318,7 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 				return pra < prb
 			elseif sortBy == "EP" then return tSetA.EP < tSetB.EP
 			elseif sortBy == "GP" then return tSetA.GP < tSetB.GP
-			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.GP) < DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.GP)
+			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.nAwardedGP+tSetA.nBaseGP) < DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.nAwardedGP+tSetB.nBaseGP)
 			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
 			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
 			elseif sortBy == "%Y" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_Y) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_Y)
@@ -4327,7 +4343,7 @@ function DKP:ExportImport()
 		local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 		local tImportedPlayers = JSON.decode(strImportString)
 		if tImportedPlayers then
-
+			local tGroups = {}
 			for k,player in ipairs(self.tItems) do
 				self.tItems[k] = nil
 			end
@@ -4339,11 +4355,16 @@ function DKP:ExportImport()
 				player.nAwardedGP = player.GP - (player.nBaseGP or self.tItems["EPGP"].BaseGP)
 				player.GP = nil
 				table.insert(self.tItems,player)
-				for k , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
+				for j , set in ipairs(self.tItems[#self.tItems].tDataSets or {}) do
+					if not tGroups[set.strGroup] then tGroups[set.strGroup] = {}  tGroups[set.strGroup].tIDs = {} end
+					table.insert(tGroups[set.strGroup].tIDs,#self.tItems)
 					if not self.tItems.tDataSets[set.strGroup] then self.tItems.tDataSets[set.strGroup] = {} end
 					self.tItems.tDataSets[set.strGroup][player.strName] = set.tData
 				end
 				self.tItems[#self.tItems].tDataSets = nil
+			end
+			for strGroup, group in pairs(tGroups) do
+				table.insert(self.tItems["settings"].Groups,{strName = strGroup,tIDs = group.tIDs,bExpand = true})
 			end
 			if not self.tItems.tRaids then self.tItems.tRaids = {} end
 			for k , raid in ipairs(tImportedPlayers['tRaids'] or {}) do
@@ -5680,6 +5701,9 @@ local ktFirstMultipliers =
 	["Gloomclaw"] = {bKilled = false,nMultiplier =1},
 	["Maelstorm Authority"] = {bKilled = false,nMultiplier =1},
 	["Avatus"] = {bKilled = false,nMultiplier =1},
+
+	["Volatility Lattice"] = {bKilled = false,nMultiplier =1},
+	["Limbo Imfomatrix"] = {bKilled = false,nMultiplier =1},
 }
 
 local tCreatedEvent = {}
@@ -5706,6 +5730,9 @@ function DKP:CEInit()
 	if self.tItems["settings"].CENotifyScreen == nil then self.tItems["settings"].CENotifyScreen = true end
 	if self.tItems["settings"].CENotifyScreenTime == nil then self.tItems["settings"].CENotifyScreenTime = 5 end
 	if self.tItems["settings"].tCEFirstMultipliers == nil then self.tItems["settings"].tCEFirstMultipliers = ktFirstMultipliers end
+
+	if not self.tItems["settings"].tCEFirstMultipliers["Limbo Imfomatrix"] then self.tItems["settings"].tCEFirstMultipliers["Limbo Imfomatrix"] = {bKilled = false,nMultiplier =1} end
+	if not self.tItems["settings"].tCEFirstMultipliers["Volatility Lattice"] then self.tItems["settings"].tCEFirstMultipliers["Volatility Lattice"] = {bKilled = false,nMultiplier =1} end
 	
 	self.wndCE:FindChild("Enable"):SetCheck(self.tItems["settings"].CEEnable)
 	self.wndCE:FindChild("RaidOnly"):SetCheck(self.tItems["settings"].CERaidOnly)
@@ -7921,10 +7948,12 @@ function DKP:COPopulate()
 end
 
 function DKP:COTileShowHighliht(wndHandler,wndControl)
+	if wndHandler ~= wndControl then return end
 	wndHandler:FindChild("Highlight"):Show(true)
 end
 
 function DKP:COTileHideHighliht(wndHandler,wndControl)
+	if wndHandler ~= wndControl then return end
 	wndHandler:FindChild("Highlight"):Show(false)
 end
 

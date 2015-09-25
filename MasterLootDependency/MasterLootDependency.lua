@@ -715,7 +715,7 @@ function MasterLoot:MLLPopulateItems(bResize)
 		Tooltip.GetItemTooltipForm(self,wnd,lootEntry.itemDrop,{bPrimary = true})
 		wnd:SetData(lootEntry)
 	end
-	Apollo.GetAddon("RaidOps"):BQUpdateCounters()
+	if Apollo.GetAddon("RaidOps") then Apollo.GetAddon("RaidOps"):BQUpdateCounters() end
 	self.wndMLL:FindChild("Items"):ArrangeChildrenVert() 
 	if bResize then 
 		self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=self.wndMLL:GetHeight()-100})

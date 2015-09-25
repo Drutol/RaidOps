@@ -5,7 +5,7 @@
  
 require "Window"
  
-local Major, Minor, Patch, Suffix = 1, 15, 0, 0
+local Major, Minor, Patch, Suffix = 1, 16, 0, 0
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMasterLoot Module Definition
 -----------------------------------------------------------------------------------------------
@@ -129,38 +129,34 @@ function RaidOpsMasterLoot:CompleteInit()
 	self:HookToMasterLootDisp()
 	self:MLSettingsRestore()
 	Apollo.RegisterSlashCommand("ropsml", "MLSettingsShow", self)
-	-- Creating Controls
-	if self.tItems["settings"]["ML"].bStandardLayout then
-		self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc,"InsertSearchBox",Hook.wndMasterLoot,self)
-		self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertMasterBid",Hook.wndMasterLoot,self)
-		self.wndInsertedMasterButton:Enable(false)
-		self.wndInsertedMasterButtonv2 = Apollo.LoadForm(self.xmlDoc,"InsertMasterBidv2",Hook.wndMasterLoot,self)
-		self.wndInsertedMasterButton:Enable(false)
-		Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(5,84,-131,128)
-		local l,t,r,b = Hook.wndMasterLoot:FindChild("Assignment"):GetAnchorOffsets()
-		self.wndInsertedMasterButton:SetAnchorPoints(.5,1,1,1)
-		--Hook.wndMasterLoot:FindChild("Assignment"):SetAnchorOffsets(l,t,r,b-22)
-
-	else
+	if not self.tItems["settings"]["ML"].bStandardLayout then
 		Hook.wndMasterLoot:Destroy()
 		Hook.wndMasterLoot = Apollo.LoadForm(self.xmlDoc,"MasterLootWindowVertLayout",nil,Hook)
 		Hook.wndMasterLoot:SetSizingMinimum(579,559)
 		Hook.wndMasterLoot:MoveToLocation(Hook.locSavedMasterWindowLoc)
 		Hook.wndMasterLoot_ItemList = Hook.wndMasterLoot:FindChild("ItemList")
 		Hook.wndMasterLoot_LooterList = Hook.wndMasterLoot:FindChild("LooterList")
-		self.wndInsertedSearch = Apollo.LoadForm(self.xmlDoc,"InsertSearchBox",Hook.wndMasterLoot,self)
-		self.wndInsertedMasterButton = Apollo.LoadForm(self.xmlDoc,"InsertBidButtonVert",Hook.wndMasterLoot,self)
-		self.wndInsertedMasterButton:Enable(false)
-		Hook.wndMasterLoot:FindChild("MasterLoot_LooterAssign_Header"):SetAnchorOffsets(37,238,-128,282)
-		self.wndInsertedSearch:SetAnchorOffsets(-122,238,-40,282)
+		Hook.wndMasterLoot:SetSizingMinimum(800, 500)
+	else
+		Hook.wndMasterLoot:SetSizingMinimum(800, 310)
 	end
+
+    self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc,"InsertMLControls",Hook.wndMasterLoot,self)
+
+	if self.tItems["settings"].BidSortAsc == 1 then 
+		self.wndInsertedControls:FindChild("Asc"):SetCheck(true) 
+	else 
+		self.wndInsertedControls:FindChild("Desc"):SetCheck(true) 
+	end
+	
+	self.wndInsertedControls:FindChild("Asc"):SetRotation(270)
+	self.wndInsertedControls:FindChild("Desc"):SetRotation(90)
+	
+	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-350,63)
 	self.tEquippedItems = {}
 
-
-	Hook.wndMasterLoot:FindChild("MasterLoot_Window_Title"):SetAnchorOffsets(48,27,-150,63)
-	self.wndInsertedControls = Apollo.LoadForm(self.xmlDoc,"InsertMLControls",Hook.wndMasterLoot,self)
-	self.wndInsertedControls:FindChild("Window"):FindChild("Random"):Enable(false)
-	Hook:OnMasterLootUpdate(true)
+	Hook.wndMasterLoot:Show(true)
+	--Hook:OnMasterLootUpdate(true)
 	--self.channel = ICCommLib.JoinChannel(self.tItems["settings"]["ML"].strChannel ,ICCommLib.CodeEnumICCommChannelType.Global)
 	--self.channel:SetReceivedMessageFunction("OnReceivedItem",self)
 	self.strMyName = GameLib.GetPlayerUnit():GetName()
@@ -238,6 +234,7 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bArrItemTiles == nil then self.tItems["settings"]["ML"].bArrItemTiles = true end
 	if self.tItems["settings"]["ML"].bStandardLayout == nil then self.tItems["settings"]["ML"].bStandardLayout = true end
 	if self.tItems["settings"]["ML"].bListIndicators == nil then self.tItems["settings"]["ML"].bListIndicators = true end
+	if self.tItems["settings"]["ML"].BidSortAsc == nil then self.tItems["settings"]["ML"].BidSortAsc = true end
 	if self.tItems["settings"]["ML"].bGroup == nil then self.tItems["settings"]["ML"].bGroup = false end
 	if self.tItems["settings"]["ML"].bShowLastItemBar == nil then self.tItems["settings"]["ML"].bShowLastItemBar = true end
 	if self.tItems["settings"]["ML"].bShowLastItemTile == nil then self.tItems["settings"]["ML"].bShowLastItemTile = true end	
@@ -267,7 +264,6 @@ function RaidOpsMasterLoot:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
 	
 	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
-	self.wndMLSettings:FindChild("ChannelName"):SetText(self.tItems["settings"]["ML"].strChannel)
 	self.wndMLSettings:FindChild("DisplayApplicable"):SetCheck(self.tItems["settings"]["ML"].bDisplayApplicable)
 
 end
@@ -437,6 +433,15 @@ function RaidOpsMasterLoot:UpdatePlayerTileBar(strPlayer,item)
 	end
 end
 
+function sortMasterLootEasyDKPNonWnd(a,b)
+	local DKPInstance = Apollo.GetAddon("RaidOpsMasterLoot")
+	if DKPInstance.tItems["settings"].BidSortAsc == 0 then
+		return a:GetName() < b:GetName()
+	else
+		return a:GetName() > b:GetName()
+	end
+end
+
 
 function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 	luaCaller.wndMasterLoot_LooterList:DestroyChildren()
@@ -468,85 +473,71 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 				local bWantEng = true
 				
 				if DKPInstance.tItems["settings"]["ML"].bDisplayApplicable then
-					local strCategory = tItem.itemDrop:GetItemCategoryName()
-
-					if string.find(strCategory,"Light") then
-						Print(strCategory)
-						bWantEng = false
-						bWantWar = false
-						bWantSta = false
-						bWantMed = false
-					elseif string.find(strCategory,"Medium") then
-						bWantEng = false
-						bWantWar = false
-						bWantSpe = false
-						bWantEsp = false
-					elseif string.find(strCategory,"Heavy") then
-						bWantEsp = false
-						bWantSpe = false
-						bWantSta = false
-						bWantMed = false
-					end
-					
-					if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
-						bWantEsp = false
-						bWantWar = false
-						bWantSpe = false
-						bWantMed = false
-						bWantSta = false
-						bWantEng = false
-					end 
-					
-					if string.find(strCategory,"Psyblade") then bWantEsp = true
-					elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
-					elseif string.find(strCategory,"Pistols") then bWantSpe = true
-					elseif string.find(strCategory,"Claws") then bWantSta = true
-					elseif string.find(strCategory,"Greatsword") then bWantWar = true
-					elseif string.find(strCategory,"Resonators") then bWantMed = true
-					end 
-				end
-				
-				
-				-- Grouping Players
-				for idx, unitLooter in pairs(tItem.tLooters) do
-					if DKPInstance.tItems["settings"]["ML"].bGroup then
-						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" and bWantEsp then
-							table.insert(tables.esp,unitLooter)
-						elseif class == "Engineer" and bWantEng then
-							table.insert(tables.eng,unitLooter)
-						elseif class == "Medic" and bWantMed then
-							table.insert(tables.med,unitLooter)
-						elseif class == "Warrior" and bWantWar then
-							table.insert(tables.war,unitLooter)
-						elseif class == "Stalker" and bWantSta then
-							table.insert(tables.sta,unitLooter)
-						elseif class == "Spellslinger" and bWantSpe then
-							table.insert(tables.spe,unitLooter)
+					if string.find(tItem.itemDrop:GetName(),"Imprint") then
+					    bWantEsp = false
+					    bWantWar = false
+					    bWantSpe = false
+					    bWantMed = false
+					    bWantSta = false
+					    bWantEng = false
+						
+						local tDetails = tItem.itemDrop:GetDetailedInfo()
+						if tDetails.tPrimary.arClassRequirement then
+							for k , class in ipairs(tDetails.tPrimary.arClassRequirement.arClasses) do
+								if class == 1 then bWantWar = true
+								elseif class == 2 then bWantEng = true
+								elseif class == 3 then bWantEsp = true
+								elseif class == 4 then bWantMed = true
+								elseif class == 5 then bWantSta = true
+								elseif class == 7 then bWantSpe = true
+								end
+							end
 						end
 					else
-						class = ktClassToString[unitLooter:GetClassId()]
-						if class == "Esper" and bWantEsp then
-							table.insert(tables.all,unitLooter)
-						elseif class == "Engineer" and bWantEng then
-							table.insert(tables.all,unitLooter)
-						elseif class == "Medic" and bWantMed then
-							table.insert(tables.all,unitLooter)
-						elseif class == "Warrior" and bWantWar then
-							table.insert(tables.all,unitLooter)
-						elseif class == "Stalker" and bWantSta then
-							table.insert(tables.all,unitLooter)
-						elseif class == "Spellslinger" and bWantSpe then
-							table.insert(tables.all,unitLooter)
+						local strCategory = tItem.itemDrop:GetItemCategoryName()
+						if strCategory ~= "" then
+							if string.find(strCategory,"Light") then
+								bWantEng = false
+								bWantWar = false
+								bWantSta = false
+								bWantMed = false
+							elseif string.find(strCategory,"Medium") then
+								bWantEng = false
+								bWantWar = false
+								bWantSpe = false
+								bWantEsp = false
+							elseif string.find(strCategory,"Heavy") then
+								bWantEsp = false
+								bWantSpe = false
+								bWantSta = false
+								bWantMed = false
+							end
+							
+							if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+								bWantEsp = false
+								bWantWar = false
+								bWantSpe = false
+								bWantMed = false
+								bWantSta = false
+								bWantEng = false
+							end 
+							
+							if string.find(strCategory,"Psyblade") then bWantEsp = true
+							elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
+							elseif string.find(strCategory,"Pistols") then bWantSpe = true
+							elseif string.find(strCategory,"Claws") then bWantSta = true
+							elseif string.find(strCategory,"Greatsword") then bWantWar = true
+							elseif string.find(strCategory,"Resonators") then bWantMed = true
+							end 
 						end
-					end	
+					end
 				end
 				-- Create name table to send request
 				if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar or DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then
 					if tItem.itemDrop:IsEquippable() then
 						DKPInstance:SendRequestsForCurrItem(tItem.itemDrop:GetItemId())
 						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()] = {}
-						self.tEquippedItems[GameLib.GetPlayerUnit():GetName()][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
+						--self.tEquippedItems[GameLib.GetPlayerUnit():GetName()][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
 					end
 				end
 				-- GuildBank
@@ -564,6 +555,10 @@ function RaidOpsMasterLoot:RefreshMasterLootLooterList(luaCaller,tMasterLootItem
 					end
 				end
 				
+				for k,tab in pairs(tables) do
+					table.sort(tab,sortMasterLootEasyDKPNonWnd)
+				end
+
 				local unitGBManager
 				--Creating windows
 				for k,tab in pairs(tables) do

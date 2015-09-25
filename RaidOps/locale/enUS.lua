@@ -295,3 +295,5 @@ L["#Avatus"] = "Avatus"
 
 --v2.34
 L["#wndSettings:ClearLogs"] = "Clear Logs"
+--v2.34b
+L["#LimboInfo"] = "Limbo Imfomatrix"

@@ -1049,7 +1049,8 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 		end
 		
 		self.CurrentBidSession.strSelected = looters[math.random(#looters)]:GetName()
-		prevLuckyChild = self.CurrentBidSession.strSelected
+		prevLuckyChild = self.CurrentBidSession.strSelected 
+		-- it flows further to standard assign method
 	end
 	
 	if self.CurrentBidSession == nil or not self.CurrentBidSession.strSelected or not self.CurrentBidSession.nSelectedOpt then return end

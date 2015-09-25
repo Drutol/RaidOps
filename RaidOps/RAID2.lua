@@ -1374,7 +1374,7 @@ function DKP:GroupDialogPopulate(forID)
 	local tActive = {}
 	local tAvailable = {}
 
-	for k , group in ipairs(self.tItems["setti.ngs"].Groups) do
+	for k , group in ipairs(self.tItems["settings"].Groups) do
 		local bFound = false
 		for j , id in ipairs(group.tIDs) do
 			if id == forID then bFound = true break end
