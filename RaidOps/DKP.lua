@@ -196,6 +196,13 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 2.34d---
+{25/09/2015}
+Resolved website export issues.
+---RaidOps version 2.34c---
+{25/09/2015}
+Fixed visual glitch display of pr value while displaying inactive group.
+Fixed sorting for groups once more. (different circumstances)
 ---RaidOps version 2.34b---
 {25/09/2015}
 Fixed bug that prevented groups from being imported.
@@ -2780,7 +2787,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 	local nGroup = playerItem.wnd:GetData().nGroupId
 	if self.tItems["settings"].bEnableGroups and self:GetActiveGroupID() ~= nGroup and self.tItems["settings"].Groups[nGroup] then
 		tDataSet = self:GetDataSetForGroupPlayer(self.tItems["settings"].Groups[nGroup].strName,playerItem.strName)
-		if tDataSet.nAwardedGP ~= 0 then
+		if tDataSet.nAwardedGP + tDataSet.nBaseGP ~= 0 then
 			tDataSet.PR = string.format("%."..tostring(self.tItems["settings"].Precision).."f", tDataSet.EP/(tDataSet.nAwardedGP+tDataSet.nBaseGP))
 		else
 			tDataSet.PR = 0
@@ -3258,8 +3265,8 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 		tSetA = DKPInstance:GetDataSetForGroupPlayer(DKPInstance.tItems["settings"].Groups[nSortedGroup].strName,a.strName)
 		tSetB = DKPInstance:GetDataSetForGroupPlayer(DKPInstance.tItems["settings"].Groups[nSortedGroup].strName,b.strName)
 	else
-		tSetA = {EP = a.EP,GP = a.GP,net = a.net,tot = a.tot}
-		tSetB = {EP = b.EP,GP = b.GP,net = b.net,tot = b.tot}
+		tSetA = {EP = a.EP,nAwardedGP = a.nAwardedGP,nBaseGP = a.nBaseGP,net = a.net,tot = a.tot}
+		tSetB = {EP = b.EP,nAwardedGP = b.nAwardedGP,nBaseGP = b.nBaseGP,net = b.net,tot = b.tot}
 	end
 	if DKPInstance.SortedLabel then
 		local sortBy = DKPInstance.tItems["settings"].LabelOptions[DKPInstance.SortedLabel]
@@ -4289,9 +4296,9 @@ function DKP:ExportWebsite()
 				if id == k then
 					local tData = self:GetDataSetForGroupPlayer(group.strName,self.tItems[id].strName)
 					tData.GP = tData.nAwardedGP + tData.nBaseGP
-					tData.nAwardedGP = nil
-					tData.nBaseGP = nil
-					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = tData})
+					--tData.nAwardedGP = nil
+					--tData.nBaseGP = nil
+					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = {EP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tData.EP),GP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tData.GP),net = tData.net,tot = tData.tot,PR = tData.PR or self:EPGPGetPRByValues(tData.EP,tData.GP)} })
 					break
 				end
 			end

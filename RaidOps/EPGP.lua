@@ -808,16 +808,28 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
     	end
     end
-    if wndTooltip and string.find(item:GetName(),this.Locale["#Imprint"]) then
-    	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
-    	--89Print(wndTooltip:FindChild("ItemBasicStatsLine"):GetText())
+    if wndTooltip and string.find(item:GetName(),this.Locale["#Imprint"]) then -- gotta insert and arrange stuff
+    	--local wndBox = wndTooltip:FindChild("SimpleRowSmallML")
+    	local wndBox = Apollo.LoadForm("ui\\Tooltips\\TooltipsForms.xml", "ItemBasicStatsLine", wndTooltip:FindChild("ItemTooltip_BasicStatsBox"))
     	if wndBox then
-    		wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </P>")
+    		wndBox:SetTextFlags("DT_RIGHT",true)
+    		wndBox:SetHeightToContentHeight()
+    		wndBox:SetAnchorOffsets(130,0,0,wndBox:GetHeight())
     	end
     end   
 
 
     return wndTooltip , wndTooltipComp
+end
+
+function printAllStuff(wnd)
+	if #wnd:GetChildren() > 0 then
+		for k , child in ipairs(wnd:GetChildren()) do
+			Print(child:GetName() .. " " .. child:GetText() .. "   parent: " .. wnd:GetName())
+			printAllStuff(child)
+		end
+	end
 end
 
 function DKP:AttachBelow(luaCaller,strText, wndHeader)

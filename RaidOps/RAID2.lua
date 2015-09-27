@@ -1691,15 +1691,8 @@ function DKP:ArmoryOnInspect(unit,items)
 	end
 	local tStats = unit:GetUnitProperties()
 	tItems['tStats'] = {}
-	tItems['tStats']['Mox'] = math.floor(tStats['Magic'].fValue)
-	tItems['tStats']['Bru'] = math.floor(tStats['Strength'].fValue)
-	tItems['tStats']['Tech'] = math.floor(tStats['Technology'].fValue)
-	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
-	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
-	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
-	tItems['tStats']['AP'] = math.floor(tStats['AssaultPower'].fValue)
-	tItems['tStats']['SP'] = math.floor(tStats['SupportPower'].fValue)
-
+	tItems['tStats']['AP'] = math.floor(tStats['AssaultRating'].fValue)
+	tItems['tStats']['SP'] = math.floor(tStats['SupportRating'].fValue)
 	self.tItems.tArmory[unit:GetName()] = tItems
 end
 
@@ -1722,14 +1715,8 @@ function DKP:GetArmoryEntries(unit)
 	end
 	local tStats = unit:GetUnitProperties()
 	tItems['tStats'] = {}
-	tItems['tStats']['Mox'] = math.floor(tStats['Magic'].fValue)
-	tItems['tStats']['Bru'] = math.floor(tStats['Strength'].fValue)
-	tItems['tStats']['Tech'] = math.floor(tStats['Technology'].fValue)
-	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
-	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
-	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
-	tItems['tStats']['AP'] = math.floor(tStats['AssaultPower'].fValue)
-	tItems['tStats']['SP'] = math.floor(tStats['SupportPower'].fValue)
+	tItems['tStats']['AP'] = math.floor(tStats['AssaultRating'].fValue)
+	tItems['tStats']['SP'] = math.floor(tStats['SupportRating'].fValue)
 	return tItems
 end
 

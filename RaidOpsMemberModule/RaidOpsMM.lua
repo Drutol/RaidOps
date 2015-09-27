@@ -1213,8 +1213,13 @@ function RaidOpsMM:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     	wndTarget:SetTextFlags("DT_CENTER", true)
     end
     if wndTooltip and string.find(item:GetName(),"Imprint") then
-    	local wndBox = wndTooltip:FindChild("ItemTooltip_BasicStats_TopLeft")
-    	wndBox:SetAML("<P Font=\"CRB_InterfaceSmall\" TextColor=\" ff39b5d4\">"..string.format("<T TextColor=\"%s\">%s</T>", kUIBody, String_GetWeaselString(Apollo.GetString("Tooltips_ItemLevel"), item:GetDetailedInfo().tPrimary.nEffectiveLevel)) ..  "<T Font=\"Nameplates\" TextColor=\"xkcdAmber\">  ".. self:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </T>".."</P>")
+    	local wndBox = Apollo.LoadForm("ui\\Tooltips\\TooltipsForms.xml", "ItemBasicStatsLine", wndTooltip:FindChild("ItemTooltip_BasicStatsBox"))
+    	if wndBox then
+    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </P>")
+    		wndBox:SetTextFlags("DT_RIGHT",true)
+    		wndBox:SetHeightToContentHeight()
+    		wndBox:SetAnchorOffsets(130,0,0,wndBox:GetHeight())
+    	end
     end   
 
 
@@ -1648,14 +1653,8 @@ function RaidOpsMM:GetArmoryEntries(unit)
 	end
 	local tStats = unit:GetUnitProperties()
 	tItems['tStats'] = {}
-	tItems['tStats']['Mox'] = math.floor(tStats['Magic'].fValue)
-	tItems['tStats']['Bru'] = math.floor(tStats['Strength'].fValue)
-	tItems['tStats']['Tech'] = math.floor(tStats['Technology'].fValue)
-	tItems['tStats']['Dex'] = math.floor(tStats['Dexterity'].fValue)
-	tItems['tStats']['Wis'] = math.floor(tStats['Wisdom'].fValue)
-	tItems['tStats']['Sta'] = math.floor(tStats['Stamina'].fValue)
-	tItems['tStats']['AP'] = math.floor(tStats['AssaultPower'].fValue)
-	tItems['tStats']['SP'] = math.floor(tStats['SupportPower'].fValue)
+	tItems['tStats']['AP'] = math.floor(tStats['AssaultRating'].fValue)
+	tItems['tStats']['SP'] = math.floor(tStats['SupportRating'].fValue)
 	return tItems
 end
 
