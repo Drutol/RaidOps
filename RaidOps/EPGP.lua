@@ -725,10 +725,20 @@ function DKP:EPGPGPBaseThresDisable()
 end
 
 -- Hook Part
+local failCounter = 0
 function DKP:HookToTooltip(tContext)
 	-- Based on EToolTip implementation
 	if tContext.originalTootltipFunction then return end
 	aAddon = Apollo.GetAddon("ToolTips")
+	if not aAddon and failCounter < 10 then
+		failCounter = failCounter + 1
+		self:delay(1,function(tContext) tContext:HookToTooltip(tContext) end)
+		return
+	elseif failCounter >= 10 then
+		Print("Failed to hook to toltips addon.This should never occur unless you have addon that replaces tooltips.Notify me about that on github or curse :)")
+		return
+	end
+	self.bPostInit = true
 	tContext.originalTootltipFunction = Tooltip.GetItemTooltipForm
     local origCreateCallNames = aAddon.CreateCallNames
     if not origCreateCallNames then return end
@@ -745,7 +755,7 @@ end
 function DKP:EPGPHookToETooltip( wndHandler, wndControl, eMouseButton )
 	if not Apollo.GetAddon("ETooltip") then
 		self.tItems["EPGP"].Tooltips = 1
-		self:delay(3,function(tContext) tContext:HookToTooltip(tContext) end)
+		self:delay(1,function(tContext) tContext:HookToTooltip(tContext) end)
 	else
 		if Apollo.GetAddon("ETooltip") == nil then
 			self.tItems["EPGP"].Tooltips = 0
@@ -810,9 +820,11 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     end
     if wndTooltip and string.find(item:GetName(),this.Locale["#Imprint"]) then -- gotta insert and arrange stuff
     	--local wndBox = wndTooltip:FindChild("SimpleRowSmallML")
+    	local nGP = this:EPGPGetItemCostByID(item:GetItemId(),true)
+    	if nGP == "" then return end -- cause there are imprints that are not GA/DS ones ... drop 6
     	local wndBox = Apollo.LoadForm("ui\\Tooltips\\TooltipsForms.xml", "ItemBasicStatsLine", wndTooltip:FindChild("ItemTooltip_BasicStatsBox"))
     	if wndBox then
-    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </P>")
+    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. nGP .. " GP".." </P>")
     		wndBox:SetTextFlags("DT_RIGHT",true)
     		wndBox:SetHeightToContentHeight()
     		wndBox:SetAnchorOffsets(130,0,0,wndBox:GetHeight())

@@ -196,6 +196,19 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.01---
+{30/09/2015}
+Second batch of F2P fixes.
+Rune collection for armory module updated.
+Fixed some issues regarding mass edit's invite funtion. (there may be something somewhere still)
+Fixed various backend issues with ToolTip addon hooking.
+Fixed empty GP value display on tokens which do not come from GA/DS.
+Chenged odd position of settings window.
+---RaidOps version 3.0---
+{29/09/2015}
+Changed API ver. to 11.
+Changed some stuff regarding token tooltip GP display in order to work with API 11.
+Changed armory data collection just so it works for now.
 ---RaidOps version 2.34d---
 {25/09/2015}
 Resolved website export issues.
@@ -241,38 +254,6 @@ Fixed issue with alts and raid sessions.
 ---RaidOps version 2.34 Beta 2 ---
 {09/09/2015}
 Fixes from previous beta.
-
----RaidOps version 2.33 Beta ---
-{06/09/2015}
-Overhaul of BaseGP system:
-From now on every player has dynamic GP offset (BaseGP) and GP from awards ; GP value is the sum of these two.
-Savefile format is changed and therefore you cannot downgrade versions.(Website export/import is the solution if you want to go back and you dindn't make backup).
-BaseGP value in EPGP settings serves now as default BaseGP value.
-Each player can have different BaseGP value in different context (group).
-
-As this change affects very core of the addon , there will be beta period to check if things work.
-Back to changelog:
-
-
----RaidOps version 2.32 ---
-{03/09/2015}
-Added support for Data Import via Uploader.
-Added support for data exposing to Uploader.
-Added option to hide bidding buttons in ML window.
----RaidOps version 2.30 ---
-{28/08/2015}
-Redesigned alts window.
-Redesigned logs window.
-Fixed sorting in logs window.
-Fixed visual bug when exporting importable database.
-Fixed harmless error when exporting settings.
-Fixed various issues with German localisation.
-Added 1st kill multipliers to custom events for units.
-Fixed Alts merge bug.
----RaidOps version 2.29 ---
-{24/08/2015}
-Redesigned export window.
-Fixed some GP formula bugs.
  ]===]
 
 -- Localization stuff
@@ -614,15 +595,14 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	Event_FireGenericEvent("RaidOpsChatBidding",{nLootId = 324,itemDrop = Item.GetDataFromId(60417)})
-	--self:BidAddPlayerToRandomSkip("Drutol Windchaser",60417)
+	self:GetNewItem(80001)
 end
 
 function DKP:GetNewItem(id)
 	Print(id)
-	if id > 80000 then self:ExportShowPreloadedText(strDB) return end
+	if id >= 120000 then self:ExportShowPreloadedText(strDB) return end
 	if Item.GetDataFromId(id) then
-		strDB = strDB .. string.format("ItemDB.create(:item_id => %d,:sprite => '%s',:quality => %d)\n",id,Item.GetDataFromId(id):GetIcon(),Item.GetDataFromId(id):GetItemQuality())
+		strDB = strDB .. string.format("ItemDb.create(:item_id => %d,:sprite => '%s',:quality => %d)\n",id,Item.GetDataFromId(id):GetIcon(),Item.GetDataFromId(id):GetItemQuality())
 	end
 	self:delay(1,function (tContext,args) tContext:GetNewItem(args.id) end,{id = id+1})
 end
@@ -664,8 +644,8 @@ local bDelayRunning = false
 function DKP:delay(nSecs,func,args)
 	table.insert(tDelayActions,{func = func , delay = nSecs , args = args})
 	if not bDelayRunning then
-		Apollo.RegisterTimerHandler(1,"DelayTimer",self)
-		self.delayTimer = ApolloTimer.Create(1,true,"DelayTimer",self)
+		Apollo.RegisterTimerHandler(0.001,"DelayTimer",self)
+		self.delayTimer = ApolloTimer.Create(0.001,true,"DelayTimer",self)
 		bDelayRunning = true
 	end
 	return #tDelayActions
@@ -2207,7 +2187,7 @@ function DKP:MassEditInvite()
 			bInviteSuspend = true
 			break			
 		end
-		if wnd:GetData().id and self.tItems[wnd:GetData().id] then
+		if wnd:GetData() and wnd:GetData().id and self.tItems[wnd:GetData().id] then
 			GroupLib.Invite(self.tItems[wnd:GetData().id].strName,strRealm,strMessage)
 			table.insert(invitedIDs,wnd:GetData().id)
 		end
@@ -2259,9 +2239,9 @@ function DKP:MassEditInviteContinue()
 	local strMsg = "Raid time!"
 	local invitedIDs = {}
 	for k,wnd in ipairs(selectedMembers) do
-		if wnd:GetData().id and self.tItems[wnd:GetData().id] then
+		if wnd:GetData() and wnd:GetData().id and self.tItems[wnd:GetData().id] then
 			GroupLib.Invite(self.tItems[wnd:GetData()].strName,strRealm,strMessage)
-			table.insert(invitedIDs,wnd:GetData())
+			table.insert(invitedIDs,wnd:GetData().id)
 		end
 	end
 	self:InviteOpen(invitedIDs)
@@ -2890,7 +2870,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetText("")
 						local l,t,r,b = playerItem.wnd:FindChild("Stat"..tostring(i)):GetAnchorOffsets()
 						playerItem.wnd:FindChild("Stat"..tostring(i)):SetAnchorOffsets(l+32.5,t,r-32.5,b)
-						Tooltip.GetItemTooltipForm(self,wnd, item  ,{bPrimary = true, bSelling = false})
+						if self.bPostInit then Tooltip.GetItemTooltipForm(self,wnd, item  ,{bPrimary = true, bSelling = false}) end
 					end
 				end
 			elseif self.tItems["settings"].LabelOptions[i] == "Hrs" then

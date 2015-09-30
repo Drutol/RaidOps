@@ -1684,7 +1684,7 @@ function DKP:ArmoryOnInspect(unit,items)
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
 				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
 				if rune.tSet then
-					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
+					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
 				end
 			end
 		end
@@ -1707,8 +1707,8 @@ function DKP:GetArmoryEntries(unit)
 			tItems[item:GetSlot()]["runes"] = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
 				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
-				if rune.tSet then
-					if not tItems['tSets'][rune.tSet.strName] then  tItems['tSets'][rune.tSet.strName] = 1 else   tItems['tSets'][rune.tSet.strName] =   tItems['tSets'][rune.tSet.strName] + 1 end
+				for i , tRuneSet in ipairs(rune.arSets or {}) do
+					if not tItems['tSets'][tRuneSet.strName] then  tItems['tSets'][tRuneSet.strName] = tRuneSet.nTotalPower end
 				end
 			end
 		end
@@ -1717,6 +1717,7 @@ function DKP:GetArmoryEntries(unit)
 	tItems['tStats'] = {}
 	tItems['tStats']['AP'] = math.floor(tStats['AssaultRating'].fValue)
 	tItems['tStats']['SP'] = math.floor(tStats['SupportRating'].fValue)
+	tItems['tStats']['Mox'] = math.floor(unit:GetEffectiveItemLevel() or 0)
 	return tItems
 end
 
