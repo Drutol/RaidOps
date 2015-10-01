@@ -650,7 +650,7 @@ function DKP:EPGPGetItemCostByID(itemID,bCut)
 		slot = item:GetSlot()
 		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
 		
-		if item:GetDetailedInfo().tPrimary.nEffectiveLevel <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
+		if (item:GetDetailedInfo().tPrimary.nEffectiveLevel or 0) <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
 			if not bCut then 
 				return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
 			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end

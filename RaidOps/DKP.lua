@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 2, 34, 0, 0
+local Major, Minor, Patch, Suffix = 3, 2, 0, 0
 local strConcatedString
 local tMetaTableForBaseGP = {}
 -----------------------------------------------------------------------------------------------
@@ -196,6 +196,9 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.02---
+{01/10/2015}
+Fixed crash when attempting to get GP value for some post F2P items.
 ---RaidOps version 3.01---
 {30/09/2015}
 Second batch of F2P fixes.
@@ -644,8 +647,8 @@ local bDelayRunning = false
 function DKP:delay(nSecs,func,args)
 	table.insert(tDelayActions,{func = func , delay = nSecs , args = args})
 	if not bDelayRunning then
-		Apollo.RegisterTimerHandler(0.001,"DelayTimer",self)
-		self.delayTimer = ApolloTimer.Create(0.001,true,"DelayTimer",self)
+		Apollo.RegisterTimerHandler(1,"DelayTimer",self)
+		self.delayTimer = ApolloTimer.Create(1,true,"DelayTimer",self)
 		bDelayRunning = true
 	end
 	return #tDelayActions

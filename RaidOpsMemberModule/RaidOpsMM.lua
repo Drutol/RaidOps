@@ -6,7 +6,7 @@
 require "Window"
 require "ICComm"
 
-local Major, Minor, Patch, Suffix = 1, 19, 0, 0
+local Major, Minor, Patch, Suffix = 1, 21, 0, 0
  
 -----------------------------------------------------------------------------------------------
 -- RaidOpsMM Module Definition
@@ -1114,7 +1114,7 @@ function RaidOpsMM:EPGPGetItemCostByID(itemID,bCut)
 		end
 		if self.SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
 		
-		if item:GetDetailedInfo().tPrimary.nEffectiveLevel <= self.nItemPowerThresholdValue or self.nItemPowerThresholdValue == 0 then
+		if (item:GetDetailedInfo().tPrimary.nEffectiveLevel or 0) <= self.nItemPowerThresholdValue or self.nItemPowerThresholdValue == 0 then
 			if not bCut then 
 				return "                                GP: " .. math.ceil(item:GetItemPower()/self.QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.CustomModifier * self.SlotValues[self:EPGPGetSlotStringByID(slot)])
 			else return math.ceil(item:GetItemPower()/self.QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.CustomModifier * self.SlotValues[self:EPGPGetSlotStringByID(slot)]) end
@@ -1133,6 +1133,7 @@ function RaidOpsMM:HookToTooltip()
 	-- Based on EToolTip implementation
 	if self.originalTootltipFunction then return end
 	aAddon = Apollo.GetAddon("ToolTips")
+	if not aAddon then return end
 	self.originalTootltipFunction = Tooltip.GetItemTooltipForm
     local origCreateCallNames = aAddon.CreateCallNames
     if not origCreateCallNames then return end
@@ -1213,9 +1214,11 @@ function RaidOpsMM:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     	wndTarget:SetTextFlags("DT_CENTER", true)
     end
     if wndTooltip and string.find(item:GetName(),"Imprint") then
+    	local nGP = this:EPGPGetItemCostByID(item:GetItemId(),true)
+    	if nGP == "" then return end -- cause there are imprints that are not GA/DS ones ... drop 6
     	local wndBox = Apollo.LoadForm("ui\\Tooltips\\TooltipsForms.xml", "ItemBasicStatsLine", wndTooltip:FindChild("ItemTooltip_BasicStatsBox"))
     	if wndBox then
-    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. this:EPGPGetItemCostByID(item:GetItemId(),true).. " GP".." </P>")
+    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. nGP .. " GP".." </P>")
     		wndBox:SetTextFlags("DT_RIGHT",true)
     		wndBox:SetHeightToContentHeight()
     		wndBox:SetAnchorOffsets(130,0,0,wndBox:GetHeight())
