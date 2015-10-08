@@ -196,6 +196,11 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.03---
+{10/10/2015}
+Fixed Light Master loot visual glitch.
+Fixed rare case of crashing when attempting to access values from outside source.
+Fixed issue with Light ML showing up when user wasn't ML.
 ---RaidOps version 3.02---
 {01/10/2015}
 Fixed crash when attempting to get GP value for some post F2P items.

@@ -702,10 +702,18 @@ local bItemSelected = false
 function MasterLoot:MLLPopulateItems(bResize)
 	if #GameLib.GetMasterLoot() > 0 then self.wndMLL:Show(true,false) end
 
+	local bMaster = false
+
 	if bItemSelected then return end
 
 	self.wndMLL:FindChild("Items"):DestroyChildren()
 	local tML = sort_loot(GameLib.GetMasterLoot())
+
+	for k , lootEntry in ipairs(tML) do
+		if lootEntry.bIsMaster then bMaster = true break end
+	end
+
+	if not bMaster then return end
 
 	for k , lootEntry in ipairs(tML) do
 		local wnd = Apollo.LoadForm(self.xmlDoc,"LightItem",self.wndMLL:FindChild("Items"),self)
@@ -910,8 +918,8 @@ function MasterLoot:MLLAssign()
 	if self.nSelectedItem and self.unitSelected then
 		GameLib.AssignMasterLoot(self.nSelectedItem,self.unitSelected)
 		bItemSelected = false
-		self:MLLPopulateItems(true)
 		self:MLLRecipientDeselected()
+		self:MLLPopulateItems(true)
 	end
 end
 

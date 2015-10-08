@@ -687,7 +687,7 @@ function DKP:EPGPGetPRByID(ID)
 	if not self.tItems[ID] then return 0 end
 	if ID ~= -1 then
 		if self.tItems[ID].GP ~= 0 then
-			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].GP))
+			return string.format("%."..tostring(self.tItems["settings"].Precision).."f", self.tItems[ID].EP/(self.tItems[ID].nAwardedGP + self.tItems[ID].nBaseGP))
 		else
 			return "0"
 		end
