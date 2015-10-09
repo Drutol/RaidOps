@@ -99,12 +99,15 @@ function MasterLoot:OnWindowManagementReady()
 end
 
 function MasterLoot:OnToggleGroupBag()
-	self:OnMasterLootUpdate(true) -- true makes it force open if we have items
+	self:OnMasterLootUpdate(true,true) -- true makes it force open if we have items , 2nd true is to idicate demand
 end
 
 ----------------------------
 
-function MasterLoot:OnMasterLootUpdate(bForceOpen)
+function MasterLoot:OnMasterLootUpdate(bForceOpen,bDemand)
+	if Apollo.GetAddon("RaidOps") and not self.wndMasterLoot:IsShown() then
+		if Apollo.GetAddon("RaidOps").tItems["settings"]["ML"].bAppOnDemand and not bDemand then return end
+	end
 	if self.settings.bLightMode then self:MLLPopulateItems() return end
 	local tMasterLoot = GameLib.GetMasterLoot()
 
@@ -653,7 +656,7 @@ function MasterLoot:MLLightInit()
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
 	
-	self.MLDummy = getDummyML(10)
+	--self.MLDummy = getDummyML(10)
  	nTargetHeight = self.wndMLL:GetHeight()+40
 	self:MLLPopulateItems()
 end
@@ -700,7 +703,7 @@ end
 
 local bItemSelected = false
 function MasterLoot:MLLPopulateItems(bResize)
-	if #GameLib.GetMasterLoot() > 0 then self.wndMLL:Show(true,false) end
+	if #GameLib.GetMasterLoot() > 0 and self.settings.bLightMode then self.wndMLL:Show(true,false) end
 
 	local bMaster = false
 

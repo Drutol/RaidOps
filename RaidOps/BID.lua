@@ -480,6 +480,11 @@ function DKP:BidDistributeAllAtRandom()
 		self:BidAddPlayerToRandomSkip(luckylooter:GetName(),item.itemDrop:GetItemId())
 		GameLib.AssignMasterLoot(item.nLootId,luckylooter)
 	end
+	self.tSelectedItems = {}
+	Hook.tMasterLootSelectedItem = nil
+	Hook.tMasterLootSelectedLooter = nil
+	Hook:OnMasterLootUpdate(true)
+
 end
 
 function DKP:BidAddPlayerToRandomSkip(strName,itemID)
@@ -2754,9 +2759,9 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 							
 							if DKPInstance:GetPlayerByIDByName(unitLooter:GetName()) ~= -1 then
 								if DKPInstance.tItems["EPGP"].Enable == 1 then 
-									wndCurrentLooter:FindChild("CharacterLevel"):SetText("PR: " .. DKPInstance:EPGPGetPRByName(unitLooter:GetName()))
+									wndCurrentLooter:FindChild("CharacterLevel"):SetText(DKPInstance:EPGPGetPRByName(unitLooter:GetName(),true))
 								else
-									wndCurrentLooter:FindChild("CharacterLevel"):SetText("DKP: " .. DKPInstance.tItems[DKPInstance:GetPlayerByIDByName(unitLooter:GetName())].net)
+									wndCurrentLooter:FindChild("CharacterLevel"):SetText(DKPInstance.tItems[DKPInstance:GetPlayerByIDByName(unitLooter:GetName())].net)
 								end
 							else
 								wndCurrentLooter:FindChild("CharacterLevel"):SetText(unitLooter:GetBasicStats().nLevel)
@@ -2945,10 +2950,10 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"] == nil then
 		self.tItems["settings"]["ML"] = {}
 		self.tItems["settings"]["ML"].bShowClass = true
-		self.tItems["settings"]["ML"].bArrTiles = true
+		self.tItems["settings"]["ML"].bArrTiles = false
 		self.tItems["settings"]["ML"].bShowValues = true
 	end
-	if self.tItems["settings"]["ML"].bArrItemTiles == nil then self.tItems["settings"]["ML"].bArrItemTiles = true end
+	if self.tItems["settings"]["ML"].bArrItemTiles == nil then self.tItems["settings"]["ML"].bArrItemTiles = false end
 	if self.tItems["settings"]["ML"].bStandardLayout == nil then self.tItems["settings"]["ML"].bStandardLayout = true end
 	if self.tItems["settings"]["ML"].bListIndicators == nil then self.tItems["settings"]["ML"].bListIndicators = true end
 	if self.tItems["settings"]["ML"].bGroup == nil then self.tItems["settings"]["ML"].bGroup = false end
@@ -2962,6 +2967,7 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].strGBManager == nil then self.tItems["settings"]["ML"].strGBManager = "" end
 	if self.tItems["settings"]["ML"].bDisplayApplicable == nil then self.tItems["settings"]["ML"].bDisplayApplicable = false end
 	if self.tItems["settings"]["ML"].bSortByName == nil then self.tItems["settings"]["ML"].bSortByName = false end
+	if self.tItems["settings"]["ML"].bAppOnDemand == nil then self.tItems["settings"]["ML"].bAppOnDemand = false end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
 	
 	if self.tItems["settings"]["ML"].bShowClass then self.wndMLSettings:FindChild("ShowClass"):SetCheck(true) end
@@ -2977,6 +2983,7 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bAllowMulti then self.wndMLSettings:FindChild("AllowMultiItem"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bDispBidding then self.wndMLSettings:FindChild("DispBiddingButtons"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bAppOnDemand then self.wndMLSettings:FindChild("DemandApp"):SetCheck(true) end
 	
 	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
 end
@@ -3022,6 +3029,14 @@ end
 function DKP:MLSettingsGroupDisable()
 	self.tItems["settings"]["ML"].bGroup = false
 	Hook:OnMasterLootUpdate(true)
+end
+
+function DKP:MLSetDemandAppearEnable()
+	self.tItems["settings"]["ML"].bAppOnDemand = true
+end
+
+function DKPMLSetDemandAppearEnable()
+	self.tItems["settings"]["ML"].bAppOnDemand = false
 end
 
 function DKP:MLSettingsShowCurrItemEnableBar( wndHandler, wndControl, eMouseButton )

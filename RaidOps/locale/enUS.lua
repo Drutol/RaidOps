@@ -119,7 +119,7 @@ L["#wndSettings:EPGPSettings"] = "EPGP Settings"
 L["#wndSettings:Purge"] = "PURGE DATABASE"
 L["#wndSettings:DataSync"] = "Data Sync"
 --wndSettings:Tooltips
-L["#wndSettings:Tooltips:AccCreation"] = "Account will be created only if player's Nameplate Affiliation is the same as your guild's name."
+L["#wndSettings:Tooltips:AccCreation"] = "Account will be created only if player is in your guild."
 L["#wndSettings:Tooltips:PopUPDec"] = "When assigning for offspec."
 L["#wndSettings:Tooltips:GPTooltip"] = ""
 L["#wndSettings:Tooltips:EnableBidding"] = "The effect will take place after UI is reloaded."
