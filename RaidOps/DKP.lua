@@ -196,6 +196,18 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.05---
+{15/10/2015}
+Fixed loot logs filtering.
+There will be blue badges displayed on player bars when you are in raid or filtering online players idicating whether players is on his/hers main character or alt.
+Added Pink quality modifier field.
+Added option to use item level instead of item power for GP calculation.
+---RaidOps version 3.04---
+{11/10/2015}
+Fixed issue where items couldn't be assigned tight after multi-assign.
+Fixed Light ML window popping-up without reason.
+Added option to show Master Loot window only on demand.
+Fixed tooltip on "filter account creation" in player collection tab in settings.
 ---RaidOps version 3.03---
 {10/10/2015}
 Fixed Light Master loot visual glitch.
@@ -235,33 +247,6 @@ Added LimboInfo and Lettuce to First kills list.
 {23/09/2015}
 Fixed rare crash concerning guild roster.
 Fixed crash when changing player gropus via pop-up.
----RaidOps version 2.34---
-{16/09/2015}
-Reskin for ML widnow (horizontal and vertical)
-Redesign of ML settings.
-Reskin of Standby list.
-Removed random button from ML toolbar.
-Added random buttons directly on item bars.
-Added "Light Master Loot" in order to save space.(feather button in top left corener of ML window)
-Added nBaseGP , nAwardedGP field to player entry , removed GP field.
-Added support for multiple BaseGP values accross groups.
-Added button to set BaseGP value in Mass Edit toolbar.
-Added strGroup field to logs , in order to differentiate which log applies to what.
-Added filtering by logs group of origin to logs window.
-Added BaseGP label.
-Added option to clear all logs.
-Added option to perform logs clear right after website export.
-Fixed bug concering hinding bidding buttons in ML window.
-Fixed alts merge bug.
-Fixed System Daemons trigger bug for Custom Events.
-Added Volatility Lattice to Custom events boss dropdown.
-Added '/rops tutorial' cmd.
-Reskin of Chat Bidding window.
-At last fixed all issues with missing pop-ups.
-Fixed issue with alts and raid sessions.
----RaidOps version 2.34 Beta 2 ---
-{09/09/2015}
-Fixes from previous beta.
  ]===]
 
 -- Localization stuff
@@ -2513,7 +2498,7 @@ function DKP:GetOnlinePlayers()
 				if umplauteConversions[uchar] then uchar = umplauteConversions[uchar] end
 				strNewName = strNewName .. uchar
 			end
-			table.insert(tOnlineMembers,strNewName) 
+			table.insert(tOnlineMembers,strNewName)
 		end
 	end
 	return tOnlineMembers
@@ -2599,6 +2584,17 @@ function DKP:RefreshMainItemList()
 			table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 		end
 	end
+	
+	local tAltsIndex = {} -- [owner] = current alt
+	-- prepare list with members online as alts
+	if GroupLib.InRaid() or self.wndMain:FindChild("OnlineOnly"):IsChecked() then
+		local raid = GroupLib.InRaid() and self:Bid2GetTargetsTable() or tOnlineMembers 		
+		for alt,ownerId in pairs(self.tItems["alts"]) do
+			for k,player in ipairs(raid) do
+				if string.lower(player) == string.lower(alt) then tAltsIndex[self.tItems[ownerId].strName] = alt break end
+			end
+		end
+	end
 
 	-- we are set in terms of preparation... let the show begin!
 	local bSortAfter = false
@@ -2641,7 +2637,7 @@ function DKP:RefreshMainItemList()
 				if player.strName ~= "Guild Bank" then
 					if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 						if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
-							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and self:IsPlayerOnline(tOnlineMembers,player.strName) then
+							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and (self:IsPlayerOnline(tOnlineMembers,player.strName) or tAltsIndex[player.strName]) then
 								if self:IsPlayerRoleDesired(player.role) then
 									if self.tItems["settings"].bHideStandby and not self.tItems["Standby"][string.lower(player.strName)] or not self.tItems["settings"].bHideStandby then	
 										-- uff , it's all over... you are getting your very own window!
@@ -2657,7 +2653,7 @@ function DKP:RefreshMainItemList()
 										
 
 										--Fill in data
-										self:UpdateItem(player)
+										self:UpdateItem(player,nil,nil,tAltsIndex[player.strName])
 										--------------------------
 
 										-- using stored info check if we want this window to be selected
@@ -2748,23 +2744,9 @@ function DKP:IsPlayerInRaid(strPlayer)
 	return false
 end
 
-function DKP:UpdateItem(playerItem,k,bAddedClass)
+function DKP:UpdateItem(playerItem,k,bAddedClass,strAlt)
 	if playerItem.wnd == nil then return end
 	-- Alt check
-	playerItem.alt = nil
-	if self.wndMain:FindChild("RaidOnly"):IsChecked() then
-		local raid = self:Bid2GetTargetsTable()
-		for j,alt in ipairs(playerItem.alts) do
-			for i,raider in ipairs(raid) do
-				if string.lower(alt) == string.lower(raider) then 
-					playerItem.alt = alt 
-					break
-				end
-			end
-			if playerItem.alt then break end
-		end
-	end
-
 	local nStats = 0
 	for k , child in ipairs(playerItem.wnd:GetChildren()) do
 		if string.find(child:GetName(),"Stat") then nStats = nStats + 1 end
@@ -2979,8 +2961,8 @@ function DKP:UpdateItem(playerItem,k,bAddedClass)
 		playerItem.wnd:FindChild("ClassIconBigger"):Show(false,false) 
 	end
 	if self.tItems["settings"].bDisplayRoles and playerItem.role then playerItem.wnd:FindChild("RoleIcon"):SetSprite(ktRoleStringToIcon[playerItem.role]) else playerItem.wnd:FindChild("RoleIcon"):Show(false) end
-	if playerItem.alt then
-		playerItem.wnd:FindChild("Alt"):SetTooltip("Playing as : " .. playerItem.alt)
+	if strAlt then
+		playerItem.wnd:FindChild("Alt"):SetTooltip("Playing as : " .. strAlt)
 		playerItem.wnd:FindChild("Alt"):Show(true,false)
 	end
 	if self.tItems["settings"].bRIEnable then
@@ -3347,6 +3329,21 @@ function DKP:RefreshMainItemListAndGroupByClass()
 	selectedMembers = {}
 	self.wndItemList:DestroyChildren()
 
+			
+	local tOnlineMembers
+	if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
+
+	local tAltsIndex = {} -- [owner] = current alt
+	-- prepare list with members online as alts
+	if GroupLib.InRaid() or self.wndMain:FindChild("OnlineOnly"):IsChecked() then
+		local raid = GroupLib.InRaid() and self:Bid2GetTargetsTable() or tOnlineMembers 		
+		for alt,ownerId in pairs(self.tItems["alts"]) do
+			for k,player in ipairs(raid) do
+				if string.lower(player) == string.lower(alt) then tAltsIndex[self.tItems[ownerId].strName] = alt break end
+			end
+		end
+	end
+
 	-- we have to artificailly create 'ungroupped' group
 	local tGroups = {}
 	if #self.tItems["settings"].Groups > 0 and self.tItems["settings"].bEnableGroups then -- provided that there's something to care about
@@ -3362,6 +3359,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			table.insert(tGroups,{strName = "Ungrouped",tIDs = tIDs,bExpand = true})
 		end
 	end
+
 
 	for i , group in ipairs((#tGroups > 0 and self.tItems["settings"].bEnableGroups) and tGroups or {[1] = {tIDs = "all",strName = "Def"}}) do -- wrapped in one more for loop to create groups those ppl in groups
 		-- if it's a group => create group bar
@@ -3444,9 +3442,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 			table.insert(tables,spe)
 			table.insert(tables,unknown)
 
-			
-			local tOnlineMembers
-			if self.wndMain:FindChild("OnlineOnly"):IsChecked() then tOnlineMembers = self:GetOnlinePlayers() end
+
 			
 			for j,tab in ipairs(tables) do
 				nSortedGroup = i
@@ -3466,7 +3462,7 @@ function DKP:RefreshMainItemListAndGroupByClass()
 											player.wnd = Apollo.LoadForm(self.xmlDoc, "ListItemButton", self.wndItemList, self)
 										end
 										player.wnd:SetData({id = self:GetPlayerByIDByName(player.strName),nGroupId = i})
-										self:UpdateItem(player,k,added)
+										self:UpdateItem(player,k,added,tAltsIndex[player.strName])
 										if not self.MassEdit then
 											if player.strName == selectedPlayer then
 												self.wndSelectedListItem = player.wnd
@@ -6859,15 +6855,10 @@ function DKP:LLMeetsFilters(item,player,nGP,tTimeWindow)
 	
 	
 	--Equippable
-	if self.tItems["settings"].LL.bEquippable and not item:IsEquippable() and not string.find(item:GetName(),"Imprint") then return false end
+	--if self.tItems["settings"].LL.bEquippable and not item:IsEquippable() and not string.find(item:GetName(),"Imprint") then return false end
 	--Slots
 	if not bMeetSlot then
-		local strSlot
-		if item:GetSlotName() == "" then
-			strSlot = self:EPGPGetSlotStringByID(item:GetSlot())
-		else
-			strSlot = self:EPGPGetSlotStringByID(item:GetSlotName())
-		end
+		local strSlot = self:EPGPGetSlotStringByID(item:GetSlot())
 
 		bMeetSlot = self.tItems["settings"].LL.tSlots[strSlot]
 		if string.find(item:GetName(),"Imprint") then bMeetSlot = true end

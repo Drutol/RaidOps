@@ -297,3 +297,6 @@ L["#Avatus"] = "Avatus"
 L["#wndSettings:ClearLogs"] = "Clear Logs"
 --v2.34b
 L["#LimboInfo"] = "Limbo Imfomatrix"
+--v3.05
+L["#wndEPGPSettings:ItemCost:PinkQual"] = "Pink Quality"
+L["#wndEPGPSettings:ItemCost:FormulaAlt"] = "Item Cost =(item level / quality) *              * slot value"

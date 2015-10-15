@@ -26,7 +26,8 @@ local defaultQualityValues =
 	["Green"] = .5,
 	["Blue"] = .33,
 	["Purple"] = .15,
-	["Orange"] = .1
+	["Orange"] = .1,
+	["Pink"] = .05
 }
 
 local DataScapeTokenIds =
@@ -88,7 +89,10 @@ function DKP:EPGPInit()
 	if self.tItems["EPGP"].SlotValuesAbove == nil then self.tItems["EPGP"].SlotValuesAbove = defaultSlotValues end
 	if self.tItems["EPGP"].FormulaModifierAbove == nil then self.tItems["EPGP"].FormulaModifierAbove = 0.5 end
 	if self.tItems["EPGP"].nItemPowerThresholdValue == nil then self.tItems["EPGP"].nItemPowerThresholdValue = 0 end
+	if self.tItems["EPGP"].bUseItemLevelForGPCalc == nil then self.tItems["EPGP"].bUseItemLevelForGPCalc = false end
 	
+	if not self.tItems["EPGP"].QualityValuesAbove["Pink"] then  self.tItems["EPGP"].QualityValuesAbove["Pink"] = defaultQualityValues["Pink"] end
+	if not self.tItems["EPGP"].QualityValues["Pink"] then  self.tItems["EPGP"].QualityValues["Pink"] = defaultQualityValues["Pink"] end
 	self.wndEPGPSettings:FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
 	self.wndMain:FindChild("EPGPDecay"):FindChild("DecayValue"):SetText(self.tItems["EPGP"].nDecayValue)
 	
@@ -103,6 +107,8 @@ function DKP:EPGPInit()
 
 	self.wndEPGPSettings:FindChild("GPMinimum1"):SetCheck(self.tItems["EPGP"].bMinGP)
 	self.wndEPGPSettings:FindChild("GPDecayThreshold"):SetCheck(self.tItems["EPGP"].bMinGPThres)
+
+	self.wndEPGPSettings:FindChild("ItemLevelForGPCalc"):SetCheck(self.tItems["EPGP"].bUseItemLevelForGPCalc)
 	
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
@@ -110,6 +116,16 @@ function DKP:EPGPInit()
 	--Apollo.RegisterEventHandler("ItemLink", "OnLootedItem", self)
 	
 
+end
+
+function DKP:EPGPItemLevelGPCalcEnable()
+	self.tItems["EPGP"].bUseItemLevelForGPCalc = true
+	self:EPGPAdjustFormulaDisplay()
+end
+
+function DKP:EPGPItemLevelGPCalcDisable()
+	self.tItems["EPGP"].bUseItemLevelForGPCalc = false
+	self:EPGPAdjustFormulaDisplay()
 end
 
 function DKP:EPGPSetPowerThreshold(wndHandler,wndControl,strText)
@@ -126,11 +142,13 @@ function DKP:EPGPSetPowerThreshold(wndHandler,wndControl,strText)
 		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetOpacity(0.5)
 		self.wndEPGPSettings:FindChild("OrangeQualAbove"):SetOpacity(0.5)
 		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("PinkQualAbove"):SetOpacity(0.5)
 	else
 		self.wndEPGPSettings:FindChild("ItemCostAbove"):SetOpacity(1)
 		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetOpacity(1)
 		self.wndEPGPSettings:FindChild("OrangeQualAbove"):SetOpacity(1)
 		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(1)
+		self.wndEPGPSettings:FindChild("PinkQualAbove"):SetOpacity(1)
 	end
 end
 
@@ -195,6 +213,7 @@ function DKP:EPGPFillInSettings()
 		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetOpacity(0.5)
 		self.wndEPGPSettings:FindChild("OrangeQualAbove"):SetOpacity(0.5)
 		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(0.5)
+		self.wndEPGPSettings:FindChild("PinkQualAbove"):SetOpacity(0.5)
 	end
 	self.wndEPGPSettings:FindChild("PowerLevelThreshold"):SetText(self.tItems["EPGP"].nItemPowerThresholdValue == 0 and "--" or self.tItems["EPGP"].nItemPowerThresholdValue)
 end
@@ -217,6 +236,7 @@ function DKP:EPGPFillInSettingsBelow()
 	self.wndEPGPSettings:FindChild("FormulaLabelBelow"):FindChild("CustomModifier"):SetText(self.tItems["EPGP"].FormulaModifier)
 	self.wndEPGPSettings:FindChild("PurpleQualBelow"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Purple"])
 	self.wndEPGPSettings:FindChild("OrangeQualBelow"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Orange"])
+	self.wndEPGPSettings:FindChild("PinkQualBelow"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValues["Pink"])
 	self.wndEPGPSettings:FindChild("MinEP"):SetText(self.tItems["EPGP"].MinEP)
 	self.wndEPGPSettings:FindChild("BaseGP"):SetText(self.tItems["EPGP"].BaseGP)	
 end
@@ -239,6 +259,7 @@ function DKP:EPGPFillInSettingsAbove()
 	self.wndEPGPSettings:FindChild("FormulaLabelAbove"):FindChild("CustomModifier"):SetText(self.tItems["EPGP"].FormulaModifierAbove)
 	self.wndEPGPSettings:FindChild("PurpleQualAbove"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValuesAbove["Purple"])
 	self.wndEPGPSettings:FindChild("OrangeQualAbove"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValuesAbove["Orange"])
+	self.wndEPGPSettings:FindChild("PinkQualAbove"):FindChild("Field"):SetText(self.tItems["EPGP"].QualityValuesAbove["Pink"])
 	self.wndEPGPSettings:FindChild("MinEP"):SetText(self.tItems["EPGP"].MinEP)
 	self.wndEPGPSettings:FindChild("BaseGP"):SetText(self.tItems["EPGP"].BaseGP)
 end
@@ -340,6 +361,19 @@ function DKP:EPGPChangeUI()
 		self.wndEPGPSettings:FindChild("DecayNow"):Enable(false)
 		self.wndSettings:FindChild("ButtonShowGP"):Enable(false)
 		if self:IsHooked(Apollo.GetAddon("ETooltip"),"AttachBelow") then self:Unhook(Apollo.GetAddon("ETooltip"),"AttachBelow") end
+	end
+
+	self:EPGPAdjustFormulaDisplay()
+
+end
+
+function DKP:EPGPAdjustFormulaDisplay()
+	if self.tItems["EPGP"].bUseItemLevelForGPCalc then
+		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):SetText(self.Locale["#wndEPGPSettings:ItemCost:FormulaAlt"])
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetText(self.Locale["#wndEPGPSettings:ItemCost:FormulaAlt"])
+	else
+		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):SetText(self.Locale["#wndEPGPSettings:ItemCost:Formula"])
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetText(self.Locale["#wndEPGPSettings:ItemCost:Formula"])
 	end
 end
 
@@ -652,12 +686,12 @@ function DKP:EPGPGetItemCostByID(itemID,bCut)
 		
 		if (item:GetDetailedInfo().tPrimary.nEffectiveLevel or 0) <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
 			if not bCut then 
-				return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
-			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
+				return "                                GP: " .. math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+			else return math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
 		else
 			if not bCut then 
-			return "                                GP: " .. math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
-			else return math.ceil(item:GetItemPower()/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
+			return "                                GP: " .. math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+			else return math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
 		end
 	else return "" end
 end
