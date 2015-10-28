@@ -196,10 +196,20 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.07---
+{28/10/2015}
+Fixed various issues with alts/queue odd ninja duplicates (hopefully?).
+Runes should now properly export to websites.
+Fixed crash when trying to export non existent personal logs.
+---RaidOps version 3.06---
+{16/10/2015}
+Fixed various issues with groups and removing players.
+Adjusted Website Export values for groups.
+Fixed visual glithes in ML settings window.
 ---RaidOps version 3.05---
 {15/10/2015}
 Fixed loot logs filtering.
-There will be blue badges displayed on player bars when you are in raid or filtering online players idicating whether players is on his/hers main character or alt.
+There will be blue badges displayed on player bars when you are in raid or filtering online players indicating whether player is on his/hers main character or alt.
 Added Pink quality modifier field.
 Added option to use item level instead of item power for GP calculation.
 ---RaidOps version 3.04---
@@ -753,6 +763,18 @@ function DKP:GetPlayerByIDByName(strName)
 
 	
 	return -1
+end
+
+function DKP:RemoveDuplicateValues(tTable)
+	local keys = {}
+	for k , value in ipairs(tTable) do
+		if not keys[value] then keys[value] = true end
+	end
+	tTable = {}
+	for key , _ in pairs(keys) do
+		table.insert(tTable,key)
+	end
+	return tTable
 end
 
 function DKP:Undo()
@@ -2031,6 +2053,7 @@ function DKP:TimeAwardAward()
 			end
 		end
 	end
+	raidMembers = self:RemoveDuplicateValues(raidMembers)
 	local tMembers = {}
 	if self.tItems["settings"].bTrackUndo  and self.tItems["settings"].bTrackTimedAwardUndo then	
 		for k, member in ipairs(raidMembers) do
@@ -2325,6 +2348,7 @@ function DKP:MassEditSelectAll( wndHandler, wndControl, eMouseButton )
 end
 
 function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
+	self:GroupSaveMembers()
 	self:RaidQueueClear()
 	local tMembers = {}
 	for k,wnd in ipairs(selectedMembers) do
@@ -2341,6 +2365,7 @@ function DKP:MassEditRemove( wndHandler, wndControl, eMouseButton )
 		end
 	end
 	self:AltsBuildDictionary()
+	self:GroupRestoreMembers()
 	self:RaidQueueRestore(save)
 	self:RefreshMainItemList()
 end
@@ -2353,34 +2378,37 @@ function DKP:MassEditModify(what,comment,val) -- :what => "Add"|"Sub"|"Set"
 		local player = self.tItems[wnd:GetData().id]
 		table.insert(tMembers,player)
 	end
-		if not comment then comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText() end
-		if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
-			if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
-				if what == "Add" then
-					comment = "Add EP"
-				elseif what == "Sub" then
-					comment = "Subtract EP"
-				elseif what == "Set" then
-					comment = "Set EP"
-				end
-			elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
-				if what == "Add" then
-					comment = "Add GP"
-				elseif what == "Sub" then
-					comment = "Subtract GP"
-				elseif what == "Set" then
-					comment = "Set GP"
-				end
-			elseif self.tItems["EPGP"].Enable == 0 then
-				if what == "Add" then
-					comment = "Add DKP"
-				elseif what == "Sub" then
-					comment = "Subtract DKP"
-				elseif what == "Set" then
-					comment = "Set DKP"
-				end
+
+	tMembers = self:RemoveDuplicateValues(tMembers)
+	
+	if not comment then comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText() end
+	if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
+		if self.wndMain:FindChild("Controls"):FindChild("ButtonEP"):IsChecked() then
+			if what == "Add" then
+				comment = "Add EP"
+			elseif what == "Sub" then
+				comment = "Subtract EP"
+			elseif what == "Set" then
+				comment = "Set EP"
+			end
+		elseif self.wndMain:FindChild("Controls"):FindChild("ButtonGP"):IsChecked() then
+			if what == "Add" then
+				comment = "Add GP"
+			elseif what == "Sub" then
+				comment = "Subtract GP"
+			elseif what == "Set" then
+				comment = "Set GP"
+			end
+		elseif self.tItems["EPGP"].Enable == 0 then
+			if what == "Add" then
+				comment = "Add DKP"
+			elseif what == "Sub" then
+				comment = "Subtract DKP"
+			elseif what == "Set" then
+				comment = "Set DKP"
 			end
 		end
+	end
 
 
 	if what == "Add" then
@@ -2634,7 +2662,7 @@ function DKP:RefreshMainItemList()
 				-- checks and generic stuff down there
 				local playerId = type(tIDs) == "table" and player or k
 				if type(tIDs) == "table" then player = self.tItems[player] end
-				if player.strName ~= "Guild Bank" then
+				if player and player.strName ~= "Guild Bank" then
 					if self.SearchString and self.SearchString ~= "" and self:string_starts(player.strName,self.SearchString) or self.SearchString == nil or self.SearchString == "" then
 						if not self.wndMain:FindChild("RaidOnly"):IsChecked() or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInRaid(player.strName) or self.wndMain:FindChild("RaidOnly"):IsChecked() and self:IsPlayerInQueue(player.strName) then
 							if not self.wndMain:FindChild("OnlineOnly"):IsChecked() or self.wndMain:FindChild("OnlineOnly"):IsChecked() and (self:IsPlayerOnline(tOnlineMembers,player.strName) or tAltsIndex[player.strName]) then
@@ -2847,7 +2875,7 @@ function DKP:UpdateItem(playerItem,k,bAddedClass,strAlt)
 							end
 						end
 						if counter > #playerItem.tLLogs then
-							itemID = 'lol'
+							itemID = 'lol' --clever flag isn't it? Yes I think so too :)
 						end
 						counter = counter + 1
 					end
@@ -4253,6 +4281,7 @@ function DKP:ExportWebsite()
 	local tTestTable = {}
 	tTestTable['tMembers'] = {}
 	tTestTable['tRaids'] = self.tItems.tRaids
+	local nActiveGroupId = self:GetActiveGroupID()
 	for k , player in ipairs(self.tItems) do
 		local tCopy = {}
 		tCopy.strName = player.strName
@@ -4282,7 +4311,11 @@ function DKP:ExportWebsite()
 					tData.GP = tData.nAwardedGP + tData.nBaseGP
 					--tData.nAwardedGP = nil
 					--tData.nBaseGP = nil
-					table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = {EP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tData.EP),GP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tData.GP),net = tData.net,tot = tData.tot,PR = tData.PR or self:EPGPGetPRByValues(tData.EP,tData.GP)} })
+					if j ~= nActiveGroupId then
+						table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = {EP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tData.EP),GP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",tData.GP),net = tData.net,tot = tData.tot,PR = tData.PR or self:EPGPGetPRByValues(tData.EP,tData.GP),nBaseGP = tData.nBaseGP} })
+					else
+						table.insert(tCopy.tDataSets,{strGroup = group.strName,tData = {EP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",player.EP),GP = string.format("%."..tostring(self.tItems["settings"].PrecisionEPGP).."f",player.GP),net = player.net,tot = player.tot,PR = player.PR or self:EPGPGetPRByValues(player.EP,player.GP),nBaseGP = tData.nBaseGP} })
+					end
 					break
 				end
 			end
@@ -4335,12 +4368,15 @@ function DKP:ExportImport()
 		local tImportedPlayers = JSON.decode(strImportString)
 		if tImportedPlayers then
 			local tGroups = {}
+			-- Clear old stuff
 			for k,player in ipairs(self.tItems) do
 				self.tItems[k] = nil
 			end
+			-- Insert Raind
 			for k,raid in ipairs(self.tItems.tRaids or {}) do
 				if self.tItems.tRaids then self.tItems.tRaids[k] = nil end
 			end
+			-- Clear datasets
 			self.tItems.tDataSets = {}
 			for k , player in ipairs(tImportedPlayers['tMembers'] or tImportedPlayers) do
 				player.nAwardedGP = player.GP - (player.nBaseGP or self.tItems["EPGP"].BaseGP)
@@ -4354,6 +4390,7 @@ function DKP:ExportImport()
 				end
 				self.tItems[#self.tItems].tDataSets = nil
 			end
+			self.tItems["settings"].Groups = {}
 			for strGroup, group in pairs(tGroups) do
 				table.insert(self.tItems["settings"].Groups,{strName = strGroup,tIDs = group.tIDs,bExpand = true})
 			end
@@ -4479,7 +4516,7 @@ end
 function DKP:ExportShowPreloadedText(exportString)
 	self.wndExport:Show(true,false)
 	self.wndExport:FindChild("ExportBox"):SetText(exportString)
-	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, exportString)
+	self.wndExport:FindChild("ButtonCopy"):SetActionData(GameLib.CodeEnumConfirmButtonType.CopyToClipboard, exportString == "" and " " or exportString)
 	self.wndExport:ToFront()
 end
 
@@ -5904,6 +5941,7 @@ function DKP:CETriggerEvent(eID)
 				end
 			end
 		end
+		raid = self:RemoveDuplicateValues(raid)
 		local strMobTrans = strMob
 
 		if self.tItems["settings"].tCEFirstMultipliers[strMobTrans] and not self.tItems["settings"].tCEFirstMultipliers[strMobTrans].bKilled then
