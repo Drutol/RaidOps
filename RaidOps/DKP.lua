@@ -40,7 +40,7 @@ local DKP = {}
  ----------------------------------------------------------------------------------------------
 -- OneVersion Support 
 -----------------------------------------------------------------------------------------------
-local Major, Minor, Patch, Suffix = 3, 2, 0, 0
+local Major, Minor, Patch, Suffix = 3, 8, 0, 0
 local strConcatedString
 local tMetaTableForBaseGP = {}
 -----------------------------------------------------------------------------------------------
@@ -196,6 +196,14 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08---
+{04/11/2015}
+Added option for static item GP calculation.
+Fixed crash on the very last step of tutorials.
+Next attempt to get rid of duplicating alts/recipients.
+Added option to calculate GP for unequippable items.
+Added option to change quality values for white , green and blue qualities.
+Modified tooltip method to include unquippable items.
 ---RaidOps version 3.07---
 {28/10/2015}
 Fixed various issues with alts/queue odd ninja duplicates (hopefully?).
@@ -598,7 +606,13 @@ end
 -----
 local strDB = ""
 function DKP:DebugFetch()
-	self:GetNewItem(80001)
+	--self:GetNewItem(80001)
+	local str = ""
+	for k , _ in pairs(Apollo) do
+		str = str .. k .. "\n"
+	end
+	self:ExportShowPreloadedText(str)
+
 end
 
 function DKP:GetNewItem(id)
@@ -760,15 +774,14 @@ function DKP:GetPlayerByIDByName(strName)
 	for j,alt in pairs(self.tItems["alts"]) do
 		if string.lower(strName) == string.lower(j) then return self.tItems["alts"][j] end
 	end
-
-	
 	return -1
 end
 
 function DKP:RemoveDuplicateValues(tTable)
 	local keys = {}
 	for k , value in ipairs(tTable) do
-		if not keys[value] then keys[value] = true end
+		value = self:GetPlayerByIDByName(value)
+		if value ~= -1 and not keys[value] then keys[value] = true end
 	end
 	tTable = {}
 	for key , _ in pairs(keys) do

@@ -444,7 +444,7 @@ local ktTutIndex =
 			[4] = "Right",
 			[5] = "Grid",
 			[6] = "Settings",
-			[7] = "Button1",
+			[7] = "HandledEvents",
 		},
 		text = 
 		{

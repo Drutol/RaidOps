@@ -90,6 +90,9 @@ function DKP:EPGPInit()
 	if self.tItems["EPGP"].FormulaModifierAbove == nil then self.tItems["EPGP"].FormulaModifierAbove = 0.5 end
 	if self.tItems["EPGP"].nItemPowerThresholdValue == nil then self.tItems["EPGP"].nItemPowerThresholdValue = 0 end
 	if self.tItems["EPGP"].bUseItemLevelForGPCalc == nil then self.tItems["EPGP"].bUseItemLevelForGPCalc = false end
+	if self.tItems["EPGP"].bStaticGPCalc == nil then self.tItems["EPGP"].bStaticGPCalc = false end
+	if self.tItems["EPGP"].bCalcForUnequippable == nil then self.tItems["EPGP"].bCalcForUnequippable = false end
+	if self.tItems["EPGP"].nUnequippableSlotValue == nil then self.tItems["EPGP"].nUnequippableSlotValue = 1 end
 	
 	if not self.tItems["EPGP"].QualityValuesAbove["Pink"] then  self.tItems["EPGP"].QualityValuesAbove["Pink"] = defaultQualityValues["Pink"] end
 	if not self.tItems["EPGP"].QualityValues["Pink"] then  self.tItems["EPGP"].QualityValues["Pink"] = defaultQualityValues["Pink"] end
@@ -109,6 +112,10 @@ function DKP:EPGPInit()
 	self.wndEPGPSettings:FindChild("GPDecayThreshold"):SetCheck(self.tItems["EPGP"].bMinGPThres)
 
 	self.wndEPGPSettings:FindChild("ItemLevelForGPCalc"):SetCheck(self.tItems["EPGP"].bUseItemLevelForGPCalc)
+	self.wndEPGPSettings:FindChild("StaticGPCalc"):SetCheck(self.tItems["EPGP"].bStaticGPCalc)
+
+	self.wndEPGPSettings:FindChild("CalcForUneq"):SetCheck(self.tItems["EPGP"].bCalcForUnequippable)
+	self.wndEPGPSettings:FindChild("SlotValueUneq"):FindChild("Field"):SetText(self.tItems["EPGP"].nUnequippableSlotValue)
 	
 	self:EPGPFillInSettings()
 	self:EPGPChangeUI()
@@ -120,12 +127,41 @@ end
 
 function DKP:EPGPItemLevelGPCalcEnable()
 	self.tItems["EPGP"].bUseItemLevelForGPCalc = true
+	self.tItems["EPGP"].bStaticGPCalc = false
 	self:EPGPAdjustFormulaDisplay()
 end
 
 function DKP:EPGPItemLevelGPCalcDisable()
 	self.tItems["EPGP"].bUseItemLevelForGPCalc = false
 	self:EPGPAdjustFormulaDisplay()
+end
+
+function DKP:EPGPStaticGPCalcEnable()
+	self.tItems["EPGP"].bUseItemLevelForGPCalc = false
+	self.tItems["EPGP"].bStaticGPCalc = true
+	self:EPGPAdjustFormulaDisplay()
+end
+
+function DKP:EPGPStaticGPCalcDisable()
+	self.tItems["EPGP"].bStaticGPCalc = false
+	self:EPGPAdjustFormulaDisplay()
+end
+
+function DKP:EPGPCalcUneqEnable()
+	self.tItems["EPGP"].bCalcForUnequippable = true
+end
+
+function DKP:EPGPCalcUneqDisable()
+	self.tItems["EPGP"].bCalcForUnequippable = false
+end
+
+function DKP:EPGPItemSlotValueUneqChanged(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val then
+		self.tItems["EPGP"].nUnequippableSlotValue = val
+	else
+		wndControl:SetText(self.tItems["EPGP"].nUnequippableSlotValue)
+	end
 end
 
 function DKP:EPGPSetPowerThreshold(wndHandler,wndControl,strText)
@@ -215,6 +251,11 @@ function DKP:EPGPFillInSettings()
 		self.wndEPGPSettings:FindChild("PurpleQualAbove"):SetOpacity(0.5)
 		self.wndEPGPSettings:FindChild("PinkQualAbove"):SetOpacity(0.5)
 	end
+
+	self.wndEPGPSettings:FindChild("White"):SetText(self.tItems["EPGP"].QualityValues["White"])
+	self.wndEPGPSettings:FindChild("Green"):SetText(self.tItems["EPGP"].QualityValues["Green"])
+	self.wndEPGPSettings:FindChild("Blue"):SetText(self.tItems["EPGP"].QualityValues["Blue"])
+
 	self.wndEPGPSettings:FindChild("PowerLevelThreshold"):SetText(self.tItems["EPGP"].nItemPowerThresholdValue == 0 and "--" or self.tItems["EPGP"].nItemPowerThresholdValue)
 end
 
@@ -372,9 +413,18 @@ function DKP:EPGPAdjustFormulaDisplay()
 	if self.tItems["EPGP"].bUseItemLevelForGPCalc then
 		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):SetText(self.Locale["#wndEPGPSettings:ItemCost:FormulaAlt"])
 		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetText(self.Locale["#wndEPGPSettings:ItemCost:FormulaAlt"])
+		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):FindChild("CustomModifier"):SetAnchorOffsets(279,3,334,36)
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):FindChild("CustomModifier"):SetAnchorOffsets(279,3,334,36)
+	elseif self.tItems["EPGP"].bStaticGPCalc then
+		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):SetText(self.Locale["#wndEPGPSettings:ItemCost:FormulaStatic"])
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetText(self.Locale["#wndEPGPSettings:ItemCost:FormulaStatic"])
+		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):FindChild("CustomModifier"):SetAnchorOffsets(363,3,418,36)
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):FindChild("CustomModifier"):SetAnchorOffsets(363,3,418,36)
 	else
 		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):SetText(self.Locale["#wndEPGPSettings:ItemCost:Formula"])
 		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):SetText(self.Locale["#wndEPGPSettings:ItemCost:Formula"])
+		self.wndEPGPSettings:FindChild("FormulaLabelBelow"):FindChild("CustomModifier"):SetAnchorOffsets(279,3,334,36)
+		self.wndEPGPSettings:FindChild("FormulaLabelAbove"):FindChild("CustomModifier"):SetAnchorOffsets(279,3,334,36)
 	end
 end
 
@@ -672,6 +722,16 @@ function DKP:EPGPPinkItemQualityValueChanged(wndHandler,wndControl,strText)
 	end
 end
 
+function DKP:EPGPLesserQualityChanged(wndHandler,wndControl,strText)
+	local val = tonumber(strText)
+	if val then
+		self.tItems["EPGP"].QualityValues[wndControl:GetName()] = val
+		self.tItems["EPGP"].QualityValuesAbove[wndControl:GetName()] = val
+	else
+		wndControl:SetText(self.tItems["EPGP"].QualityValues[wndControl:GetName()])
+	end
+end
+
 
 function DKP:EPGPSetMinEP( wndHandler, wndControl, strText )
 	if tonumber(strText) ~= nil then
@@ -697,19 +757,37 @@ function DKP:EPGPGetItemCostByID(itemID,bCut)
 	if string.find(item:GetName(),self.Locale["#Imprint"]) then
 		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
 	end
-	if item ~= nil and item:IsEquippable() and item:GetItemQuality() <= 6 then
-		local slot 
-		slot = item:GetSlot()
-		if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
-		
-		if (item:GetDetailedInfo().tPrimary.nEffectiveLevel or 0) <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
-			if not bCut then 
-				return "                                GP: " .. math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
-			else return math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
+	if item then
+		if item:IsEquippable() then
+			local slot 
+			slot = item:GetSlot()
+			if self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)] == nil then return "" end
+			
+			if (item:GetDetailedInfo().tPrimary.nEffectiveLevel or 0) <= self.tItems["EPGP"].nItemPowerThresholdValue or self.tItems["EPGP"].nItemPowerThresholdValue == 0 then
+				if not self.tItems["EPGP"].bStaticGPCalc then
+					if not bCut then 
+						return "                                GP: " .. math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+					else return math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifier * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]) end
+				else -- static
+					if not bCut then 
+						return "                                GP: " .. math.ceil((self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())]) * self.tItems["EPGP"].FormulaModifier)
+					else return math.ceil((self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())]) * self.tItems["EPGP"].FormulaModifier) end
+				end
+			else
+				if not self.tItems["EPGP"].bStaticGPCalc then
+					if not bCut then 
+					return "                                GP: " .. math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
+					else return math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
+				else -- static
+					if not bCut then 
+						return "                                GP: " .. math.ceil((self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())]) * self.tItems["EPGP"].FormulaModifier)
+					else return math.ceil((self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)]/self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())]) * self.tItems["EPGP"].FormulaModifier) end
+				end
+			end
+		elseif self.tItems["EPGP"].bCalcForUnequippable then
+			return math.ceil((self.tItems["EPGP"].nUnequippableSlotValue /self.tItems["EPGP"].QualityValues[self:EPGPGetQualityStringByID(item:GetItemQuality())]) * self.tItems["EPGP"].FormulaModifier) 
 		else
-			if not bCut then 
-			return "                                GP: " .. math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValues[self:EPGPGetSlotStringByID(slot)])
-			else return math.ceil((self.tItems["EPGP"].bUseItemLevelForGPCalc and item:GetDetailedInfo().tPrimary.nEffectiveLevel or item:GetItemPower())/self.tItems["EPGP"].QualityValuesAbove[self:EPGPGetQualityStringByID(item:GetItemQuality())] * self.tItems["EPGP"].FormulaModifierAbove * self.tItems["EPGP"].SlotValuesAbove[self:EPGPGetSlotStringByID(slot)]) end
+			return 
 		end
 	else return "" end
 end
@@ -843,18 +921,28 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     local wndTooltip, wndTooltipComp = this.originalTootltipFunction(self, wndControl, item, tOpt, nCount)
     local wndTarget
    	if wndTooltip then wndTarget = wndTooltip:FindChild("SeparatorDiagonal") and wndTooltip:FindChild("SeparatorDiagonal") or wndTooltip:FindChild("SeparatorSmallLine") end
-    if wndTooltip and wndTarget and item and item:IsEquippable() then
+    if wndTooltip and item then
     	local val = this:EPGPGetItemCostByID(item:GetItemId(),true)
-    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")
-    	wndTarget:SetTextColor("xkcdAmber")
-    	wndTarget:SetFont("Nameplates")
-    	wndTarget:SetTextFlags("DT_VCENTER", true)
-    	wndTarget:SetTextFlags("DT_CENTER", true)
-    	if wndTarget:GetName() == "SeparatorSmallLine" then 
-    		wndTarget:SetSprite("CRB_Tooltips:sprTooltip_HorzDividerDiagonal") 
-    		local l,t,r,b = wndTarget:GetAnchorOffsets()
-    		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
-    	end
+    	if val and item:IsEquippable() and wndTarget then
+	    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")
+	    	wndTarget:SetTextColor("xkcdAmber")
+	    	wndTarget:SetFont("Nameplates")
+	    	wndTarget:SetTextFlags("DT_VCENTER", true)
+	    	wndTarget:SetTextFlags("DT_CENTER", true)
+	    	if wndTarget:GetName() == "SeparatorSmallLine" then 
+	    		wndTarget:SetSprite("CRB_Tooltips:sprTooltip_HorzDividerDiagonal") 
+	    		local l,t,r,b = wndTarget:GetAnchorOffsets()
+	    		wndTarget:SetAnchorOffsets(l,t+3,r,b-1)
+	    	end
+	    elseif val then
+		    local wndBox = Apollo.LoadForm("ui\\Tooltips\\TooltipsForms.xml", "ItemBasicStatsLine", wndTooltip:FindChild("ItemTooltip_BasicStatsBox"))
+	    	if wndBox then
+	    		wndBox:SetAML("<P Font=\"Nameplates\" TextColor=\"xkcdAmber\"> ".. val .. " GP".." </P>")
+	    		wndBox:SetTextFlags("DT_RIGHT",true)
+	    		wndBox:SetHeightToContentHeight()
+	    		wndBox:SetAnchorOffsets(130,0,0,wndBox:GetHeight())
+	    	end
+	    end
     end
     if wndTooltipComp then wndTarget = wndTooltipComp:FindChild("SeparatorDiagonal") and wndTooltipComp:FindChild("SeparatorDiagonal") or wndTooltipComp:FindChild("SeparatorSmallLine") end
     if wndTooltipComp and wndTarget and tOpt.itemCompare and tOpt.itemCompare:IsEquippable() then
