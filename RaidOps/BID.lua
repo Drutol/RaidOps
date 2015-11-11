@@ -434,12 +434,12 @@ end
 
 function DKP:BidSetSortAsc()
 	self.tItems["settings"].BidSortAsc = 1
-	self:BidMLSortPlayers()
+	Hook:OnMasterLootUpdate(true)
 end
 
 function DKP:BidSetSortDesc()
 	self.tItems["settings"].BidSortAsc = 0
-	self:BidMLSortPlayers()
+	Hook:OnMasterLootUpdate(true)
 end
 
 local prevLuckyChild
@@ -2469,7 +2469,7 @@ function DKP:MLRegisterItemWinner()
 	end
 end
 
-function sortMasterLootEasyDKPasc(a,b)
+function DKP:sortMasterLootEasyDKPasc(a,b)
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance == nil then return end
 	if not DKPInstance.tItems["settings"]["ML"].bSortByName then
@@ -2519,35 +2519,39 @@ function sortMasterLootEasyDKPdesc(a,b)
 	end
 end
 
-function sortMasterLootEasyDKPNonWnd(a,b)
+function sortLooters(a,b)
+	if not a or not b then return true end
+	local nameA = a:GetName()
+	local nameB = b:GetName()
+
 	local DKPInstance = Apollo.GetAddon("RaidOps")
 	if DKPInstance.tItems["settings"].BidSortAsc == 0 then
 		if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 			if DKPInstance.tItems["EPGP"].Enable == 1 then
-				return DKPInstance:EPGPGetPRByName(a:GetName()) < DKPInstance:EPGPGetPRByName(b:GetName()) 
+				return DKPInstance:EPGPGetPRByName(nameA) < DKPInstance:EPGPGetPRByName(nameB) 
 			else
-				local IDa = DKPInstance:GetPlayerByIDByName(a:GetName())
-				local IDb = DKPInstance:GetPlayerByIDByName(b:GetName())
+				local IDa = DKPInstance:GetPlayerByIDByName(nameA)
+				local IDb = DKPInstance:GetPlayerByIDByName(nameB)
 				if IDa ~= -1 and IDb ~= -1 then
 					return DKPInstance.tItems[IDa].net < DKPInstance.tItems[IDb].net
 				end
 			end
 		else -- name
-			return a:GetName() < b:GetName()
+			return nameA < nameB
 		end
 	else -- asc
 		if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 			if DKPInstance.tItems["EPGP"].Enable == 1 then
-				return DKPInstance:EPGPGetPRByName(a:GetName()) > DKPInstance:EPGPGetPRByName(b:GetName()) 
+				return DKPInstance:EPGPGetPRByName(nameA) > DKPInstance:EPGPGetPRByName(nameB) 
 			else
-				local IDa = DKPInstance:GetPlayerByIDByName(a:GetName())
-				local IDb = DKPInstance:GetPlayerByIDByName(b:GetName())
+				local IDa = DKPInstance:GetPlayerByIDByName(nameA)
+				local IDb = DKPInstance:GetPlayerByIDByName(nameB)
 				if IDa ~= -1 and IDb ~= -1 then
 					return DKPInstance.tItems[IDa].net > DKPInstance.tItems[IDb].net
 				end
 			end
 		else -- name
-			return a:GetName() > b:GetName()
+			return nameA > nameB
 		end
 	end
 end
@@ -2712,9 +2716,11 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					end	
 				end
 				-- Sorting in groups
-				for k,tab in pairs(tables) do
-					table.sort(tab,sortMasterLootEasyDKPNonWnd)
+				for k , tab in pairs(tables) do	
+					table.sort(tab,sortLooters)
 				end
+				--Print('-----')
+				--table.sort(tables.all,sortMasterLootEasyDKPNonWnd)
 				-- Requesting EquippedItems
 				if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar or DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then
 					if tItem.itemDrop:IsEquippable() then

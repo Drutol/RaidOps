@@ -196,6 +196,11 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08[abcde]...---
+{11/11/2015}
+Version a-c fixes issues regarding v3.08
+Version d fixes mass edit's invite bug.
+Version e adds new slider for maximum value of personal logs.
 ---RaidOps version 3.08---
 {04/11/2015}
 Added option for static item GP calculation.
@@ -503,6 +508,7 @@ function DKP:OnDocLoaded()
 		if self.tItems["settings"].bAutoLog == nil then self.tItems["settings"].bAutoLog = true end
 		if self.tItems["Standby"] == nil then self.tItems["Standby"] = {} end
 		if self.tItems.tQueuedPlayers == nil then self.tItems.tQueuedPlayers = {} end
+		if self.tItems["settings"].nMaxLogs == nil then self.tItems["settings"].nMaxLogs = 15 end
 		self.wndTimeAward = self.wndMain:FindChild("TimeAward")
 		self.wndTimeAward:Show(false,true)
 		self.MassEdit = false
@@ -779,8 +785,14 @@ end
 
 function DKP:RemoveDuplicateValues(tTable)
 	local keys = {}
+	--normalize
+	local tCopyTable = {}
 	for k , value in ipairs(tTable) do
-		value = self:GetPlayerByIDByName(value)
+		if type(value) == "table" then table.insert(tCopyTable,self:GetPlayerByIDByName(value.strName)) 
+		elseif type(value) == "string" then table.insert(tCopyTable,self:GetPlayerByIDByName(value))
+		elseif type(value) == "number" then table.insert(tCopyTable,value) end
+	end
+	for k , value in ipairs(tCopyTable) do
 		if value ~= -1 and not keys[value] then keys[value] = true end
 	end
 	tTable = {}
@@ -1672,7 +1684,7 @@ function DKP:OnChatMessage(channelCurrent, tMessage)
 
 			if self.ItemDatabase and self.ItemDatabase[string.sub(itemStr,2)] then
 				local item = Item.GetDataFromId(self.ItemDatabase[string.sub(itemStr,2)].ID)
-				if item:GetDetailedInfo().tPrimary.nEffectiveLevel  >= self.tItems["settings"].nMinIlvl then bMeetLevel = true end
+				if (item:GetDetailedInfo().tPrimary.nEffectiveLevel or 0)  >= (self.tItems["settings"].nMinIlvl or 0) then bMeetLevel = true end
 				bMeetQual = self.tItems["settings"].tFilterQual[self:EPGPGetQualityStringByID(item:GetItemQuality())]
 				if not item:IsEquippable() and not bFound and self.tItems["settings"].FilterEquippable or not bMeetLevel and not bFound or not bFound and not bMeetQual then self:dbglog(">Query Fail > Reason: 'Filtered out'") return end
 			elseif self.tItems["settings"].strLootFiltering == "WL" and not bFound then
@@ -2070,7 +2082,7 @@ function DKP:TimeAwardAward()
 	local tMembers = {}
 	if self.tItems["settings"].bTrackUndo  and self.tItems["settings"].bTrackTimedAwardUndo then	
 		for k, member in ipairs(raidMembers) do
-			local ID = self:GetPlayerByIDByName(member)
+			local ID = member
 			if ID ~= -1  then
 				table.insert(tMembers,self.tItems[ID])
 			end
@@ -2080,7 +2092,7 @@ function DKP:TimeAwardAward()
 	
 
 	for k, member in ipairs(raidMembers) do
-		local ID = self:GetPlayerByIDByName(member)
+		local ID = member
 		if ID ~= -1 then
 			if self.wndTimeAward:FindChild("Settings"):FindChild("EP"):IsChecked() then
 				self.tItems[ID].EP = self.tItems[ID].EP + self.tItems["AwardTimer"].amount
@@ -2269,7 +2281,7 @@ function DKP:MassEditInviteContinue()
 	local invitedIDs = {}
 	for k,wnd in ipairs(selectedMembers) do
 		if wnd:GetData() and wnd:GetData().id and self.tItems[wnd:GetData().id] then
-			GroupLib.Invite(self.tItems[wnd:GetData()].strName,strRealm,strMessage)
+			GroupLib.Invite(self.tItems[wnd:GetData().id].strName,strRealm,strMessage)
 			table.insert(invitedIDs,wnd:GetData().id)
 		end
 	end
@@ -2393,6 +2405,10 @@ function DKP:MassEditModify(what,comment,val) -- :what => "Add"|"Sub"|"Set"
 	end
 
 	tMembers = self:RemoveDuplicateValues(tMembers)
+
+	for k , member in ipairs(tMembers) do
+		tMembers[k] = self.tItems[member]
+	end
 	
 	if not comment then comment = self.wndMain:FindChild("Controls"):FindChild("EditBox"):GetText() end
 	if comment == "Comment - Auto" and self.tItems["settings"].bAutoLog then 
@@ -3305,7 +3321,7 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 				local prb = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(tSetB.tot)/(tonumber(tSetB.tot)-tonumber(tSetB.net))))
 				return pra > prb
 			elseif sortBy == "EP" then return a.EP > b.EP
-			elseif sortBy == "GP" then return a.GP > b.GP
+			elseif sortBy == "GP" then return tSetA.nAwardedGP+tSetA.nBaseGP > tSetB.nAwardedGP+tSetB.nBaseGP
 			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.nAwardedGP+tSetA.nBaseGP) > DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.nAwardedGP+tSetB.nBaseGP)
 			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
 			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) > DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
@@ -3335,7 +3351,7 @@ function easyDKPSortPlayerbyLabelNotWnd(a,b)
 				local prb = tonumber(string.format("%."..tostring(DKPInstance.tItems["settings"].Precision).."f",tonumber(tSetB.tot)/(tonumber(tSetB.tot)-tonumber(tSetB.net))))
 				return pra < prb
 			elseif sortBy == "EP" then return tSetA.EP < tSetB.EP
-			elseif sortBy == "GP" then return tSetA.GP < tSetB.GP
+			elseif sortBy == "GP" then return tSetA.nAwardedGP+tSetA.nBaseGP < tSetB.nAwardedGP+tSetB.nBaseGP
 			elseif sortBy == "PR" then return  DKPInstance:EPGPGetPRByValues(tSetA.EP,tSetA.nAwardedGP+tSetA.nBaseGP) < DKPInstance:EPGPGetPRByValues(tSetB.EP,tSetB.nAwardedGP+tSetB.nBaseGP)
 			elseif sortBy == "%GA" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_GA) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_GA)
 			elseif sortBy == "%DS" then return DKPInstance:GetRaidTypeCount(a.tAtt,RAID_DS) < DKPInstance:GetRaidTypeCount(b.tAtt,RAID_DS)
@@ -3864,9 +3880,11 @@ function DKP:SettingsRestore()
 	--Sliders
 	self.wndSettings:FindChild("Precision"):SetValue(self.tItems["settings"].Precision)
 	self.wndSettings:FindChild("PrecisionEPGP"):SetValue(self.tItems["settings"].PrecisionEPGP)
+	self.wndSettings:FindChild("MaxLogsSlider"):SetValue(self.tItems["settings"].nMaxLogs)
 	self.wndSettings:FindChild("PrecisionTitle"):SetText(string.format(self.Locale["#wndSettings:PRPrec"].. " - %d",self.tItems["settings"].Precision))
 	self.wndSettings:FindChild("PrecisionEPGPTitle"):SetText(string.format(self.Locale["#wndSettings:EPGPPrec"].. " - %d",self.tItems["settings"].PrecisionEPGP))
 	self.wndSettings:FindChild("PrecisionDKPTitle"):SetText(string.format(self.Locale["#wndSettings:DKPPrec"].. " - %d",self.tItems["settings"].nPrecisionDKP))
+	self.wndSettings:FindChild("MaxLogsTitle"):SetText(string.format(self.Locale["#wndSettings:MaxLogs"].. " - %d",self.tItems["settings"].nMaxLogs))
 	--Affiliation
 	if self.tItems["settings"].CheckAffiliation == 1 then self.wndSettings:FindChild("ButtonSettingsNameplatreAffiliation"):SetCheck(true) end
 
@@ -4189,6 +4207,13 @@ function DKP:SettingsSetPrecisionEPGP( wndHandler, wndControl, fNewValue, fOldVa
 		self.tItems["settings"].PrecisionEPGP = math.floor(fNewValue)
 		self:ShowAll()
 		self.wndSettings:FindChild("PrecisionEPGPTitle"):SetText(string.format(self.Locale["#wndSettings:EPGPPrec"].. " - %d",self.tItems["settings"].PrecisionEPGP))
+	end
+end
+
+function DKP:SettingsSetMaxLogs( wndHandler, wndControl, fNewValue, fOldValue )
+	if math.floor(fNewValue) ~= self.tItems["settings"].nPrecisionDKP then
+		self.tItems["settings"].nMaxLogs = math.floor(fNewValue)
+		self.wndSettings:FindChild("MaxLogsTitle"):SetText(string.format(self.Locale["#wndSettings:MaxLogs"].. " - %d",self.tItems["settings"].nMaxLogs))
 	end
 end
 
@@ -4743,7 +4768,7 @@ function DKP:PopUpWindowOpen(strNameOrig,strItem)
 		for k , winner in ipairs(self.tRandomWinners) do
 			if winner.strName == entry.strName and winner.item == entry.item:GetItemId() then
 				bFound = true
-				table.remove(self.tRandomWinners,k)
+				self.tRandomWinners[k] = nil
 				break
 			end
 		end
@@ -4797,7 +4822,7 @@ function DKP:PopUpPopulate()
 	self.wndPopUp:FindChild("LabelCurrency"):SetText(self.tItems["EPGP"].Enable == 1 and "GP." or "DKP.")
 	self.wndPopUp:FindChild("GPOffspec"):Show(self.tItems["EPGP"].Enable == 1 and true or false)
 	self.wndPopUp:FindChild("GPOffspec"):SetCheck(false)
-	self.wndPopUp:FindChild("EditBoxDKP"):SetText(currEntry.nGP)
+	self.wndPopUp:FindChild("EditBoxDKP"):SetText(currEntry.nGP or "")
 	self.wndPopUp:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(currEntry.item:GetItemQuality()))
 	self.wndPopUp:FindChild("ItemIcon"):SetSprite(currEntry.item:GetIcon())
 	Tooltip.GetItemTooltipForm(self,self.wndPopUp:FindChild("Frame"),currEntry.item,{})
@@ -5620,8 +5645,8 @@ function DKP:DetailAddLog(strCommentPre,strType,strModifier,ID)
 		end
 
 		for k , logGroup in pairs(tGroups) do
-			if #logGroup > 15 then
-				for i=16,#logGroup do table.remove(self.tItems[ID].logs,logGroup[i]) end
+			if #logGroup > self.tItems["settings"].nMaxLogs then
+				for i=self.tItems["settings"].nMaxLogs+1,#logGroup do self.tItems[ID].logs[logGroup[i]] = nil end
 			end
 		end
 
@@ -5974,7 +5999,7 @@ function DKP:CETriggerEvent(eID)
 		local tMembers = {}
 		if self.tItems["settings"].bTrackUndo then
 			for k,player in ipairs(raid) do
-				local ID = self:GetPlayerByIDByName(player)
+				local ID = player
 				if ID ~= -1 then
 					table.insert(tMembers,self.tItems[ID])
 				end
@@ -6006,7 +6031,7 @@ function DKP:CETriggerEvent(eID)
 		if bFirst then strFirstKill = "1st Kill" else strFirstKill = "" end
 
 		for k,member in ipairs(raid) do
-			local pID = self:GetPlayerByIDByName(member)
+			local pID = member
 			if pID ~= -1 then
 				if event.EP then
 					self.tItems[pID].EP = self.tItems[pID].EP + (event.EP * nMultiplier)

@@ -757,7 +757,7 @@ function DKP:EPGPGetItemCostByID(itemID,bCut)
 	if string.find(item:GetName(),self.Locale["#Imprint"]) then
 		item = Item.GetDataFromId(self:EPGPGetTokenItemID(item:GetName()))
 	end
-	if item then
+	if item and item:GetItemQuality() > 1 then
 		if item:IsEquippable() then
 			local slot 
 			slot = item:GetSlot()
@@ -921,7 +921,7 @@ function DKP:EnhanceItemTooltip(wndControl,item,tOpt,nCount)
     local wndTooltip, wndTooltipComp = this.originalTootltipFunction(self, wndControl, item, tOpt, nCount)
     local wndTarget
    	if wndTooltip then wndTarget = wndTooltip:FindChild("SeparatorDiagonal") and wndTooltip:FindChild("SeparatorDiagonal") or wndTooltip:FindChild("SeparatorSmallLine") end
-    if wndTooltip and item then
+    if wndTooltip and item and item:GetItemQuality() > 1 then
     	local val = this:EPGPGetItemCostByID(item:GetItemId(),true)
     	if val and item:IsEquippable() and wndTarget then
 	    	wndTarget:SetText(val ~= "" and (val .. " GP") or "")

@@ -306,3 +306,5 @@ L["#wndEPGPSettings:ItemCost:Unequipable"] = "Unequippable"
 L["#wndEPGPSettings:ItemCost:WQual"] = "White Quality"
 L["#wndEPGPSettings:ItemCost:GQual"] = "Green Quality"
 L["#wndEPGPSettings:ItemCost:BQual"] = "Blue Quality"
+--v3.08
+L["#wndSettings:MaxLogs"] = "Set limit for personal logs"
