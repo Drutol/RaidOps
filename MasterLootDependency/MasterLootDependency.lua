@@ -406,7 +406,14 @@ end
 
 function MasterLoot:OnCharacterCheck(wndHandler, wndControl, eMouseButton)
 	if eMouseButton ~= GameLib.CodeEnumInputMouse.Right then
-		self.tMasterLootSelectedLooter = wndControl:GetData()
+		if type(wndControl:GetData()) == "table" then -- if it's guild bank entry it is table as a flag
+			self.tMasterLootSelectedLooter = wndControl:GetData().unit
+			self.bSelectedGuildBank = true
+		else
+			self.tMasterLootSelectedLooter = wndControl:GetData()
+			self.bSelectedGuildBank = false
+		end
+
 		if self.tMasterLootSelectedItem ~= nil then
 			self.wndMasterLoot:FindChild("Assignment"):Enable(true)
 		else

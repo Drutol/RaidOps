@@ -689,7 +689,9 @@ function DKP:AttUpdatePlayers(nTime)
 			table.insert(currentPlayers,self.tItems[player].strName)
 		end
 	end
-	table.insert(currentPlayers,GameLib.GetPlayerUnit():GetName())
+	if(GameLib.GetPlayerUnit()) then
+		table.insert(currentPlayers,GameLib.GetPlayerUnit():GetName())
+	end
 	-- Alts
 	for k , player in ipairs(currentPlayers) do
 		if self.tItems["alts"][string.lower(player)] and self.tItems[self.tItems["alts"][string.lower(player)]] then

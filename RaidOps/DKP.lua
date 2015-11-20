@@ -196,6 +196,11 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08f---
+{20/11/2015}
+Fixed GB manager input in ML settings.
+Fixed bug where GB manager was treated always as Guild Bank.
+Fixed race condition in attendance.
 ---RaidOps version 3.08[abcde]...---
 {11/11/2015}
 Version a-c fixes issues regarding v3.08
@@ -4745,7 +4750,6 @@ function DKP:PopUpModifyGPValue(wndHandler,wndControl)
 end
 
 function DKP:PopUpWindowOpen(strNameOrig,strItem)
-	self:dbglog(">PopUp Request > Received ---PopUp Request Begin---")
 	local entry = {}
 	local strName = ""
 	for uchar in string.gfind(strNameOrig, "([%z\1-\127\194-\244][\128-\191]*)") do

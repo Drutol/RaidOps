@@ -2458,7 +2458,7 @@ end
 
 function DKP:OnLootAssigned(luaCaller,objItem, strLooter)
 	local DKPInstance = Apollo.GetAddon("RaidOps")
-	if DKPInstance.bIsSelectedGuildBank and string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then strLooter = "Guild Bank" end
+	if DKPInstance.bIsSelectedGuildBank and string.lower(strLooter) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) and Hook.bSelectedGuildBank then strLooter = "Guild Bank" end
 	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), objItem:GetName(), strLooter))
 end
 
@@ -2746,7 +2746,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 					wndGuildBank:FindChild("ClassIcon"):SetSprite("achievements:sprAchievements_Icon_Group")
 					wndGuildBank:FindChild("CharacterLevel"):SetText("")
 					wndGuildBank:SetTooltip(unitGBManager:GetName() .. " is behind this.")
-					wndGuildBank:SetData(unitGBManager)
+					wndGuildBank:SetData({unit = unitGBManager}) -- it's a flag! notice it! (in dependency addon)
 				end
 
 				-- Finally Creating windows
@@ -3041,7 +3041,7 @@ function DKP:MLSetDemandAppearEnable()
 	self.tItems["settings"]["ML"].bAppOnDemand = true
 end
 
-function DKPMLSetDemandAppearEnable()
+function DKP:MLSetDemandAppearDisable()
 	self.tItems["settings"]["ML"].bAppOnDemand = false
 end
 
