@@ -689,7 +689,7 @@ function DKP:AttUpdatePlayers(nTime)
 			table.insert(currentPlayers,self.tItems[player].strName)
 		end
 	end
-	if(GameLib.GetPlayerUnit()) then
+	if GameLib.GetPlayerUnit() then
 		table.insert(currentPlayers,GameLib.GetPlayerUnit():GetName())
 	end
 	-- Alts
@@ -1683,11 +1683,15 @@ function DKP:ArmoryOnInspect(unit,items)
 		if slot ~= 9 and slot ~= 17  then
 			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
 			tItems[item:GetSlot()]["runes"] = {}
+			tSetsInItem = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
-				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end		
 				for i , tRuneSet in ipairs(rune.arSets or {}) do
 					local key = String_GetWeaselString(Apollo.GetString("ItemTooltip_RuneSetSummaryText"), tRuneSet.strName, tRuneSet.nTotalPower , tRuneSet.nMaxPower)
-					if not tItems['tSets'][key] then  tItems['tSets'][key] = 1 else tItems['tSets'][key] = tItems['tSets'][key] + 1 end
+					if not tSetsInItem[key] then
+						if not tItems['tSets'][key] then  tItems['tSets'][key] = 1 else tItems['tSets'][key] = tItems['tSets'][key] + 1 end
+						tSetsInItem[key] = true
+					end
 				end
 			end
 		end
@@ -1709,11 +1713,15 @@ function DKP:GetArmoryEntries(unit)
 		if slot ~= 9 and slot ~= 17  then
 			tItems[item:GetSlot()] = {["id"] = item:GetItemId()}
 			tItems[item:GetSlot()]["runes"] = {}
+			tSetsInItem = {}
 			for j , rune in ipairs(item:GetDetailedInfo().tPrimary.tRunes and item:GetDetailedInfo().tPrimary.tRunes.arRuneSlots or {}) do
-				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end
+				if rune.itemRune then table.insert(tItems[item:GetSlot()]["runes"],rune.itemRune:GetItemId()) end		
 				for i , tRuneSet in ipairs(rune.arSets or {}) do
 					local key = String_GetWeaselString(Apollo.GetString("ItemTooltip_RuneSetSummaryText"), tRuneSet.strName, tRuneSet.nTotalPower , tRuneSet.nMaxPower)
-					if not tItems['tSets'][key] then  tItems['tSets'][key] = 1 else tItems['tSets'][key] = tItems['tSets'][key] + 1 end
+					if not tSetsInItem[key] then
+						if not tItems['tSets'][key] then  tItems['tSets'][key] = 1 else tItems['tSets'][key] = tItems['tSets'][key] + 1 end
+						tSetsInItem[key] = true
+					end
 				end
 			end
 		end

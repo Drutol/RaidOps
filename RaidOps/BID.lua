@@ -1730,8 +1730,10 @@ function DKP:Bid2SendResumeMessage(itemID)
 end
 
 function DKP:Bid2GetTargetsTable()
-	if not self.strMyName then 
-		self.strMyName = GameLib.GetPlayerUnit():GetName()
+	if not self.strMyName then
+		if GameLib.GetPlayerUnit() then
+			self.strMyName = GameLib.GetPlayerUnit():GetName()
+		end
 		return {} 
 	end
 	local targets = {}

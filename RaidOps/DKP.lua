@@ -196,11 +196,14 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08g---
+{22/11/2015}
+Armory from now on will count "Set count" instead of "Rune count".
 ---RaidOps version 3.08f---
 {20/11/2015}
 Fixed GB manager input in ML settings.
 Fixed bug where GB manager was treated always as Guild Bank.
-Fixed race condition in attendance.
+Fixed race condition in attendance module.
 ---RaidOps version 3.08[abcde]...---
 {11/11/2015}
 Version a-c fixes issues regarding v3.08
@@ -618,11 +621,12 @@ end
 local strDB = ""
 function DKP:DebugFetch()
 	--self:GetNewItem(80001)
-	local str = ""
-	for k , _ in pairs(Apollo) do
-		str = str .. k .. "\n"
-	end
-	self:ExportShowPreloadedText(str)
+	--local str = ""
+	--for k , _ in pairs(Apollo) do
+	--	str = str .. k .. "\n"
+	--end
+	--self:ExportShowPreloadedText(str)
+	self:ExportShowPreloadedText(tohtml(Item.GetSetBonuses()))
 
 end
 
