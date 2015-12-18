@@ -196,6 +196,9 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08i---
+{16/12/2015}
+Added option to include OOR players in sorted list in Master Loot window.
 ---RaidOps version 3.08g---
 {22/11/2015}
 Armory from now on will count "Set count" instead of "Rune count".
@@ -255,29 +258,6 @@ Fixed some issues regarding mass edit's invite funtion. (there may be something 
 Fixed various backend issues with ToolTip addon hooking.
 Fixed empty GP value display on tokens which do not come from GA/DS.
 Chenged odd position of settings window.
----RaidOps version 3.0---
-{29/09/2015}
-Changed API ver. to 11.
-Changed some stuff regarding token tooltip GP display in order to work with API 11.
-Changed armory data collection just so it works for now.
----RaidOps version 2.34d---
-{25/09/2015}
-Resolved website export issues.
----RaidOps version 2.34c---
-{25/09/2015}
-Fixed visual glitch display of pr value while displaying inactive group.
-Fixed sorting for groups once more. (different circumstances)
----RaidOps version 2.34b---
-{25/09/2015}
-Fixed bug that prevented groups from being imported.
-Fixed issue with sorting by pr when using groups.
-Fixed graphical glithes in class order settings window.
-Added Limbo Infomatrix to Custom events boss list.
-Added LimboInfo and Lettuce to First kills list.
----RaidOps version 2.34a---
-{23/09/2015}
-Fixed rare crash concerning guild roster.
-Fixed crash when changing player gropus via pop-up.
  ]===]
 
 -- Localization stuff

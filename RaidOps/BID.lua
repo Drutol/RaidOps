@@ -494,7 +494,9 @@ end
 function DKP:ChooseRandomLooter(entry)
 	local looters = {}
 	for k , playerUnit in pairs(entry.tLooters or {}) do
-		table.insert(looters,playerUnit)
+		if type(playerUnit) == "userdata" then
+			table.insert(looters,playerUnit)
+		end
 	end	
 	return looters[math.random(#looters)]
 end
@@ -2523,10 +2525,20 @@ end
 
 function sortLooters(a,b)
 	if not a or not b then return true end
-	local nameA = a:GetName()
-	local nameB = b:GetName()
-
 	local DKPInstance = Apollo.GetAddon("RaidOps")
+	local nameA
+	local nameB
+	if type(a) == "number" then -- in order to make this less confusing we will lose some performance -- aka (I'm lazy)
+		nameA = DKPInstance.tItems[a].strName -- a is valid ID as it was checked previously
+	else
+		nameA = a:GetName()
+	end	
+	if type(b) == "number" then 
+		nameB = DKPInstance.tItems[b].strName
+	else
+		nameB = b:GetName()
+	end
+	
 	if DKPInstance.tItems["settings"].BidSortAsc == 0 then
 		if not DKPInstance.tItems["settings"]["ML"].bSortByName then
 			if DKPInstance.tItems["EPGP"].Enable == 1 then
@@ -2664,15 +2676,36 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 						end
 					end
 				end
-				
-				
+				local tPlayerResources = tItem.tLooters
+				local tPlayersExcluded = {}
+				-- Include OOR ppls if needed
+				if not self.tItems["settings"]["ML"].bExcludeOOR then
+					if tItem.tLootersOutOfRange and next(tItem.tLootersOutOfRange) then
+						for idx, strLooterOOR in pairs(tItem.tLootersOutOfRange) do
+							local ID = self:GetPlayerByIDByName(strLooterOOR)
+							if ID ~= -1 then
+								table.insert(tPlayerResources,ID) -- this serves as flag too
+							else
+								tPlayersExcluded[strLooterOOR] = 1 -- if there no such player in db ... well ... no data
+							end
+						end
+					end
+				else
+					tPlayersExcluded = tItem.tLootersOutOfRange
+				end
 				-- Grouping Players
 				local unitGBManager
-				for idx, unitLooter in pairs(tItem.tLooters) do
-					--Print(unitLooter:GetName())
-					if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and string.lower(unitLooter:GetName()) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then unitGBManager = unitLooter end
+				for idx, unitLooter in pairs(tPlayerResources) do
+					if(type(unitLooter) ~= "number") then
+						if DKPInstance.tItems["settings"]["ML"].bShowGuildBank and string.lower(unitLooter:GetName()) == string.lower(DKPInstance.tItems["settings"]["ML"].strGBManager) then unitGBManager = unitLooter end
+					end
+					class = ""
 					if DKPInstance.tItems["settings"]["ML"].bGroup then
-						class = ktClassToString[unitLooter:GetClassId()]
+						if(type(unitLooter) ~= "number") then
+							class = ktClassToString[unitLooter:GetClassId()]
+						else
+							class = self.tItems[unitLooter].class
+						end
 						if class == "Esper" and bWantEsp then
 							table.insert(tables.esp,unitLooter)
 						elseif class == "Engineer" and bWantEng then
@@ -2694,7 +2727,11 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 							end
 						end
 					else
-						class = ktClassToString[unitLooter:GetClassId()]
+						if(type(unitLooter) ~= "number") then
+							class = ktClassToString[unitLooter:GetClassId()]
+						else
+							class = self.tItems[unitLooter].class
+						end
 						if class == "Esper" and bWantEsp then
 							table.insert(tables.all,unitLooter)
 						elseif class == "Engineer" and bWantEng then
@@ -2721,10 +2758,8 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				for k , tab in pairs(tables) do	
 					table.sort(tab,sortLooters)
 				end
-				--Print('-----')
-				--table.sort(tables.all,sortMasterLootEasyDKPNonWnd)
-				-- Requesting EquippedItems
-				if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar or DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then
+				-- Requesting EquippedItems - (deprecated)
+				--[[if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar or DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then
 					if tItem.itemDrop:IsEquippable() then
 						local myName = GameLib.GetPlayerUnit():GetName()
 						if myName then
@@ -2733,7 +2768,7 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 							--self.tEquippedItems[myName][tItem.itemDrop:GetEquippedItemForItemType():GetSlot()] = tItem.itemDrop:GetEquippedItemForItemType():GetItemId()
 						end
 					end
-				end
+				end]]
 			
 				-- Guild Bank
 				local wndGuildBank
@@ -2752,106 +2787,120 @@ function DKP:RefreshMasterLootLooterList(luaCaller,tMasterLootItemList)
 				end
 
 				-- Finally Creating windows
-
+				local added = {}
+				local strName
+				local strSprite 
 				for k,tab in pairs(tables) do
 					for j,unitLooter in ipairs(tab) do
 						local wndCurrentLooter
-						local strName = unitLooter:GetName()
-						if DKPInstance.tItems["settings"]["ML"].bArrTiles then
-							if DKPInstance.tItems["settings"]["ML"].bShowClass or DKPInstance.tItems["settings"]["ML"].bShowLastItem then
-								wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
-								wndCurrentLooter:FindChild("ClassIcon"):SetSprite(ktClassToIcon[unitLooter:GetClassId()])
-							else
-								wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2,"CharacterButtonTile", luaCaller.wndMasterLoot_LooterList,luaCaller)
-							end
-							
-							if DKPInstance:GetPlayerByIDByName(unitLooter:GetName()) ~= -1 then
-								if DKPInstance.tItems["EPGP"].Enable == 1 then 
-									wndCurrentLooter:FindChild("CharacterLevel"):SetText(DKPInstance:EPGPGetPRByName(unitLooter:GetName(),true))
-								else
-									wndCurrentLooter:FindChild("CharacterLevel"):SetText(DKPInstance.tItems[DKPInstance:GetPlayerByIDByName(unitLooter:GetName())].net)
-								end
-							else
-								wndCurrentLooter:FindChild("CharacterLevel"):SetText(unitLooter:GetBasicStats().nLevel)
-							end
-
-							if DKPInstance.tItems["settings"]["ML"].bShowLastItemTile then
-								if self.tItems["settings"]["ML"].tWinners[unitLooter:GetName()] then
-									local item = Item.GetDataFromId(self.tItems["settings"]["ML"].tWinners[unitLooter:GetName()])
-									wndCurrentLooter:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
-									wndCurrentLooter:FindChild("ItemFrame"):Show(true,false)
-									wndCurrentLooter:FindChild("ItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
-									Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("ItemFrame"),item, {bPrimary = true, bSelling = false})
-								end
-							end
-							
-							if DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then -- Set Current Item
-								if DKPInstance.tEquippedItems[unitLooter:GetName()] and DKPInstance.tEquippedItems[unitLooter:GetName()][tItem.itemDrop:GetSlot()] then							
-									local item = Item.GetDataFromId(DKPInstance.tEquippedItems[unitLooter:GetName()][tItem.itemDrop:GetSlot()])
-									wndCurrentLooter:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
-									wndCurrentLooter:FindChild("ItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
-									wndCurrentLooter:FindChild("ItemFrame"):Show(true,false)
-									Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("ItemFrame"),item, {bPrimary = true, bSelling = false})
-								end
-							end	
-							
-						else -- List
-							if DKPInstance.tItems["settings"]["ML"].bShowClass then
-								wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
-								wndCurrentLooter:FindChild("ClassIcon"):SetSprite(ktClassToIcon[unitLooter:GetClassId()])
-							else
-								wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonList", luaCaller.wndMasterLoot_LooterList, luaCaller)
-							end
-							wndCurrentLooter:FindChild("CharacterLevel"):SetText(unitLooter:GetBasicStats().nLevel)
-							if DKPInstance.tItems["settings"]["ML"].bShowLastItemBar then
-								if self.tItems["settings"]["ML"].tWinners[unitLooter:GetName()] then
-									local item = Item.GetDataFromId(self.tItems["settings"]["ML"].tWinners[unitLooter:GetName()])
-									wndCurrentLooter:FindChild("LastItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
-									wndCurrentLooter:FindChild("LastItemFrame"):Show(true)
-									wndCurrentLooter:FindChild("LastItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
-									Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("LastItemFrame"),item, {bPrimary = true, bSelling = false})
-								end
-							end
-							if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar then
-								if DKPInstance.tEquippedItems[unitLooter:GetName()] and DKPInstance.tEquippedItems[unitLooter:GetName()][tItem.itemDrop:GetSlot()] then
-									local item = Item.GetDataFromId(DKPInstance.tEquippedItems[unitLooter:GetName()][tItem.itemDrop:GetSlot()])
-									wndCurrentLooter:FindChild("CurrItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
-									wndCurrentLooter:FindChild("CurrItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
-									wndCurrentLooter:FindChild("CurrItemFrame"):Show(true)
-									Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("CurrItemFrame"),item, {bPrimary = true, bSelling = false})
-								end
-							end
-							local ID = DKPInstance:GetPlayerByIDByName(strName)
-							if ID ~= -1 and DKPInstance.tItems["settings"]["ML"].bListIndicators then
-								local wndCounter = Apollo.LoadForm(DKPInstance.xmlDoc,"InsertDKPIndicator",wndCurrentLooter,DKPInstance)
-								if DKPInstance.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. DKPInstance.tItems[ID].net)
-								else wndCounter:SetText("PR : ".. DKPInstance:EPGPGetPRByName(DKPInstance.tItems[ID].strName)) end
-							end
+						
+						if type(unitLooter) == "number" then -- if OOR
+							strName = DKPInstance.tItems[unitLooter].strName
+							strSprite = ktStringToIcon[DKPInstance.tItems[unitLooter].class]
+						else --if normal
+							strName = unitLooter:GetName()
+							strSprite = ktClassToIcon[unitLooter:GetClassId()]
 						end
-						wndCurrentLooter:FindChild("CharacterName"):SetText(unitLooter:GetName())
-						
-						wndCurrentLooter:SetData(unitLooter)
-						
-						
-						if luaCaller.tMasterLootSelectedLooter == unitLooter then
-							wndCurrentLooter:SetCheck(true)
-							bStillHaveLooter = true
+
+						if not added[strName] then
+							added[strName] = true
+							if DKPInstance.tItems["settings"]["ML"].bArrTiles then
+								if DKPInstance.tItems["settings"]["ML"].bShowClass or DKPInstance.tItems["settings"]["ML"].bShowLastItem then
+									wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonTileClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+									wndCurrentLooter:FindChild("ClassIcon"):SetSprite(strSprite)
+								else
+									wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2,"CharacterButtonTile", luaCaller.wndMasterLoot_LooterList,luaCaller)
+								end
+								
+								if DKPInstance:GetPlayerByIDByName(strName) ~= -1 then
+									if DKPInstance.tItems["EPGP"].Enable == 1 then 
+										wndCurrentLooter:FindChild("CharacterLevel"):SetText(DKPInstance:EPGPGetPRByName(strName,true))
+									else
+										wndCurrentLooter:FindChild("CharacterLevel"):SetText(DKPInstance.tItems[DKPInstance:GetPlayerByIDByName(strName)].net)
+									end
+								else
+									wndCurrentLooter:FindChild("CharacterLevel"):SetText(type(unitLooter) == "number" and "" or unitLooter:GetBasicStats().nLevel)
+								end
+
+								if DKPInstance.tItems["settings"]["ML"].bShowLastItemTile then
+									if self.tItems["settings"]["ML"].tWinners[strName] then
+										local item = Item.GetDataFromId(self.tItems["settings"]["ML"].tWinners[strName])
+										wndCurrentLooter:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+										wndCurrentLooter:FindChild("ItemFrame"):Show(true,false)
+										wndCurrentLooter:FindChild("ItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
+										Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("ItemFrame"),item, {bPrimary = true, bSelling = false})
+									end
+								end
+								
+								if DKPInstance.tItems["settings"]["ML"].bShowCurrItemTile then -- Set Current Item
+									if DKPInstance.tEquippedItems[strName] and DKPInstance.tEquippedItems[strName][tItem.itemDrop:GetSlot()] then							
+										local item = Item.GetDataFromId(DKPInstance.tEquippedItems[strName][tItem.itemDrop:GetSlot()])
+										wndCurrentLooter:FindChild("ItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+										wndCurrentLooter:FindChild("ItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
+										wndCurrentLooter:FindChild("ItemFrame"):Show(true,false)
+										Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("ItemFrame"),item, {bPrimary = true, bSelling = false})
+									end
+								end	
+								
+							else -- List
+								if DKPInstance.tItems["settings"]["ML"].bShowClass then
+									wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonListClass", luaCaller.wndMasterLoot_LooterList, luaCaller)
+									wndCurrentLooter:FindChild("ClassIcon"):SetSprite(strSprite)
+								else
+									wndCurrentLooter = Apollo.LoadForm(DKPInstance.xmlDoc2, "CharacterButtonList", luaCaller.wndMasterLoot_LooterList, luaCaller)
+								end
+								wndCurrentLooter:FindChild("CharacterLevel"):SetText(type(unitLooter) == "number" and "" or unitLooter:GetBasicStats().nLevel)
+								if DKPInstance.tItems["settings"]["ML"].bShowLastItemBar then
+									if self.tItems["settings"]["ML"].tWinners[strName] then
+										local item = Item.GetDataFromId(self.tItems["settings"]["ML"].tWinners[strName])
+										wndCurrentLooter:FindChild("LastItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+										wndCurrentLooter:FindChild("LastItemFrame"):Show(true)
+										wndCurrentLooter:FindChild("LastItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
+										Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("LastItemFrame"),item, {bPrimary = true, bSelling = false})
+									end
+								end
+								if DKPInstance.tItems["settings"]["ML"].bShowCurrItemBar then
+									if DKPInstance.tEquippedItems[strName] and DKPInstance.tEquippedItems[strName][tItem.itemDrop:GetSlot()] then
+										local item = Item.GetDataFromId(DKPInstance.tEquippedItems[strName][tItem.itemDrop:GetSlot()])
+										wndCurrentLooter:FindChild("CurrItemFrame"):SetSprite(self:EPGPGetSlotSpriteByQualityRectangle(item:GetItemQuality()))
+										wndCurrentLooter:FindChild("CurrItemFrame"):FindChild("ItemIcon"):SetSprite(item:GetIcon())
+										wndCurrentLooter:FindChild("CurrItemFrame"):Show(true)
+										Tooltip.GetItemTooltipForm(self,wndCurrentLooter:FindChild("CurrItemFrame"),item, {bPrimary = true, bSelling = false})
+									end
+								end
+								local ID = DKPInstance:GetPlayerByIDByName(strName)
+								if ID ~= -1 and DKPInstance.tItems["settings"]["ML"].bListIndicators then
+									local wndCounter = Apollo.LoadForm(DKPInstance.xmlDoc,"InsertDKPIndicator",wndCurrentLooter,DKPInstance)
+									if DKPInstance.tItems["EPGP"].Enable == 0 then wndCounter:SetText("DKP : ".. DKPInstance.tItems[ID].net)
+									else wndCounter:SetText("PR : ".. DKPInstance:EPGPGetPRByName(DKPInstance.tItems[ID].strName)) end
+								end
+							end
+							wndCurrentLooter:FindChild("CharacterName"):SetText(strName)
+							
+							wndCurrentLooter:SetData(unitLooter)
+							
+							if type(unitLooter) == "number" then
+								wndCurrentLooter:Enable(false)
+								wndCurrentLooter:FindChild("CharacterName"):SetText(String_GetWeaselString(Apollo.GetString("Group_OutOfRange"), strName))
+							end
+											
+							if luaCaller.tMasterLootSelectedLooter == unitLooter then
+								wndCurrentLooter:SetCheck(true)
+								bStillHaveLooter = true
+							end
 						end
 					end
 				end
 				-- For for ended
-
-				
-
-				
+								
 				if not bStillHaveLooter then
 					luaCaller.tMasterLootSelectedLooter = nil
 				end
 
 				-- get out of range people
 				-- tLootersOutOfRange
-				if tItem.tLootersOutOfRange and next(tItem.tLootersOutOfRange) then
-					for idx, strLooterOOR in pairs(tItem.tLootersOutOfRange) do
+				if tPlayersExcluded and next(tPlayersExcluded) then
+					for idx, strLooterOOR in pairs(tPlayersExcluded) do
 						local wndCurrentLooter = Apollo.LoadForm(luaCaller.xmlDoc, "CharacterButton", luaCaller.wndMasterLoot_LooterList, luaCaller)
 						wndCurrentLooter:FindChild("CharacterName"):SetText(String_GetWeaselString(Apollo.GetString("Group_OutOfRange"), strLooterOOR))
 						wndCurrentLooter:FindChild("ClassIcon"):SetSprite("CRB_GroupFrame:sprGroup_Disconnected")
@@ -2976,6 +3025,7 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bDisplayApplicable == nil then self.tItems["settings"]["ML"].bDisplayApplicable = false end
 	if self.tItems["settings"]["ML"].bSortByName == nil then self.tItems["settings"]["ML"].bSortByName = false end
 	if self.tItems["settings"]["ML"].bAppOnDemand == nil then self.tItems["settings"]["ML"].bAppOnDemand = false end
+	if self.tItems["settings"]["ML"].bExcludeOOR == nil then self.tItems["settings"]["ML"].bExcludeOOR = true end
 	if self.tItems["settings"]["ML"].tWinners == nil then self.tItems["settings"]["ML"].tWinners = {} end
 	
 	if self.tItems["settings"]["ML"].bShowClass then self.wndMLSettings:FindChild("ShowClass"):SetCheck(true) end
@@ -2992,6 +3042,7 @@ function DKP:MLSettingsRestore()
 	if self.tItems["settings"]["ML"].bShowGuildBank then self.wndMLSettings:FindChild("ShowGuildBankEntry"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bDispBidding then self.wndMLSettings:FindChild("DispBiddingButtons"):SetCheck(true) end
 	if self.tItems["settings"]["ML"].bAppOnDemand then self.wndMLSettings:FindChild("DemandApp"):SetCheck(true) end
+	if self.tItems["settings"]["ML"].bExcludeOOR then self.wndMLSettings:FindChild("ExcludeOOR"):SetCheck(true) end
 	
 	self.wndMLSettings:FindChild("GBManager"):SetText(self.tItems["settings"]["ML"].strGBManager)
 end
@@ -3045,6 +3096,14 @@ end
 
 function DKP:MLSetDemandAppearDisable()
 	self.tItems["settings"]["ML"].bAppOnDemand = false
+end
+
+function DKP:MLSetExcludeOOREnable()
+	self.tItems["settings"]["ML"].bExcludeOOR = true
+end
+
+function DKP:MLSetExcludeOORDisable()
+	self.tItems["settings"]["ML"].bExcludeOOR = false
 end
 
 function DKP:MLSettingsShowCurrItemEnableBar( wndHandler, wndControl, eMouseButton )
