@@ -581,22 +581,24 @@ end
 
 local tResizes = {}
 local bResizeRunning = false
-function MasterLoot:gracefullyResize(wnd,tTargets,bQuick)
-	for k , resize in ipairs(tResizes) do
-		if resize.wnd:GetName() == wnd:GetName() then table.remove(tResizes,k) end
+function MasterLoot:gracefullyResize(wnd,tTargets,bQuick,bQueue)
+	if not bQueue then
+		for k , resize in ipairs(tResizes) do
+			if resize.wnd:GetName() == wnd:GetName() then table.remove(tResizes,k) end
+		end
 	end
 	if bQuick then
 		if tTargets.l then
-			if tTargets.l - math.floor(tTargets.l/2)*2 ~= 0 then tTargets.l = tTargets.l +1 end
+			if tTargets.l - math.floor(tTargets.l/2)*2 ~= 0 then tTargets.l = tTargets.l - 1 end
 		end		
 		if tTargets.t then
-			if tTargets.t - math.floor(tTargets.t/2)*2 ~= 0 then tTargets.t = tTargets.t +1 end
+			if tTargets.t - math.floor(tTargets.t/2)*2 ~= 0 then tTargets.t = tTargets.t - 1 end
 		end		
 		if tTargets.r then
-			if tTargets.r - math.floor(tTargets.r/2)*2 ~= 0 then tTargets.r = tTargets.r +1 end
+			if tTargets.r - math.floor(tTargets.r/2)*2 ~= 0 then tTargets.r = tTargets.r + 1 end
 		end		
 		if tTargets.b then
-			if tTargets.b - math.floor(tTargets.b/2)*2 ~= 0 then tTargets.b = tTargets.b +1 end
+			if tTargets.b - math.floor(tTargets.b/2)*2 ~= 0 then tTargets.b = tTargets.b + 1 end
 		end
 	end
 	table.insert(tResizes,{wnd = wnd,tTargets = tTargets,bQuick = bQuick})
@@ -612,42 +614,46 @@ function MasterLoot:MLLClose()
 end
 
 function MasterLoot:GracefulResize()
+	local tCompleted = {} -- prevent duplicates 
 	for k , resize in ipairs(tResizes) do
-		local l,t,r,b = resize.wnd:GetAnchorOffsets()
-		local nSpeed = resize.bQuick and 2 or 1
-		if resize.tTargets.l then
-			if l > resize.tTargets.l then
-				l = l-nSpeed
-			elseif l < resize.tTargets.l then
-				l = l+nSpeed
-			end		
-		end
-		
-		if resize.tTargets.t then
-			if t > resize.tTargets.t then
-				t = t-nSpeed
-			elseif t < resize.tTargets.t then
-				t = t+nSpeed
-			end		
-		end
-
-		if resize.tTargets.r then
-			if r > resize.tTargets.r then
-				r = r-nSpeed
-			elseif r < resize.tTargets.r then
-				r = r+nSpeed
-			end	
-		end
-
-		if resize.tTargets.b then
-			if b > resize.tTargets.b then
-				b = b-nSpeed
-			elseif b < resize.tTargets.b then
-				b = b+nSpeed
+		if not tCompleted[resize.wnd:GetName()] then
+			tCompleted[resize.wnd:GetName()] = true
+			local l,t,r,b = resize.wnd:GetAnchorOffsets()
+			local nSpeed = resize.bQuick and 2 or 1
+			if resize.tTargets.l then
+				if l > resize.tTargets.l then
+					l = l-nSpeed
+				elseif l < resize.tTargets.l then
+					l = l+nSpeed
+				end		
 			end
-		end	
-		resize.wnd:SetAnchorOffsets(l,t,r,b)
-		if l == (resize.tTargets.l or l) and r == (resize.tTargets.r or r) and b == (resize.tTargets.b or b) and t == (resize.tTargets.t or t) then table.remove(tResizes,k) end
+			
+			if resize.tTargets.t then
+				if t > resize.tTargets.t then
+					t = t-nSpeed
+				elseif t < resize.tTargets.t then
+					t = t+nSpeed
+				end		
+			end
+
+			if resize.tTargets.r then
+				if r > resize.tTargets.r then
+					r = r-nSpeed
+				elseif r < resize.tTargets.r then
+					r = r+nSpeed
+				end	
+			end
+
+			if resize.tTargets.b then
+				if b > resize.tTargets.b then
+					b = b-nSpeed
+				elseif b < resize.tTargets.b then
+					b = b+nSpeed
+				end
+			end	
+			resize.wnd:SetAnchorOffsets(l,t,r,b)
+			if l == (resize.tTargets.l or l) and r == (resize.tTargets.r or r) and b == (resize.tTargets.b or b) and t == (resize.tTargets.t or t) then table.remove(tResizes,k) end
+		end
 	end
 
 	if #tResizes == 0 then
@@ -658,7 +664,7 @@ end
 local nTargetHeight
 function MasterLoot:MLLightInit()
 	self.wndMLL = Apollo.LoadForm(self.xmlDoc,"MasterLootLight",nil,self)
-	self.wndMLL:Show(false)
+	self.wndMLL:Show(true)
 	Apollo.RegisterEventHandler("SystemKeyDown", "MLLKeyDown", self)
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
@@ -717,7 +723,7 @@ function MasterLoot:MLLPopulateItems(bResize)
 	if bItemSelected then return end
 
 	self.wndMLL:FindChild("Items"):DestroyChildren()
-	local tML = sort_loot(GameLib.GetMasterLoot())
+	local tML = sort_loot(GameLib:GetMasterLoot())
 
 	for k , lootEntry in ipairs(tML) do
 		if lootEntry.bIsMaster then bMaster = true break end
@@ -757,8 +763,8 @@ end
 
 function MasterLoot:MLLDeselectItem(wndHandler,wndControl)
 	bItemSelected = false
-	self:MLLPopulateItems(true)
 	self:MLLRecipientDeselected()
+	self:MLLPopulateItems(true)
 	self.nSelectedItem = nil
 end
 
@@ -890,16 +896,18 @@ function MasterLoot:MLLDisable()
 end
 
 function MasterLoot:MLLRecipientSelected(wndHandler,wndControl)
+	local l,t,r,b = self.wndMLL:GetAnchorOffsets()
 	self:gracefullyResize(self.wndMLL:FindChild("Assign"),{t=561})
-	self:gracefullyResize(self.wndMLL,{b=nTargetHeight})
+	self:gracefullyResize(self.wndMLL,{b=t+nTargetHeight},nil,true)
 	self.wndMLL:FindChild("Assign"):SetText("Assign")
 	bRecipientSelected = true
 	self.unitSelected = wndControl:GetData()
 end
 
 function MasterLoot:MLLRecipientDeselected(wndHandler,wndControl)
+	local l,t,r,b = self.wndMLL:GetAnchorOffsets()
 	self:gracefullyResize(self.wndMLL:FindChild("Assign"),{t=622})
-	self:gracefullyResize(self.wndMLL,{b=nTargetHeight-40})
+	self:gracefullyResize(self.wndMLL,{b=t + nTargetHeight-40},nil,true)
 	self.wndMLL:FindChild("Assign"):SetText("")
 	self.unitSelected = nil
 end
