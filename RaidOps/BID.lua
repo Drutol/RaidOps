@@ -944,6 +944,9 @@ function DKP:BidPerformCountdown()
 	if not self.bIsBidding then
 		if self.BidCountdown then self.BidCountdown:Stop() end
 		Apollo.RemoveEventHandler("BidPerformCountdown",self)
+		ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. " [ChatBidding] " .. "Bidding stopped")
+		self.wndBid:FindChild("ButtonStop"):Enable(false)
+		self.wndBid:FindChild("ButtonStart"):Enable(true)
 		return
 	end
 
@@ -994,7 +997,7 @@ end
 function DKP:BidAssignItem(wndHandler,wndControl)
 	local bMaster = true
 
-	if type(self.wndBid:GetData()) == "table" and wndControl:GetName() == "Assign" then
+	if type(self.wndBid:GetData()) == "table" and wndControl:GetName() == "Assign" then -- if item reference was passed
 		if self.CurrentBidSession == nil or not self.CurrentBidSession.strSelected or not self.CurrentBidSession.nSelectedOpt then return end
 		if self.bIsBidding then 
 			ChatSystemLib.Command(self.tItems["settings"].strBidChannel .. string.format(self.Locale["#biddingStrings:AuctionEndEarly"],self.CurrentBidSession.strSelected))
@@ -1008,7 +1011,7 @@ function DKP:BidAssignItem(wndHandler,wndControl)
 		local price = self:EPGPGetItemCostByID(self.wndBid:GetData().itemDrop:GetItemId(),true)
 		if price and type(price) ~= "string" then
 			price = (self.tItems["settings"].tBidCategoryModifiers[self.CurrentBidSession.nSelectedOpt] * price) / 100
-			self.tPopUpItemGPvalues[selectedItem.itemDrop:GetName()] = price
+			self.tPopUpItemGPvalues[self.wndBid:GetData().itemDrop:GetName()] = price
 		end
 
 		--Event_FireGenericEvent("RaidOpsLootHexAssignThisItem",self.wndBid:GetData().nLootId,self.CurrentBidSession.strSelected)
@@ -1702,7 +1705,7 @@ function DKP:Bid2SendAuctionStartMessage(itemID)
 		local msg = {}
 		msg.type = "NewAuction"
 		msg.itemID = itemID
-		msg.cost = string.sub(self:EPGPGetItemCostByID(itemID),36)
+		msg.cost = self:EPGPGetItemCostByID(itemID,true)
 		msg.duration = self.tItems["settings"]["Bid2"].duration
 		msg.pass = self.tItems["settings"]["Bid2"].bRegisterPass
 		msg.tLabels = self.tItems["settings"]["Bid2"].tLabels
@@ -1880,7 +1883,7 @@ function DKP:BidAddNewAuction(itemID,bMaster,progress,nDuration,bReceived,tLabel
 		targetWnd:FindChild("Frame"):FindChild("Icon"):SetSprite(item:GetIcon())
 		targetWnd:FindChild("Frame"):SetSprite(self:EPGPGetSlotSpriteByQuality(item:GetItemQuality()))
 		targetWnd:FindChild("ItemName"):SetText(item:GetName())
-		targetWnd:FindChild("ItemCost"):SetText(string.sub(self:EPGPGetItemCostByID(itemID),32))
+		targetWnd:FindChild("ItemCost"):SetText(self:EPGPGetItemCostByID(itemID,true))
 		targetWnd:SetData(itemID)
 		targetWnd:SetText(item:GetName())
 		targetWnd:FindChild("TimeLeft"):SetProgress(progress,1000)
@@ -2339,7 +2342,7 @@ function DKP:Bid2CloseOnAssignDisable()
 end
 
 function DKP:Bid2CloseOnAssign(strItem)
-	if not self.ItemDatabase or not self.ItemDatabase[strItem] or not self.tItems["settings"]["Bid2"].bCloseOnAssign then return end
+	if not self.ItemDatabase or not self.ItemDatabase[strItem] or not self.tItems["settings"]["Bid2"] or not self.tItems["settings"]["Bid2"].bCloseOnAssign then return end
 	local itemID = self.ItemDatabase[strItem].ID
 	
 	for k,auction in ipairs(self.ActiveAuctions) do
@@ -2452,7 +2455,7 @@ function DKP:OnAssignDown(luaCaller,wndHandler, wndControl, eMouseButton)
 			end
 			DKPInstance.tSelectedItems = {}
 		else
-			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild then self:BidAddPlayerToRandomSkip(prevLuckyChild,luaCaller.tMasterLootSelectedItem.itemDrop:GetItemId()) end
+			if prevLuckyChild and SelectedLooter:GetName() == prevLuckyChild and luaCaller.tMasterLootSelectedItem then self:BidAddPlayerToRandomSkip(prevLuckyChild,luaCaller.tMasterLootSelectedItem.itemDrop:GetItemId()) end
 			GameLib.AssignMasterLoot(SelectedItemLootId,SelectedLooter)
 		end
 	end

@@ -196,6 +196,10 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08k---
+{27/12/2015}
+Fixed Chatbidding's crashes.
+Fixed NetworkBidding's crashes.
 ---RaidOps version 3.08i---
 {16/12/2015}
 Added option to include OOR players in sorted list in Master Loot window.
@@ -3914,6 +3918,11 @@ function DKP:SettingsRestore()
 									 " /nb - For Network Bidding window \n" ..
 									 " /chatbid - For Chat Bidding window \n" ..
 									 " /rops help - for all action commands \n")
+
+	--Disabled till further notice
+	self.wndSettings:FindChild("ButtonShowLoot"):Enable(false)
+	self.wndSettings:FindChild("ButtonSettingsDataFetch"):Enable(false)
+
 									 
 end
 

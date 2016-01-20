@@ -664,7 +664,7 @@ end
 local nTargetHeight
 function MasterLoot:MLLightInit()
 	self.wndMLL = Apollo.LoadForm(self.xmlDoc,"MasterLootLight",nil,self)
-	self.wndMLL:Show(true)
+	self.wndMLL:Show(false)
 	Apollo.RegisterEventHandler("SystemKeyDown", "MLLKeyDown", self)
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
