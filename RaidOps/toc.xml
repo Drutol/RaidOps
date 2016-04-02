@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Drutol Windchaser@Jabbit" APIVersion="11" Name="RaidOps" Description="">
+<Addon Author="Drutol Windchaser@Jabbit" APIVersion="12" Name="RaidOps" Description="">
     <Script Name="libs/GeminiHook-1.0.lua"/>
     <Script Name="libs/LibJSON-2.5.lua"/>
     <Script Name="libs/Base64.lua"/>
