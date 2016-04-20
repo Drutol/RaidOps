@@ -471,8 +471,8 @@ end
 
 ----------------------------
 
-function MasterLoot:OnLootAssigned(objItem, strLooter)
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), objItem:GetName(), strLooter))
+function MasterLoot:OnLootAssigned(tLootInfo)
+	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("CRB_MasterLoot_AssignMsg"), tLootInfo.itemLoot:GetName(), tLootInfo.strPlayer))
 end
 
 local knSaveVersion = 1
@@ -523,7 +523,7 @@ local MasterLoot_Singleton = MasterLoot:new()
 MasterLoot_Singleton:Init()
 
 -- Master Loot light
-local ktQualColors = 
+local ktQualColors =
 {
 	[1] = "ItemQuality_Inferior",
 	[2] = "ItemQuality_Average",
@@ -534,7 +534,7 @@ local ktQualColors =
 	[7] = "ItemQuality_Artifact",
 }
 
-local ktKeys = 
+local ktKeys =
 {
 	[81] = "Q",
 	[87] = "W",
@@ -546,7 +546,7 @@ local ktKeys =
 	[73] = "I",
 	[79] = "O",
 	[80] = "P",
-	
+
 	[65] = "A",
 	[83] = "S",
 	[68] = "D",
@@ -556,7 +556,7 @@ local ktKeys =
 	[74] = "J",
 	[75] = "K",
 	[76] = "L",
-	
+
 	[90] = "Z",
 	[88] = "X",
 	[67] = "C",
@@ -574,7 +574,7 @@ local function getDummyML(nCount)
 		if item then
 			table.insert(tDummy,{nLootId = math.random(1,100000),itemDrop = item,tLooters = {[math.random(100)] = GameLib.GetPlayerUnit()}})
 			nCount = nCount - 1
-		end	
+		end
 	end
 	return tDummy
 end
@@ -590,13 +590,13 @@ function MasterLoot:gracefullyResize(wnd,tTargets,bQuick,bQueue)
 	if bQuick then
 		if tTargets.l then
 			if tTargets.l - math.floor(tTargets.l/2)*2 ~= 0 then tTargets.l = tTargets.l - 1 end
-		end		
+		end
 		if tTargets.t then
 			if tTargets.t - math.floor(tTargets.t/2)*2 ~= 0 then tTargets.t = tTargets.t - 1 end
-		end		
+		end
 		if tTargets.r then
 			if tTargets.r - math.floor(tTargets.r/2)*2 ~= 0 then tTargets.r = tTargets.r + 1 end
-		end		
+		end
 		if tTargets.b then
 			if tTargets.b - math.floor(tTargets.b/2)*2 ~= 0 then tTargets.b = tTargets.b + 1 end
 		end
@@ -614,7 +614,7 @@ function MasterLoot:MLLClose()
 end
 
 function MasterLoot:GracefulResize()
-	local tCompleted = {} -- prevent duplicates 
+	local tCompleted = {} -- prevent duplicates
 	for k , resize in ipairs(tResizes) do
 		if not tCompleted[resize.wnd:GetName()] then
 			tCompleted[resize.wnd:GetName()] = true
@@ -625,15 +625,15 @@ function MasterLoot:GracefulResize()
 					l = l-nSpeed
 				elseif l < resize.tTargets.l then
 					l = l+nSpeed
-				end		
+				end
 			end
-			
+
 			if resize.tTargets.t then
 				if t > resize.tTargets.t then
 					t = t-nSpeed
 				elseif t < resize.tTargets.t then
 					t = t+nSpeed
-				end		
+				end
 			end
 
 			if resize.tTargets.r then
@@ -641,7 +641,7 @@ function MasterLoot:GracefulResize()
 					r = r-nSpeed
 				elseif r < resize.tTargets.r then
 					r = r+nSpeed
-				end	
+				end
 			end
 
 			if resize.tTargets.b then
@@ -650,14 +650,14 @@ function MasterLoot:GracefulResize()
 				elseif b < resize.tTargets.b then
 					b = b+nSpeed
 				end
-			end	
+			end
 			resize.wnd:SetAnchorOffsets(l,t,r,b)
 			if l == (resize.tTargets.l or l) and r == (resize.tTargets.r or r) and b == (resize.tTargets.b or b) and t == (resize.tTargets.t or t) then table.remove(tResizes,k) end
 		end
 	end
 
 	if #tResizes == 0 then
-		bResizeRunning = false 
+		bResizeRunning = false
 		self.resizeTimer:Stop()
 	end
 end
@@ -668,13 +668,13 @@ function MasterLoot:MLLightInit()
 	Apollo.RegisterEventHandler("SystemKeyDown", "MLLKeyDown", self)
 	if not self.settings then self.settings = {} end
 	if self.settings.bLightMode == nil then self.settings.bLightMode = false end
-	
+
 	--self.MLDummy = getDummyML(10)
  	nTargetHeight = self.wndMLL:GetHeight()+40
 	self:MLLPopulateItems()
 end
 
-local ktSlotOrder = 
+local ktSlotOrder =
 {
 	[16] = 1,
 	[15] = 2,
@@ -740,8 +740,8 @@ function MasterLoot:MLLPopulateItems(bResize)
 		wnd:SetData(lootEntry)
 	end
 	if Apollo.GetAddon("RaidOps") then Apollo.GetAddon("RaidOps"):BQUpdateCounters() end
-	self.wndMLL:FindChild("Items"):ArrangeChildrenVert() 
-	if bResize then 
+	self.wndMLL:FindChild("Items"):ArrangeChildrenVert()
+	if bResize then
 		self:gracefullyResize(self.wndMLL:FindChild("ItemsFrame"),{b=self.wndMLL:GetHeight()-100})
 		local l,t,r,b = self.wndMLL:FindChild("RecipientsFrame"):GetAnchorOffsets()
 		self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=b})
@@ -758,7 +758,7 @@ function MasterLoot:MLLSelectItem(wndHandler,wndControl)
 	self:gracefullyResize(self.wndMLL:FindChild("RecipientsFrame"),{t=200})
 	self:MLLPopulateRecipients(wndControl:GetData())
 	self.nSelectedItem = wndControl:GetData().nLootId
-	
+
 end
 
 function MasterLoot:MLLDeselectItem(wndHandler,wndControl)
@@ -781,7 +781,7 @@ function MasterLoot:MLLGetSuggestestedLooters(tLooters,item)
 
 	if string.find(item:GetName(),"Prägung") or string.find(item:GetName(),"Imprint") or item:IsEquippable() then
 
-		
+
 		local tDetails = item:GetDetailedInfo()
 		if tDetails.tPrimary.arClassRequirement then
 
@@ -820,16 +820,16 @@ function MasterLoot:MLLGetSuggestestedLooters(tLooters,item)
 					bWantSta = false
 					bWantMed = false
 				end
-				
-				if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then 
+
+				if string.find(strCategory,"Psyblade") or string.find(strCategory,"Heavy Gun") or string.find(strCategory,"Pistols") or string.find(strCategory,"Claws") or string.find(strCategory,"Greatsword") or string.find(strCategory,"Resonators") then
 					bWantEsp = false
 					bWantWar = false
 					bWantSpe = false
 					bWantMed = false
 					bWantSta = false
 					bWantEng = false
-				end 
-				
+				end
+
 				if string.find(strCategory,"Psyblade") then bWantEsp = true
 				elseif string.find(strCategory,"Heavy Gun") then bWantEng = true
 				elseif string.find(strCategory,"Pistols") then bWantSpe = true
@@ -838,7 +838,7 @@ function MasterLoot:MLLGetSuggestestedLooters(tLooters,item)
 				elseif string.find(strCategory,"Resonators") then bWantMed = true
 				end
 			end
-		end 
+		end
 	end
 
 	for k , looter in pairs(tLooters) do
@@ -868,7 +868,7 @@ function MasterLoot:MLLPopulateRecipients(lootEntry)
 	local tLootersSuggested , tLootersRest = self:MLLGetSuggestestedLooters(lootEntry.tLooters,lootEntry.itemDrop)
 	table.sort(tLootersSuggested,function (a,b)
 		return a:GetName() < b:GetName()
-	end)	
+	end)
 	table.sort(tLootersRest,function (a,b)
 		return a:GetName() < b:GetName()
 	end)
@@ -914,7 +914,7 @@ end
 
 function MasterLoot:MLLKeyDown(nKey)
 	if self.wndMLL:IsShown() and bItemSelected then
-		local l,t,r,b 
+		local l,t,r,b
 		local strKey = ktKeys[nKey]
 		if not strKey then return end
 		for k , child in ipairs(self.wndMLL:FindChild("Recipients"):GetChildren()) do
@@ -957,7 +957,7 @@ function MasterLoot:ChooseRandomLooter(entry)
 	local looters = {}
 	for k , playerUnit in pairs(entry.tLooters or {}) do
 		table.insert(looters,playerUnit)
-	end	
+	end
 	return looters[math.random(#looters)]
 end
 
@@ -982,17 +982,17 @@ function MasterLoot:BidMLSearch(wndHandler,wndControl,strText)
 	local Rops = Apollo.GetAddon("RaidOps")
 	if strText ~= "Search..." then
 		local children = self.wndMasterLoot:FindChild("LooterList"):GetChildren()
-		
+
 		for k,child in ipairs(children) do
 			child:Show(true,true)
 		end
-		
+
 		for k,child in ipairs(children) do
 			if not Rops:string_starts(child:FindChild("CharacterName"):GetText(),strText) then child:Show(false,true) end
 		end
-		
+
 		if wndControl ~= nil and wndControl:GetText() == "" then wndControl:SetText("Search...") end
-		
+
 		if Rops.tItems["settings"]["ML"].bArrTiles then
 			self.wndMasterLoot_LooterList:ArrangeChildrenTiles()
 		else
@@ -1008,4 +1008,3 @@ end
 function MasterLoot:BQRemItem(wndH,wndC)
 	Apollo.GetAddon("RaidOps"):BQRemItem(wndH,wndC)
 end
-

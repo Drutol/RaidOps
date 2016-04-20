@@ -196,6 +196,11 @@ local nSortedGroup = nil
 -- Changelog
 local strChangelog = 
 [===[
+---RaidOps version 3.08l---
+{20/01/2016}
+Master Loot Light fixes.
+More chat bidding fixes.
+And a pinch of misc stuff.
 ---RaidOps version 3.08k---
 {27/12/2015}
 Fixed Chatbidding's crashes.

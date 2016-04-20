@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Drutol" APIVersion="11" Name="MasterLootDependency" Description="">
+<Addon Author="Drutol" APIVersion="12" Name="MasterLootDependency" Description="">
     <Script Name="MasterLootDependency.lua"/>
     <Form Name="MasterLootDependency.xml"/>
     <ReplaceAddon Name="MasterLoot"/>
